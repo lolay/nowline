@@ -362,6 +362,7 @@ export function sequenceItem(
             ? { titleLines: captionLines }
             : {}),
         box: itemBox,
+        dateSpan: { startX: logicalLeft, endX: logicalRight },
         status,
         progressFraction: progress,
         footnoteIndicators,

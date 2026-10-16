@@ -1,516 +1,406 @@
-// Channel-based dependency-arrow router. Replaces the single-elbow
-// `routeEdge` shipped in m2g with one that:
+// Date-port dependency router (specs/true-width-layout.md §3.4).
 //
-//   - Drops the vertical leg in the cleanest inter-column gutter (item
-//     bars are obstacles).
-//   - Nudges the elbow X away from any visible parallel/group bracket
-//     within `BRACKET_NUDGE_PX` so arrows breathe instead of hugging
-//     the bracket line.
-//   - Assigns distinct slots when multiple edges share a channel so
-//     parallel arrows don't stack on top of one another.
-//   - Falls back to under-bar routing (rendered behind the bars with a
-//     thinner stroke) when no clean channel exists in the source-target
-//     gap.
+// An arrow runs on the dates. It leaves the middle of its source's last
+// day through the source's bottom edge (top edge when the target is
+// above), drops into a gap between rows, runs horizontally in that gap to
+// the middle of the target's first day, and turns into the target's top
+// edge (bottom edge when the source is below), arrowhead first. Day
+// centres, never date lines: in a chain the successor starts exactly on
+// its predecessor's end date, so a leg on the date line would run down the
+// successor's edge.
 //
-// Containers are NOT treated as obstacles. Endpoints inside a parallel
-// or group route directly through the items-only obstacle map and use
-// the under-bar fallback when needed. Looping around container edges
-// to avoid a single intersecting bar produced unsatisfying detours
-// (see `specs/handoffs/handoff-channel-routing-design.md`).
+// Legs pass behind bars and cross them at right angles. The horizontal leg
+// sits in a gap no bar, spilled caption or container header reaches into
+// (between the source and the target, over the leg's x-range); among the
+// gaps, the router takes the one whose vertical legs keep clear of every
+// bar edge, then the one whose vertical legs cross the fewest bars, then
+// the one nearest the source. Arrows sharing a gap take offset lanes
+// `CHANNEL_LANE_PX` apart; arrows landing in the same day column share one
+// lane, so they merge into one trunk over their target (§8 O1).
+//
+// Two shapes need no gap: a target on its source's row (a dotted leg at
+// the row's midline, or no arrow when it starts where the source ends),
+// and a marker source (`dependency-edges.ts`). Everything here is pure
+// geometry on numbers the caller reads off the final model.
 
-import { CONTAINER_BRACKET_LINE_OFFSET_PX } from './container-header-geometry.js';
-import type {
-    BoundingBox,
-    Point,
-    PositionedIncludeRegion,
-    PositionedSwimlane,
-    PositionedTrackChild,
-} from './types.js';
+import type { BoundingBox, Point } from './types.js';
 
-/** A visible parallel or group bracket stroke. Used by the
- *  bracket-clearance nudge: arrows whose chosen elbow X falls within
- *  `BRACKET_NUDGE_PX` of one of these lines are shifted away. Brackets
- *  are NOT obstacles — they're aesthetic preferences, not collisions. */
-export interface BracketLine {
-    x: number;
-    yTop: number;
-    yBottom: number;
+/** Spacing between the lanes of one gap (§3.4 "Channels"). */
+export const CHANNEL_LANE_PX = 2.5;
+
+/** A vertical leg keeps more than this from a bar's left or right edge over its height (§6). */
+export const EDGE_CLEARANCE_PX = 1;
+
+/** Full arrowhead width (and the length along the leg is `ARROW_HEAD_LENGTH_PX`). */
+export const ARROW_HEAD_WIDTH_PX = 7;
+
+/** Length of a full arrowhead along its leg. */
+export const ARROW_HEAD_LENGTH_PX = 5;
+
+/** The narrowest arrowhead; a target narrower than this gets a dot of this diameter (§8 O6). */
+export const ARROW_HEAD_MIN_PX = 3;
+
+/** Two x's (or y's) closer than this are the same date line. */
+const SAME_PX = 0.01;
+
+/** A gap must be at least this tall to carry a leg. */
+const MIN_GAP_PX = 2;
+
+/** Clearance kept between a horizontal leg and anything it must not touch. */
+const BLOCK_MARGIN_PX = 1;
+
+/** One end of a dependency arrow: an item bar or a group / parallel. */
+export interface ArrowEnd {
+    /** The entity's dates in x (an item's bar is drawn inside them, a seam in from each). */
+    startX: number;
+    endX: number;
+    /** Painted left edge and width (the bar, or the container's box). */
+    paintedX: number;
+    paintedWidth: number;
+    /** Painted top and bottom (a container's box runs from its header to its body's bottom). */
+    top: number;
+    bottom: number;
+    /** An item's row midline (`box.y + bandwidth / 2`); undefined for a container. */
+    rowY?: number;
+    /**
+     * Where a horizontal leg leaves this item on its own row: the row
+     * midline, or the progress strip's centre when its caption spills, so
+     * the leg runs under the caption. Undefined for a container.
+     */
+    exitY?: number;
 }
 
-/** Per-edge routing request. `from` and `to` are the (visualEdge, midY)
- *  attach points the rest of the layout already computed; the router
- *  produces the orthogonal polyline that connects them. */
-export interface EdgeRouteRequest {
+export interface DependencyRouteRequest {
     fromId: string;
     toId: string;
+    source: ArrowEnd;
+    target: ArrowEnd;
+}
+
+/** A vertical stroke a vertical leg must keep clear of. */
+export interface VerticalEdge {
+    x: number;
+    top: number;
+    bottom: number;
+}
+
+export interface RouteObstacles {
+    /**
+     * What a horizontal leg must stay out of: every bar with its spilled
+     * caption and decorations, every container header band, and every lane
+     * or region edge (zero-height boxes).
+     */
+    blocks: BoundingBox[];
+    /** The left and right edges of every bar and drawn container, over its height. */
+    edges: VerticalEdge[];
+}
+
+export interface RoutedDependency {
+    fromId: string;
+    toId: string;
+    /** First = source port, last = target port (the arrowhead's tip). */
+    waypoints: Point[];
+    /** The target waits: its horizontal leg is dotted, its length the slack. */
+    slack: boolean;
+    headWidth: number;
+    head: 'arrow' | 'dot';
+}
+
+/** Where an arrow leaves `end`: the middle of its last day, or its middle when shorter than a day. */
+export function sourcePortX(end: ArrowEnd, pixelsPerDay: number): number {
+    return end.endX - Math.min(pixelsPerDay / 2, (end.endX - end.startX) / 2);
+}
+
+/** Where an arrow lands on `end`: the middle of its first day, or its middle when shorter than a day. */
+export function targetPortX(end: ArrowEnd, pixelsPerDay: number): number {
+    return end.startX + Math.min(pixelsPerDay / 2, (end.endX - end.startX) / 2);
+}
+
+/** Arrowhead for a leg landing across a target `width` wide (§8 O6). */
+export function arrowHead(width: number): { headWidth: number; head: 'arrow' | 'dot' } {
+    if (width < ARROW_HEAD_MIN_PX) return { headWidth: ARROW_HEAD_MIN_PX, head: 'dot' };
+    return { headWidth: Math.min(ARROW_HEAD_WIDTH_PX, width), head: 'arrow' };
+}
+
+const within = (y: number, lo: number, hi: number): boolean =>
+    y >= lo - SAME_PX && y <= hi + SAME_PX;
+
+/**
+ * True when the target sits on its source's row: each one's row midline
+ * crosses the other (a container source, which has no row, only needs the
+ * target's midline to cross it).
+ */
+function onSameRow(s: ArrowEnd, t: ArrowEnd): boolean {
+    if (t.rowY === undefined || !within(t.rowY, s.top, s.bottom)) return false;
+    return s.rowY === undefined || within(s.rowY, t.top, t.bottom);
+}
+
+/** The free stretches of `(lo, hi)` no block over `[xLo, xHi]` reaches into. */
+function freeGaps(
+    blocks: BoundingBox[],
+    xLo: number,
+    xHi: number,
+    lo: number,
+    hi: number,
+): Array<[number, number]> {
+    const covered: Array<[number, number]> = [];
+    for (const b of blocks) {
+        if (b.x >= xHi + BLOCK_MARGIN_PX || b.x + b.width <= xLo - BLOCK_MARGIN_PX) continue;
+        const top = b.y - BLOCK_MARGIN_PX;
+        const bottom = b.y + b.height + BLOCK_MARGIN_PX;
+        if (bottom <= lo || top >= hi) continue;
+        covered.push([Math.max(lo, top), Math.min(hi, bottom)]);
+    }
+    covered.sort((a, b) => a[0] - b[0]);
+    const gaps: Array<[number, number]> = [];
+    let y = lo;
+    for (const [top, bottom] of covered) {
+        if (top - y >= MIN_GAP_PX) gaps.push([y, top]);
+        y = Math.max(y, bottom);
+    }
+    if (hi - y >= MIN_GAP_PX) gaps.push([y, hi]);
+    return gaps;
+}
+
+/** Bar or container edges a vertical leg at `x` over `(y0, y1)` runs within the clearance of. */
+function grazes(edges: VerticalEdge[], x: number, y0: number, y1: number): number {
+    const lo = Math.min(y0, y1);
+    const hi = Math.max(y0, y1);
+    let n = 0;
+    for (const e of edges) {
+        if (Math.abs(e.x - x) > EDGE_CLEARANCE_PX) continue;
+        if (e.bottom <= lo || e.top >= hi) continue;
+        n++;
+    }
+    return n;
+}
+
+/** Blocks a vertical leg at `x` over `(y0, y1)` passes behind. */
+function crossings(blocks: BoundingBox[], x: number, y0: number, y1: number): number {
+    const lo = Math.min(y0, y1);
+    const hi = Math.max(y0, y1);
+    let n = 0;
+    for (const b of blocks) {
+        if (b.height <= 0 || x <= b.x || x >= b.x + b.width) continue;
+        if (b.y + b.height <= lo || b.y >= hi) continue;
+        n++;
+    }
+    return n;
+}
+
+/** An arrow that needs a gap, before its lane is chosen. */
+interface Pending {
+    index: number;
+    req: DependencyRouteRequest;
     from: Point;
     to: Point;
-    /** Marker → item edges (anchor / milestone source) skip the channel
-     *  router entirely — the cut line is the visible stem, the path is
-     *  always a short horizontal stub. Set true to bypass routing. */
-    isMarkerSource: boolean;
-}
-
-export interface EdgeRouteResult {
-    fromId: string;
-    toId: string;
-    waypoints: Point[];
-    /** True when the chosen channel intersected an item bar. The
-     *  renderer paints these edges BEFORE bar fills with a thinner
-     *  stroke so the bar still reads as the foreground. */
-    underBar: boolean;
-}
-
-/** Distance (px) the elbow X must keep from any visible bracket. Picked
- *  to leave a small visible gap between the arrow's vertical leg and
- *  the bracket stroke without forcing the arrow far from its natural
- *  mid-gutter line. */
-export const BRACKET_NUDGE_PX = 4;
-
-/** Minimum horizontal source stub (px) — distance from the source's
- *  exit point to the vertical-leg elbow. Below this, the source-side
- *  arrow body collapses into the bar's right edge with no visible
- *  horizontal segment. Treated as a hard constraint when picking
- *  the channel X for left-to-right edges. */
-export const MIN_SOURCE_STUB_PX = 6;
-
-/** Minimum horizontal target stub (px) — distance from the vertical-leg
- *  elbow to the target's left edge. Below this, the arrowhead has no
- *  horizontal lead-in: the leg appears to plunge directly into the bar
- *  without a visible target-side stub. Treated as a hard constraint
- *  when picking the channel X for left-to-right edges; conflicts with
- *  obstacle / bracket clearance trigger the under-bar fallback. */
-export const MIN_TARGET_STUB_PX = 6;
-
-/** Spacing between slots inside one channel. With a 12 px gutter and
- *  this spacing, three slots (-1, 0, +1) fit comfortably; more than
- *  three sharing a channel collapses to centerline. */
-const SLOT_SPACING_PX = 3;
-
-/** Tolerance (px) when grouping edges by channel X for slot assignment.
- *  Edges within this distance share a channel. */
-const SLOT_GROUP_TOLERANCE_PX = 1;
-
-/** Stub length leaving each endpoint before the elbow turn for
- *  right-to-left edges. The router also inserts a quarter-arc at the
- *  elbow corner; the renderer's `roundedOrthogonalPath` rounds the
- *  corners. Left-to-right edges use the per-side `MIN_*_STUB_PX`
- *  constants instead — they provide tighter, asymmetric control over
- *  the source vs target sides. */
-const STUB_OUT_PX = 10;
-
-export interface ChannelGridInput {
-    /** Every painted item box (visual edges, including chip-spill
-     *  growth). Treated as hard obstacles: a vertical leg crossing one
-     *  triggers under-bar fallback. */
-    itemBars: BoundingBox[];
-    /** Every visible bracket stroke (parallel `bracket:solid|dashed`,
-     *  filled-style group chiclets are NOT brackets). Used by the
-     *  clearance nudge only — not obstacles. */
-    brackets: BracketLine[];
-}
-
-export class ChannelGrid {
-    private readonly items: BoundingBox[];
-    private readonly brackets: BracketLine[];
-
-    constructor(input: ChannelGridInput) {
-        this.items = input.itemBars;
-        this.brackets = input.brackets;
-    }
-
-    /** True when a vertical line at `x` intersects any item bar within
-     *  the Y span `[yMin, yMax]`. */
-    hasObstacle(x: number, yMin: number, yMax: number): boolean {
-        const lo = Math.min(yMin, yMax);
-        const hi = Math.max(yMin, yMax);
-        for (const bar of this.items) {
-            if (x <= bar.x || x >= bar.x + bar.width) continue;
-            if (bar.y + bar.height <= lo || bar.y >= hi) continue;
-            return true;
-        }
-        return false;
-    }
-
-    /** Visible brackets within `radius` px of `x` whose Y span overlaps
-     *  `[yMin, yMax]`. The clearance nudge uses these to shift the
-     *  elbow X away from the bracket. */
-    bracketsNear(x: number, yMin: number, yMax: number, radius: number): BracketLine[] {
-        const lo = Math.min(yMin, yMax);
-        const hi = Math.max(yMin, yMax);
-        const out: BracketLine[] = [];
-        for (const b of this.brackets) {
-            if (Math.abs(b.x - x) > radius) continue;
-            if (b.yBottom <= lo || b.yTop >= hi) continue;
-            out.push(b);
-        }
-        return out;
-    }
+    /** +1 when the leg runs down from the source, -1 when up. */
+    dir: 1 | -1;
+    gap: [number, number];
+    centre: number;
+    xLo: number;
+    xHi: number;
+    /** Arrows landing in one day column share a lane (O1). */
+    bundle: string;
 }
 
 /**
- * Walk a positioned swimlane tree and collect every painted item bar
- * (visual edges) AND every visible bracket stroke. Output feeds
- * `ChannelGrid` so the router knows what to avoid.
- *
- * Swimlanes contained in include regions count too — items inside an
- * isolated region share the parent timeline so cross-region arrows
- * still need the obstacle/bracket data to route cleanly.
+ * Pick the gap for an arrow from `from` (on the source's edge) to `to` (on
+ * the target's edge): clear of every bar edge first, then fewest bars
+ * crossed, then nearest the source. With no free gap at all, the leg runs
+ * just past the source and passes behind whatever is there.
  */
-export function collectRoutingObstacles(
-    swimlanes: PositionedSwimlane[],
-    includes: PositionedIncludeRegion[],
-): ChannelGridInput {
-    const itemBars: BoundingBox[] = [];
-    const brackets: BracketLine[] = [];
-
-    const visitChild = (child: PositionedTrackChild): void => {
-        if (child.kind === 'item') {
-            itemBars.push(child.box);
-            return;
-        }
-        // A container's header bracket is a horizontal line over its dates
-        // with a short tick down to the body at each end
-        // (specs/true-width-layout.md §3.3). The ticks are the only vertical
-        // strokes it paints, so they are what an elbow must not hug.
-        const isDrawn = !(child.kind === 'group' && child.waveOnly);
-        if (isDrawn && child.headerHeight > 0 && child.style.bracket !== 'none') {
-            const yTop = child.box.y + CONTAINER_BRACKET_LINE_OFFSET_PX;
-            const yBottom = child.box.y + child.headerHeight;
-            brackets.push({ x: child.box.x, yTop, yBottom });
-            brackets.push({ x: child.box.x + child.box.width, yTop, yBottom });
-        }
-        for (const sub of child.children) visitChild(sub);
-    };
-
-    const visitSwimlane = (lane: PositionedSwimlane): void => {
-        for (const child of lane.children) visitChild(child);
-        for (const nested of lane.nested) visitSwimlane(nested);
-    };
-
-    for (const lane of swimlanes) visitSwimlane(lane);
-    for (const region of includes) {
-        for (const lane of region.nestedSwimlanes) visitSwimlane(lane);
+function pickGap(
+    from: Point,
+    to: Point,
+    dir: 1 | -1,
+    obstacles: RouteObstacles,
+): { gap: [number, number]; centre: number } {
+    const xLo = Math.min(from.x, to.x);
+    const xHi = Math.max(from.x, to.x);
+    const lo = Math.min(from.y, to.y);
+    const hi = Math.max(from.y, to.y);
+    let best: { gap: [number, number]; centre: number; key: number[] } | null = null;
+    for (const gap of freeGaps(obstacles.blocks, xLo, xHi, lo, hi)) {
+        const centre = (gap[0] + gap[1]) / 2;
+        const key = [
+            grazes(obstacles.edges, from.x, from.y, centre) +
+                grazes(obstacles.edges, to.x, centre, to.y),
+            crossings(obstacles.blocks, from.x, from.y, centre) +
+                crossings(obstacles.blocks, to.x, centre, to.y),
+            Math.abs(centre - from.y),
+        ];
+        if (!best || lessThan(key, best.key)) best = { gap, centre, key };
     }
-
-    return { itemBars, brackets };
+    if (best) return { gap: best.gap, centre: best.centre };
+    const reach = Math.min(4, (hi - lo) / 2);
+    const centre = from.y + dir * reach;
+    return { gap: [lo, hi], centre };
 }
 
-/** Satisfiable range for a left-to-right edge's elbow X — tightest
- *  band that still leaves `MIN_SOURCE_STUB_PX` of horizontal lead-out
- *  on the source side and `MIN_TARGET_STUB_PX` of horizontal lead-in
- *  on the target side. `null` means the gutter is too narrow to honor
- *  both stubs (router pins to the target-stub line and forces
- *  under-bar). For right-to-left and same-row edges the range is
- *  always `null` — those branches don't apply the stub constraints
- *  because their geometry is fundamentally different. */
-type StubRange = { minX: number; maxX: number } | null;
-
-/**
- * Pick a channel X for one edge (no slot offset yet). Returns the
- * provisional X, an `underBar` flag, and the satisfiable stub range
- * so the bracket-clearance nudge can stay inside it. Same-row edges
- * (`from.y ≈ to.y`) get a degenerate "channel" at midX so the
- * renderer emits a straight line.
- */
-function pickChannelX(
-    req: EdgeRouteRequest,
-    grid: ChannelGrid,
-): { x: number; underBar: boolean; range: StubRange } {
-    const { from, to } = req;
-    if (Math.abs(from.y - to.y) < 0.5) {
-        return { x: (from.x + to.x) / 2, underBar: false, range: null };
+function lessThan(a: number[], b: number[]): boolean {
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return a[i] < b[i];
     }
+    return false;
+}
 
-    const yMin = Math.min(from.y, to.y);
-    const yMax = Math.max(from.y, to.y);
-
-    if (from.x <= to.x) {
-        // Left-to-right edge. The elbow X must satisfy both the
-        // min-source-stub and min-target-stub constraints — when the
-        // gutter is wider than the sum of the stubs, that's a band;
-        // when it's tighter the band collapses or inverts and the
-        // arrow drops to under-bar at the target-stub line.
-        const minX = from.x + MIN_SOURCE_STUB_PX;
-        const maxX = to.x - MIN_TARGET_STUB_PX;
-        if (minX > maxX) {
-            // Gutter narrower than the combined min stubs — give up
-            // and honor the target-stub line so the arrowhead still
-            // has its visible lead-in. Source stub absorbs the loss.
-            return {
-                x: to.x - MIN_TARGET_STUB_PX,
-                underBar: true,
-                range: null,
-            };
-        }
-        const range: StubRange = { minX, maxX };
-        // Try the natural gutter midpoint, clamped into the range.
-        const naturalMid = (from.x + to.x) / 2;
-        const mid = Math.max(minX, Math.min(maxX, naturalMid));
-        if (!grid.hasObstacle(mid, yMin, yMax)) {
-            return { x: mid, underBar: false, range };
-        }
-        // Walk inside the satisfiable range looking for a clear strip.
-        const span = maxX - minX;
-        for (let step = 1; step <= span; step++) {
-            const left = mid - step;
-            if (left >= minX && !grid.hasObstacle(left, yMin, yMax)) {
-                return { x: left, underBar: false, range };
-            }
-            const right = mid + step;
-            if (right <= maxX && !grid.hasObstacle(right, yMin, yMax)) {
-                return { x: right, underBar: false, range };
-            }
-        }
-        return { x: mid, underBar: true, range };
+/** Lane offsets to try, the first one toward the source (so the arrowhead keeps its leg). */
+function laneOffsets(dir: 1 | -1, halfHeight: number): number[] {
+    const out = [0];
+    for (let k = 1; k * CHANNEL_LANE_PX <= halfHeight + SAME_PX; k++) {
+        out.push(-dir * k * CHANNEL_LANE_PX, dir * k * CHANNEL_LANE_PX);
     }
-
-    // Right-to-left edge: source ends past target's left edge. Try a
-    // channel just right of source first; then walk leftward across
-    // the source/target span looking for any clear vertical strip.
-    const probes = [from.x + STUB_OUT_PX, to.x - STUB_OUT_PX];
-    for (const probe of probes) {
-        if (probe > 0 && !grid.hasObstacle(probe, yMin, yMax)) {
-            return { x: probe, underBar: false, range: null };
-        }
-    }
-    // Fallback to under-bar at the source-side stub.
-    return { x: from.x + STUB_OUT_PX, underBar: true, range: null };
+    return out;
 }
 
 /**
- * Apply the bracket-clearance nudge to a chosen channel X. Shifts `x`
- * away from the nearest visible bracket within `BRACKET_NUDGE_PX`,
- * preferring the direction that stays inside the satisfiable stub
- * range. When neither direction fits — or the candidate position is
- * still within nudge distance of another bracket — returns the input
- * X clamped to the range and signals `forceUnderBar` so the leg paints
- * BEHIND the bars and bracket strokes (z-order: bracket renders after
- * under-bar edges, so the bracket cleanly covers the colliding
- * portion).
+ * Give each gap-routed arrow its lane: an arrow whose day column already
+ * has a lane in this gap joins it; otherwise the first offset no other
+ * horizontal leg over the same x's sits on, or, when the gap is full, the
+ * least crowded one.
  */
-function nudgeAwayFromBrackets(
-    x: number,
-    range: StubRange,
-    req: EdgeRouteRequest,
-    grid: ChannelGrid,
-): { x: number; forceUnderBar: boolean } {
-    const yMin = Math.min(req.from.y, req.to.y);
-    const yMax = Math.max(req.from.y, req.to.y);
-    const near = grid.bracketsNear(x, yMin, yMax, BRACKET_NUDGE_PX);
-    if (near.length === 0) return { x, forceUnderBar: false };
-
-    // Find the closest bracket — that's the one driving the nudge.
-    let closest = near[0];
-    let closestDist = Math.abs(near[0].x - x);
-    for (let i = 1; i < near.length; i++) {
-        const d = Math.abs(near[i].x - x);
-        if (d < closestDist) {
-            closest = near[i];
-            closestDist = d;
-        }
-    }
-
-    // Try both sides of the closest bracket. Accept the first
-    // candidate that stays within the satisfiable range AND clears
-    // every other nearby bracket. The recheck radius is one epsilon
-    // tighter than `BRACKET_NUDGE_PX` so the closest bracket itself
-    // (now sitting at exactly the nudge distance) doesn't falsely
-    // trip the rejection — and so a SECOND bracket exactly at the
-    // nudge distance is also accepted as "just clear enough".
-    const candidates = [closest.x + BRACKET_NUDGE_PX, closest.x - BRACKET_NUDGE_PX];
-    const recheckRadius = BRACKET_NUDGE_PX - 0.01;
-    for (const candidate of candidates) {
-        if (range && (candidate < range.minX || candidate > range.maxX)) continue;
-        // Clamp right-to-left candidates to the natural gap so they
-        // don't escape past either endpoint (range is null on that path).
-        const clamped = range
-            ? candidate
-            : Math.max(
-                  Math.min(req.from.x, req.to.x) + 1,
-                  Math.min(Math.max(req.from.x, req.to.x) - 1, candidate),
-              );
-        const stillNear = grid.bracketsNear(clamped, yMin, yMax, recheckRadius);
-        if (stillNear.length === 0) {
-            return { x: clamped, forceUnderBar: false };
-        }
-    }
-
-    // No nudge fits. Keep the channel at its current X (clamped into
-    // the range) and force under-bar so item bars + bracket strokes
-    // mask the colliding portion of the leg.
-    const fallback = range ? Math.min(Math.max(x, range.minX), range.maxX) : x;
-    return { x: fallback, forceUnderBar: true };
-}
-
-/**
- * Greedy interval coloring per channel. Edges sharing a channel
- * (within `SLOT_GROUP_TOLERANCE_PX`) get distinct slot indices;
- * overlapping Y spans land on different slots. Slot 0 is the
- * centerline; ±1 sit `SLOT_SPACING_PX` to either side; further slots
- * collapse back to the centerline (rare; visual stacking accepted).
- */
-function assignSlots(
-    edges: Array<{
-        req: EdgeRouteRequest;
-        channelX: number;
-        underBar: boolean;
-        orderIndex: number;
-    }>,
-): Map<number, number> {
-    // Group by channel X (sort first so close-X edges collapse).
-    const byX = [...edges].sort((a, b) => {
-        if (Math.abs(a.channelX - b.channelX) >= SLOT_GROUP_TOLERANCE_PX) {
-            return a.channelX - b.channelX;
-        }
-        // Within the same channel, deterministic by orderIndex.
-        return a.orderIndex - b.orderIndex;
-    });
-
-    const slotsByOrderIndex = new Map<number, number>();
-    let groupStart = 0;
-    while (groupStart < byX.length) {
-        let groupEnd = groupStart + 1;
-        while (
-            groupEnd < byX.length &&
-            Math.abs(byX[groupEnd].channelX - byX[groupStart].channelX) < SLOT_GROUP_TOLERANCE_PX
-        ) {
-            groupEnd++;
-        }
-        const group = byX.slice(groupStart, groupEnd);
-        // Within the group, greedy color by Y span. Sort by min Y then
-        // (deterministically) by orderIndex.
-        const sortedGroup = [...group].sort((a, b) => {
-            const aMin = Math.min(a.req.from.y, a.req.to.y);
-            const bMin = Math.min(b.req.from.y, b.req.to.y);
-            if (Math.abs(aMin - bMin) > 0.5) return aMin - bMin;
-            return a.orderIndex - b.orderIndex;
-        });
-        // Track per-slot maxY assigned so far.
-        const slotMaxY: number[] = [];
-        for (const entry of sortedGroup) {
-            const eMin = Math.min(entry.req.from.y, entry.req.to.y);
-            const eMax = Math.max(entry.req.from.y, entry.req.to.y);
-            let assigned = -1;
-            for (let s = 0; s < slotMaxY.length; s++) {
-                if (slotMaxY[s] <= eMin) {
-                    assigned = s;
-                    slotMaxY[s] = eMax;
-                    break;
+function assignLanes(pending: Pending[]): Map<number, number> {
+    const placed: Array<{ y: number; xLo: number; xHi: number; bundle: string }> = [];
+    const out = new Map<number, number>();
+    const order = [...pending].sort(
+        (a, b) => a.centre - b.centre || a.xLo - b.xLo || a.index - b.index,
+    );
+    for (const p of order) {
+        const [lo, hi] = p.gap;
+        const mate = placed.find(
+            (q) => q.bundle === p.bundle && q.y >= lo - SAME_PX && q.y <= hi + SAME_PX,
+        );
+        let y = p.centre;
+        if (mate) {
+            y = mate.y;
+        } else {
+            // The gap already keeps `BLOCK_MARGIN_PX` from its neighbours.
+            const offsets = laneOffsets(p.dir, (hi - lo) / 2);
+            let bestConflicts = Number.POSITIVE_INFINITY;
+            for (const off of offsets) {
+                const cy = p.centre + off;
+                const conflicts = placed.filter(
+                    (q) =>
+                        q.bundle !== p.bundle &&
+                        Math.abs(q.y - cy) < CHANNEL_LANE_PX - SAME_PX &&
+                        q.xLo < p.xHi + BLOCK_MARGIN_PX &&
+                        q.xHi > p.xLo - BLOCK_MARGIN_PX,
+                ).length;
+                if (conflicts < bestConflicts) {
+                    bestConflicts = conflicts;
+                    y = cy;
                 }
+                if (conflicts === 0) break;
             }
-            if (assigned === -1) {
-                assigned = slotMaxY.length;
-                slotMaxY.push(eMax);
-            }
-            slotsByOrderIndex.set(entry.orderIndex, assigned);
         }
-        groupStart = groupEnd;
+        placed.push({ y, xLo: p.xLo, xHi: p.xHi, bundle: p.bundle });
+        out.set(p.index, y);
     }
-    return slotsByOrderIndex;
-}
-
-/** Convert a slot index to its signed offset around the channel
- *  centerline. Slots 0/1/2/... become 0, +SLOT, -SLOT, +2*SLOT,
- *  -2*SLOT... so the FIRST edge sits on the centerline (no shift)
- *  and additional edges fan out alternately. Past 2 ± slots, slots
- *  collapse back to the centerline (visual stacking accepted). */
-function slotOffset(slot: number): number {
-    if (slot === 0) return 0;
-    if (slot > 4) return 0; // collapse beyond ±2 slots
-    const half = Math.ceil(slot / 2);
-    const sign = slot % 2 === 1 ? 1 : -1;
-    return sign * half * SLOT_SPACING_PX;
+    return out;
 }
 
 /**
- * Marker → item stub. Source X sits on the marker's vertical cut
- * line; the stub is a short horizontal segment to the target's left
- * visual edge at the target's row mid-Y. No channel selection, no
- * obstacle check — the cut line is the stem.
+ * Route every item dependency of one chart (the host, or one isolated
+ * region) in a batch, so arrows sharing a gap can take lanes. Returns one
+ * entry per request; `null` where position already says it (a target on
+ * its source's row that starts where the source ends).
  */
-function routeMarkerStub(req: EdgeRouteRequest): EdgeRouteResult {
-    // When the cut line sits AT or PAST the target's left edge (item
-    // hugs the anchor's date column), nudge the source 1 px back so
-    // routeEdge produces a non-degenerate path with a visible
-    // arrowhead.
-    const from = req.from.x >= req.to.x ? { x: req.to.x - 1, y: req.from.y } : req.from;
-    return {
-        fromId: req.fromId,
-        toId: req.toId,
-        waypoints: [from, req.to],
-        underBar: false,
-    };
-}
-
-/**
- * Route every dependency edge in one batch so slot assignment can
- * coordinate across edges that share a channel. Marker → item edges
- * route as direct stubs and bypass the channel router.
- */
-export function routeChannelEdges(
-    requests: EdgeRouteRequest[],
-    grid: ChannelGrid,
-): EdgeRouteResult[] {
-    const results: EdgeRouteResult[] = new Array(requests.length);
-    const channelEdges: Array<{
-        req: EdgeRouteRequest;
-        channelX: number;
-        underBar: boolean;
-        orderIndex: number;
-    }> = [];
-
-    for (let i = 0; i < requests.length; i++) {
-        const req = requests[i];
-        if (req.isMarkerSource) {
-            results[i] = routeMarkerStub(req);
-            continue;
-        }
-        // Same-row contiguous chains drop entirely. The caller skips
-        // them before passing in, but defend against direct calls.
-        if (Math.abs(req.from.y - req.to.y) < 0.5 && req.to.x - req.from.x < 20) {
-            results[i] = {
+export function routeDependencies(
+    requests: DependencyRouteRequest[],
+    obstacles: RouteObstacles,
+    pixelsPerDay: number,
+): Array<RoutedDependency | null> {
+    const out: Array<RoutedDependency | null> = new Array(requests.length).fill(null);
+    const pending: Pending[] = [];
+    requests.forEach((req, index) => {
+        const { source: s, target: t } = req;
+        const slack = t.startX - s.endX > SAME_PX;
+        if (onSameRow(s, t) && t.startX >= s.endX - SAME_PX) {
+            if (!slack) return;
+            // A dotted leg along the row, from the source's end date to the
+            // target's painted start.
+            const y =
+                s.exitY !== undefined && within(s.exitY, t.top, t.bottom) ? s.exitY : (t.rowY ?? 0);
+            out[index] = {
                 fromId: req.fromId,
                 toId: req.toId,
-                waypoints: [req.from, req.to],
-                underBar: false,
+                waypoints: [
+                    { x: s.endX, y },
+                    { x: t.paintedX, y },
+                ],
+                slack: true,
+                ...arrowHead(t.bottom - t.top),
             };
-            continue;
+            return;
         }
-        const { x: provisionalX, underBar: provisionalUnderBar, range } = pickChannelX(req, grid);
-        const { x: channelX, forceUnderBar } = nudgeAwayFromBrackets(
-            provisionalX,
-            range,
+        const px = sourcePortX(s, pixelsPerDay);
+        const tx = targetPortX(t, pixelsPerDay);
+        let from: Point;
+        let to: Point;
+        let dir: 1 | -1;
+        if (t.top >= s.bottom - SAME_PX) {
+            dir = 1;
+            from = { x: px, y: s.bottom };
+            to = { x: tx, y: t.top };
+        } else if (t.bottom <= s.top + SAME_PX) {
+            dir = -1;
+            from = { x: px, y: s.top };
+            to = { x: tx, y: t.bottom };
+        } else {
+            // Overlapping but not on one row (a target that starts before
+            // its source ends): leave the source's bottom, run below both,
+            // come up into the target's bottom.
+            const below = Math.max(s.bottom, t.bottom) + 4;
+            out[index] = {
+                fromId: req.fromId,
+                toId: req.toId,
+                waypoints: [
+                    { x: px, y: s.bottom },
+                    { x: px, y: below },
+                    { x: tx, y: below },
+                    { x: tx, y: t.bottom },
+                ],
+                slack,
+                ...arrowHead(t.paintedWidth),
+            };
+            return;
+        }
+        if (Math.abs(px - tx) < SAME_PX) {
+            out[index] = {
+                fromId: req.fromId,
+                toId: req.toId,
+                waypoints: [from, to],
+                slack,
+                ...arrowHead(t.paintedWidth),
+            };
+            return;
+        }
+        const { gap, centre } = pickGap(from, to, dir, obstacles);
+        pending.push({
+            index,
             req,
-            grid,
-        );
-        const underBar = provisionalUnderBar || forceUnderBar;
-        channelEdges.push({ req, channelX, underBar, orderIndex: i });
-    }
-
-    const slots = assignSlots(channelEdges);
-    for (const entry of channelEdges) {
-        const offset = slotOffset(slots.get(entry.orderIndex) ?? 0);
-        const slotX = entry.channelX + offset;
-        results[entry.orderIndex] = {
-            fromId: entry.req.fromId,
-            toId: entry.req.toId,
-            waypoints: buildOrthogonalPath(entry.req.from, entry.req.to, slotX),
-            underBar: entry.underBar,
+            from,
+            to,
+            dir,
+            gap,
+            centre,
+            xLo: Math.min(px, tx),
+            xHi: Math.max(px, tx),
+            bundle: `${Math.round(tx * 100)}:${dir}`,
+        });
+    });
+    const lanes = assignLanes(pending);
+    for (const p of pending) {
+        const y = lanes.get(p.index) ?? p.centre;
+        const slack = p.req.target.startX - p.req.source.endX > SAME_PX;
+        out[p.index] = {
+            fromId: p.req.fromId,
+            toId: p.req.toId,
+            waypoints: [p.from, { x: p.from.x, y }, { x: p.to.x, y }, p.to],
+            slack,
+            ...arrowHead(p.req.target.paintedWidth),
         };
     }
-
-    return results;
-}
-
-/**
- * Build the orthogonal polyline through a chosen vertical channel.
- * Source-out-stub → vertical leg → target-in-stub. Same-row edges
- * collapse to two points (handled by the caller's same-row skip).
- */
-function buildOrthogonalPath(from: Point, to: Point, slotX: number): Point[] {
-    if (Math.abs(from.y - to.y) < 0.5) {
-        return [from, to];
-    }
-    return [from, { x: slotX, y: from.y }, { x: slotX, y: to.y }, to];
+    return out;
 }

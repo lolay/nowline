@@ -1,0 +1,7 @@
+```release-note:changed
+Dependency arrows now run on the dates. An arrow leaves the middle of its source's last day through the bar's bottom (or top) edge, runs in the gap between rows, and lands on the middle of the target's first day on its top (or bottom) edge, so it never runs down the edge of a neighbouring bar or points at the wrong item. Legs pass behind the bars they cross. The horizontal leg is dotted when the target waits on its source and solid when it starts the day the source ends; arrows landing on the same day merge into one trunk, and the arrowhead narrows to a thin target and becomes a dot on the thinnest. No arrow is drawn where position already says it: a target on its source's row that starts where the source ends, or an item that starts on the anchor or milestone it follows (one that starts later gets a dotted stub from the cut line). An item `after:` a group or parallel now draws an arrow too, from the bottom of the container. Milestone slack lines start on the predecessor's end date. The xlsx, msproj and mermaid exports do not change.
+```
+
+```release-note:changed
+`@nowline/layout`: `PositionedDependencyEdge` drops `kind` (`normal`, `overflow`, `underBar`) for `slack`, `headWidth` and `head`, and every arrow is drawn behind the bars. `PositionedItem` gains `dateSpan`, the item's dates in x.
+```

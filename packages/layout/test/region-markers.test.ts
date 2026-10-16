@@ -107,20 +107,24 @@ describe('isolated region markers', () => {
 describe('isolated region dependency edges', () => {
     it("routes a region's own after: arrows among its lanes", async () => {
         const child = CHILD.replace(
+            '  item alpha "Alpha" duration:3w after:kickoff',
+            '  item prep "Prep" duration:2w\n  item alpha "Alpha" duration:3w after:kickoff',
+        ).replace(
             '  item bravo "Bravo" duration:1w',
             '  item bravo "Bravo" duration:1w\n  item charlie "Charlie" duration:1w after:alpha',
         );
         const model = await layout(HOST, child);
         const region = model.includes[0];
         const edges = region.edges ?? [];
-        // alpha after the region's anchor (a stub off its cut line), and
-        // charlie after alpha across lanes.
+        // alpha waits on the region's anchor after prep (a dotted stub off
+        // its cut line), and charlie follows alpha across lanes.
         expect(edges.map((e) => `${e.fromId}>${e.toId}`).sort()).toEqual([
             'alpha>charlie',
             'kickoff>alpha',
         ]);
-        // The host routes only its own.
-        expect(model.edges.map((e) => `${e.fromId}>${e.toId}`)).toEqual(['launch>api']);
+        // The host routes only its own: api starts on launch, so position
+        // already says it and it has none (specs/true-width-layout.md §3.5).
+        expect(model.edges).toEqual([]);
         const kickoff = region.anchors?.[0];
         const stub = edges.find((e) => e.fromId === 'kickoff');
         expect(stub?.waypoints[0].x).toBe(kickoff?.center.x);

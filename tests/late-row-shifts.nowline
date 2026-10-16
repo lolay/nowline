@@ -10,15 +10,19 @@ nowline v1
 // What to look for when rendering this:
 //   - First lane: "Auth refactor" spills, so "Next" and "Plain thing"
 //     drop to row 1, and every later child stays at or below the one
-//     before it. The a -> b arrow must end on "Next"'s midline, the
-//     c -> d arrow must leave "Plain thing" at its progress strip, and the
-//     calendar glyphs on "Plain thing", the filled group's chiclet row and
+//     before it. The a -> b arrow must land on "Next"'s top edge, the
+//     dotted c -> d arrow must leave "Plain thing"'s bottom edge and pass
+//     behind no bar on its way to "Next one" (it used to cross "Delta"),
+//     and the calendar glyphs on "Plain thing", the group's header row and
 //     the parallel's header band must sit on their own (moved) boxes.
 //   - The "Ship" milestone's slack arrow leaves "Gamma" (row 2) at its
 //     progress strip, not 16px above it.
 //   - Marker band: the anchor and the "Beta" milestone collide, so the band
 //     grows to two rows and everything below it moves down. The `after:`
 //     glyph on "Alpha" must sit inside Alpha's bar, not above it.
+//   - "Omega" waits on the code-freeze anchor (it starts two weeks after
+//     it), so a dotted stub runs from the anchor's cut line to Omega's
+//     start on Omega's (moved) midline.
 
 config
 
@@ -42,6 +46,9 @@ swimlane retro "Retroactive row growth"
 
 swimlane band "Marker band growth"
   item alpha "Alpha" duration:4w after:2026-01-12
+
+swimlane stub "Anchor stub"
+  item omega "Omega" duration:2w after:[freeze, 2026-02-16]
 
 milestone beta "Beta" after:alpha
 milestone ship "Ship" after:[g1, d]

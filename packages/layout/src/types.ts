@@ -398,6 +398,13 @@ export interface PositionedItem {
      */
     titleTruncated?: true;
     box: BoundingBox;
+    /**
+     * The item's dates in x: its scheduled start and end through the time
+     * scale. The bar (`box`) is drawn inside them, a seam in from each
+     * (specs/true-width-layout.md §3.1); dependency arrows and milestone
+     * slack lines read them (§3.4, §3.5).
+     */
+    dateSpan: { startX: number; endX: number };
     status: StatusKind;
     progressFraction: number; // 0..1; 1 == fully filled
     footnoteIndicators: number[]; // 1-based superscript numbers, empty when no footnotes
@@ -783,19 +790,23 @@ export interface SlackCorridor {
 export interface PositionedDependencyEdge {
     fromId: string;
     toId: string;
-    waypoints: Point[]; // first = source port; last = target port
     /**
-     * - `normal`   — orthogonal arrow drawn AFTER swimlane / item /
-     *   marker fills so it sits on top of lane bands.
-     * - `overflow` — currently unused at construction; reserved for the
-     *   red `before:` overrun annotation arrow.
-     * - `underBar` — channel router could not find a clear vertical
-     *   gutter between the source and target columns; the arrow's
-     *   vertical leg crosses one or more item bars. The renderer paints
-     *   these edges BEFORE bar fills with a thinner stroke so the bar
-     *   stays the visual foreground.
+     * Orthogonal path on the dates (specs/true-width-layout.md §3.4): first
+     * = source port, last = target port, where the arrowhead's tip lands.
+     * Item and container sources route vertical, horizontal (in a gap
+     * between rows), vertical; a target on its source's row and a marker
+     * stub are one horizontal leg.
      */
-    kind: 'normal' | 'overflow' | 'underBar';
+    waypoints: Point[];
+    /** The target waits on its source: the horizontal legs are dotted. */
+    slack: boolean;
+    /**
+     * Arrowhead width across its leg, scaled down to the target's width;
+     * a target narrower than `ARROW_HEAD_MIN_PX` gets a dot that wide
+     * (`head: 'dot'`) instead (§8 O6).
+     */
+    headWidth: number;
+    head: 'arrow' | 'dot';
     style: ResolvedStyle;
 }
 

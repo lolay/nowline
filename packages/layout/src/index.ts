@@ -24,6 +24,11 @@ export {
     containerHeaderTitleX,
 } from './container-header-geometry.js';
 export {
+    ARROW_HEAD_LENGTH_PX,
+    ARROW_HEAD_MIN_PX,
+    ARROW_HEAD_WIDTH_PX,
+} from './edge-routing.js';
+export {
     FRAME_TAB_INNER_GAP_PX,
     FRAME_TAB_LEFT_INSET_PX,
     FRAME_TAB_MIN_WIDTH_PX,

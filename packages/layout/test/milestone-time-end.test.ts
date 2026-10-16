@@ -92,7 +92,7 @@ milestone m "After B" after:b
         expect(dayAt(model, milestone(model, 'm').center.x)).toBe(15);
     });
 
-    it('keeps the slack arrow on the painted edge of a non-binding bar', async () => {
+    it('starts the slack arrow of a non-binding bar on its end date', async () => {
         const { model } = await laidOut(`  item a "A" duration:1w
 swimlane t "Other"
   item b "B" duration:3w
@@ -102,7 +102,8 @@ milestone m "Both" after:[a, b]
         const m = milestone(model, 'm');
         const a = item(model, 'a');
         expect(dayAt(model, m.center.x)).toBe(21);
-        expect(m.slackArrows?.map((p) => p.x)).toEqual([a.box.x + a.box.width]);
+        expect(m.slackArrows?.map((p) => p.x)).toEqual([a.dateSpan.endX]);
+        expect(dayAt(model, a.dateSpan.endX)).toBe(7);
     });
 });
 
@@ -117,7 +118,7 @@ milestone m "Jan 6" date:2026-01-06 after:a
         expect(m.slackArrows).toBeUndefined();
     });
 
-    it('is overrun when the duration passes the date, arrow from the painted edge', async () => {
+    it('is overrun when the duration passes the date, arrow from the end date', async () => {
         const { model } = await laidOut(`  item a "A" duration:2d
 
 milestone m "Jan 6" date:2026-01-06 after:a
@@ -125,7 +126,7 @@ milestone m "Jan 6" date:2026-01-06 after:a
         const m = milestone(model, 'm');
         const a = item(model, 'a');
         expect(m.isOverrun).toBe(true);
-        expect(m.slackArrows?.map((p) => p.x)).toEqual([a.box.x + a.box.width]);
+        expect(m.slackArrows?.map((p) => p.x)).toEqual([a.dateSpan.endX]);
     });
 });
 

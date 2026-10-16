@@ -392,10 +392,10 @@ swimlane build "Build"
     });
 
     it('attaches item→item dependency arrows at visual edges', async () => {
-        // Two items in different swimlanes — the source's right
-        // visual edge should equal the arrow's first waypoint x, and
-        // the target's left visual edge should equal the last
-        // waypoint x. midY at both ends.
+        // Two items in different swimlanes, the target below: the arrow
+        // leaves the middle of the source's last day through its bottom
+        // edge and lands on the middle of the target's first day on its
+        // top edge (specs/true-width-layout.md §3.4).
         const src = `nowline v1
 
 roadmap r1 "R" start:2026-01-05 length:10w
@@ -408,37 +408,30 @@ swimlane b "B"
 `;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const upstream = model.swimlanes[0].children[0] as {
-            id: string;
-            box: { x: number; y: number; width: number; height: number };
-        };
-        const downstream = model.swimlanes[1].children[0] as {
-            id: string;
-            box: { x: number; y: number; width: number; height: number };
-        };
+        const upstream = model.swimlanes[0].children[0] as PositionedItem;
+        const downstream = model.swimlanes[1].children[0] as PositionedItem;
         const edge = model.edges.find((e) => e.toId === 'downstream');
         expect(edge).toBeDefined();
         const wp = edge!.waypoints;
-        expect(wp.length).toBeGreaterThanOrEqual(2);
-        const upRight = upstream.box.x + upstream.box.width;
-        const upMidY = upstream.box.y + upstream.box.height / 2;
-        const downLeft = downstream.box.x;
-        const downMidY = downstream.box.y + downstream.box.height / 2;
-        expect(wp[0].x).toBeCloseTo(upRight, 1);
-        expect(wp[0].y).toBeCloseTo(upMidY, 1);
-        expect(wp[wp.length - 1].x).toBeCloseTo(downLeft, 1);
-        expect(wp[wp.length - 1].y).toBeCloseTo(downMidY, 1);
+        expect(wp).toHaveLength(4);
+        const day = model.timeline.pixelsPerDay;
+        expect(wp[0].x).toBeCloseTo(upstream.dateSpan.endX - day / 2, 6);
+        expect(wp[0].y).toBeCloseTo(upstream.box.y + upstream.box.height, 6);
+        expect(wp[3].x).toBeCloseTo(downstream.dateSpan.startX + day / 2, 6);
+        expect(wp[3].y).toBeCloseTo(downstream.box.y, 6);
+        // The target starts the day its source ends: a solid arrow.
+        expect(edge!.slack).toBe(false);
     });
 
-    it('attaches item→anchor dependency arrows at the cut line + item midY', async () => {
-        // An item with `after:` an anchor — the arrow should leave
-        // the anchor's vertical cut line at the dependent item's
-        // row mid-Y and land at the item's left visual edge.
+    it('draws a dotted stub from an anchor to an item that waits on it', async () => {
+        // An item with `after:` an anchor that starts later (it waits on
+        // `ramp`): the stub leaves the anchor's cut line at the item's row
+        // midline and lands on its painted left edge (§3.5).
         const src = `nowline v1
 
 roadmap r1 "R" start:2026-01-05 length:10w
 
-anchor kickoff "Kick" date:2026-02-09
+anchor kickoff "Kick" date:2026-01-07
 
 swimlane a "A"
   item ramp "Ramp" duration:1w
@@ -446,28 +439,38 @@ swimlane a "A"
 `;
         const { file, resolved } = await parseAndResolve(src);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
-        const phase2 = model.swimlanes[0].children.find((c) => 'id' in c && c.id === 'phase2') as {
-            id: string;
-            box: { x: number; y: number; width: number; height: number };
-        };
+        const phase2 = model.swimlanes[0].children.find(
+            (c) => 'id' in c && c.id === 'phase2',
+        ) as PositionedItem;
         expect(phase2).toBeDefined();
         const anchor = model.anchors.find((a) => a.id === 'kickoff');
         expect(anchor).toBeDefined();
         const edge = model.edges.find((e) => e.fromId === 'kickoff' && e.toId === 'phase2');
         expect(edge).toBeDefined();
+        expect(edge!.slack).toBe(true);
         const wp = edge!.waypoints;
-        expect(wp.length).toBeGreaterThanOrEqual(2);
-        const phaseLeft = phase2.box.x;
+        expect(wp).toHaveLength(2);
         // The row's nominal midline, not a grown bar's middle: "Phase 2"
         // wraps inside its bar (specs/rendering.md, "Row midline").
         const phaseMidY = phase2.box.y + 28;
-        // First waypoint sits on the anchor's vertical cut line
-        // (centerX) at the target's row midY.
         expect(wp[0].x).toBeCloseTo(anchor!.center.x, 1);
         expect(wp[0].y).toBeCloseTo(phaseMidY, 1);
-        // Last waypoint lands at the target's left visual edge.
-        expect(wp[wp.length - 1].x).toBeCloseTo(phaseLeft, 1);
-        expect(wp[wp.length - 1].y).toBeCloseTo(phaseMidY, 1);
+        expect(wp[1].x).toBeCloseTo(phase2.box.x, 1);
+        expect(wp[1].y).toBeCloseTo(phaseMidY, 1);
+    });
+
+    it('draws no stub for an item that starts on its anchor', async () => {
+        const { file, resolved } = await parseAndResolve(`nowline v1
+
+roadmap r1 "R" start:2026-01-05 length:10w
+
+anchor kickoff "Kick" date:2026-02-09
+
+swimlane a "A"
+  item phase2 "Phase 2" duration:2w after:kickoff
+`);
+        const model = layoutRoadmap(file, resolved, { theme: 'light' });
+        expect(model.edges).toEqual([]);
     });
 
     it('places title-only swimlanes from resolved content', async () => {
@@ -1055,7 +1058,7 @@ swimlane "Platform"
         expect(below.box.y).toBe(tech.box.y + 80);
     });
 
-    it('attaches dependency arrows at the nominal row midline when the title wrapped', async () => {
+    it('leaves a bar grown by a wrapped title through its painted bottom', async () => {
         const src = `nowline v1
 
 roadmap r "R" start:2026-04-06 scale:2w
@@ -1071,13 +1074,12 @@ swimlane b "B"
         expect(tech.box.height).toBe(72);
         const edge = model.edges.find((e) => e.fromId === 'tech');
         expect(edge).toBeDefined();
-        // A wrapped title does not spill, so the arrow leaves the bar's right
-        // edge on the row's nominal midline (28px below the top, as for any
-        // 56px bar), not along the progress-strip row a spilled caption would
-        // force and not at the grown bar's own mid-height (36px).
+        // The target is in the lane below, so the arrow drops from the
+        // middle of the source's last day through its grown bottom edge
+        // (72px below its top), not the 56px band's.
         const wp = edge?.waypoints ?? [];
-        expect(wp[0].x).toBeCloseTo(tech.box.x + tech.box.width, 1);
-        expect(wp[0].y).toBeCloseTo(tech.box.y + 28, 1);
+        expect(wp[0].x).toBeCloseTo(tech.dateSpan.endX - model.timeline.pixelsPerDay / 2, 6);
+        expect(wp[0].y).toBeCloseTo(tech.box.y + 72, 6);
     });
 });
 
@@ -1691,10 +1693,11 @@ milestone beta "Beta" after:a
         const edge = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b');
         expect(edge).toBeDefined();
         const wp = edge?.waypoints ?? [];
-        expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
-        expect(wp[0].y).toBeCloseTo(a.box.y + NOMINAL_MID_PX, 1);
-        expect(wp[wp.length - 1].x).toBeCloseTo(b.box.x, 1);
-        expect(wp[wp.length - 1].y).toBeCloseTo(b.box.y + NOMINAL_MID_PX, 1);
+        const day = model.timeline.pixelsPerDay;
+        expect(wp[0].x).toBeCloseTo(a.dateSpan.endX - day / 2, 6);
+        expect(wp[0].y).toBeCloseTo(a.box.y + a.box.height, 6);
+        expect(wp[wp.length - 1].x).toBeCloseTo(b.dateSpan.startX + day / 2, 6);
+        expect(wp[wp.length - 1].y).toBeCloseTo(b.box.y, 6);
     });
 
     it('draws one straight segment from a grown bar to a normal bar on the same row', async () => {
@@ -1719,7 +1722,8 @@ swimlane s "S"
         expect(wp).toHaveLength(2);
         expect(wp[0].y).toBeCloseTo(wp[1].y, 3);
         expect(wp[0].y).toBeCloseTo(a.box.y + NOMINAL_MID_PX, 1);
-        expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
+        // From the source's end date to the target's painted start.
+        expect(wp[0].x).toBeCloseTo(a.dateSpan.endX, 6);
         expect(wp[1].x).toBeCloseTo(b.box.x, 1);
     });
 
@@ -1764,11 +1768,12 @@ swimlane s "S"
         expect(model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')).toBeUndefined();
     });
 
-    it('attaches a grown bar slack arrow on its dependency-arrow line', async () => {
-        // `ui` wraps its title with a meta line, so its bar grew to 72px. Its
-        // dependency arrows (in from `api`, out to `qa`) attach on the nominal
-        // midline; the dotted slack arrow to `beta` must leave on that line
-        // too, not at the grown bar's own mid-height 8px lower.
+    it('attaches a grown bar slack arrow on its row midline', async () => {
+        // `ui` wraps its title with a meta line, so its bar grew to 72px. The
+        // dotted slack arrow to `beta` leaves its end date on the row's
+        // nominal midline, the line a same-row dependency would use, not at
+        // the grown bar's own mid-height 8px lower. Its dependency arrows to
+        // other lanes meet its painted top and bottom.
         const src = `nowline v1
 
 roadmap slack "Slack" start:2026-01-05 scale:1w
@@ -1796,10 +1801,10 @@ milestone beta "Beta" after:[deploy, ui]
         const beta = model.milestones.find((m) => m.title === 'Beta');
         expect(beta?.slackArrows).toHaveLength(1);
         const slack = beta?.slackArrows?.[0];
-        expect(slack?.x).toBeCloseTo(ui.box.x + ui.box.width, 1);
+        expect(slack?.x).toBeCloseTo(ui.dateSpan.endX, 6);
         expect(slack?.y).toBeCloseTo(ui.box.y + NOMINAL_MID_PX, 1);
-        expect(slack?.y).toBeCloseTo(into?.[into.length - 1].y ?? Number.NaN, 3);
-        expect(slack?.y).toBeCloseTo(out?.[0].y ?? Number.NaN, 3);
+        expect(into?.[into.length - 1].y).toBeCloseTo(ui.box.y, 6);
+        expect(out?.[0].y).toBeCloseTo(ui.box.y + 72, 6);
     });
 
     it('attaches a chip-grown bar slack arrow on the nominal midline', async () => {
@@ -1826,10 +1831,10 @@ milestone ship "Ship" after:[wide, long]
         expect(slack?.y).toBeCloseTo(wide.box.y + NOMINAL_MID_PX, 1);
     });
 
-    it('terminates arrows into a spilled, chip-grown bar on the nominal midline', async () => {
+    it('lands an arrow into a spilled, chip-grown bar on its first day, top edge', async () => {
         // `auth`'s caption spills right and its chip column grows the bar to
-        // 78px. The arrow from `api` lands on the same nominal midline as any
-        // other target, not at the grown bar's own mid-height 11px lower.
+        // 78px. The arrow from `api`, a lane above, lands arrowhead first on
+        // the middle of its first day, on its top edge.
         const src = `nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
@@ -1850,8 +1855,8 @@ swimlane t "T"
         const wp = model.edges.find((e) => e.fromId === 'api' && e.toId === 'auth')?.waypoints;
         expect(wp).toBeDefined();
         const end = wp?.[wp.length - 1];
-        expect(end?.x).toBeCloseTo(auth.box.x, 1);
-        expect(end?.y).toBeCloseTo(auth.box.y + NOMINAL_MID_PX, 1);
+        expect(end?.x).toBeCloseTo(auth.dateSpan.startX + model.timeline.pixelsPerDay / 2, 6);
+        expect(end?.y).toBeCloseTo(auth.box.y, 6);
     });
 
     it('keeps the progress-strip slack attach for a spilled-caption source', async () => {
@@ -1874,23 +1879,29 @@ milestone ship "Ship" after:[a, b]
         expect(slack?.y).toBeCloseTo(a.box.y + a.box.height - PROGRESS_STRIP_HALF_PX, 1);
     });
 
-    it('keeps the progress-strip attach for a spilled-caption source', async () => {
+    it('runs a same-row leg from a spilled-caption source along its progress strip', async () => {
+        // `b` waits on a date past `a`'s caption, so it stays on `a`'s row;
+        // the dotted leg runs under the caption, on the progress strip.
         const src = `nowline v1
 
 roadmap spill "Spill" start:2026-01-05 scale:1w
 
 swimlane s "S"
   item a "Infrastructure" duration:1w
-
-swimlane t "T"
-  item b "Beta" duration:2w after:a
+  item b "Beta" duration:2w after:[a, 2026-02-02]
 `;
         const model = await layout(src);
         const a = find(model, 'a');
+        const b = find(model, 'b');
         expect(a.textSpills).toBe(true);
-        const wp = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
-        expect(wp[0].x).toBeCloseTo(a.box.x + a.box.width, 1);
+        expect(b.box.y).toBe(a.box.y);
+        const edge = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b');
+        expect(edge?.slack).toBe(true);
+        const wp = edge?.waypoints ?? [];
+        expect(wp).toHaveLength(2);
+        expect(wp[0].x).toBeCloseTo(a.dateSpan.endX, 6);
         expect(wp[0].y).toBeCloseTo(a.box.y + a.box.height - PROGRESS_STRIP_HALF_PX, 1);
+        expect(wp[1].y).toBeCloseTo(wp[0].y, 6);
     });
 });
 
@@ -1934,55 +1945,74 @@ describe('layoutRoadmap geometry after a late vertical shift', () => {
         return found;
     }
 
+    /** Where a leg along its own row leaves an item. */
     function sourceY(i: PositionedItem): number {
         return i.textSpills
             ? i.box.y + i.box.height - PROGRESS_STRIP_HALF_PX
             : i.box.y + NOMINAL_MID_PX;
     }
 
-    function targetY(i: PositionedItem): number {
-        return i.textSpills ? i.box.y + i.box.height / 2 : i.box.y + NOMINAL_MID_PX;
+    function rowY(i: PositionedItem): number {
+        return i.box.y + NOMINAL_MID_PX;
     }
 
     function slackY(i: PositionedItem): number {
-        return i.textSpills
-            ? i.box.y + i.box.height - PROGRESS_STRIP_HALF_PX
-            : i.box.y + i.box.height / 2;
+        return sourceY(i);
     }
 
-    /** Every arrow whose ends are id'd items starts and ends on their final bars. */
+    const near = (a: number, b: number): boolean => Math.abs(a - b) <= 0.01;
+
+    /**
+     * Every arrow whose ends are id'd items starts and ends on their final
+     * bars: on the middle of the source's last day and the target's first,
+     * at their painted top or bottom; or, along one row, from the source's
+     * end date to the target's painted start (specs/true-width-layout.md
+     * §3.4).
+     */
     function arrowMismatches(model: Model): string[] {
         const byId = new Map(allItems(model).map((i) => [i.id, i]));
+        const day = model.timeline.pixelsPerDay;
+        const lastDay = (i: PositionedItem) =>
+            i.dateSpan.endX - Math.min(day / 2, (i.dateSpan.endX - i.dateSpan.startX) / 2);
+        const firstDay = (i: PositionedItem) =>
+            i.dateSpan.startX + Math.min(day / 2, (i.dateSpan.endX - i.dateSpan.startX) / 2);
         const out: string[] = [];
         for (const edge of model.edges) {
             const to = byId.get(edge.toId);
             if (!to) continue;
             const wp = edge.waypoints;
+            const start = wp[0];
             const end = wp[wp.length - 1];
-            if (Math.abs(end.x - to.box.x) > 0.01 || Math.abs(end.y - targetY(to)) > 0.01) {
-                out.push(`${edge.fromId}->${edge.toId} ends at (${end.x}, ${end.y})`);
-            }
+            const alongRow = wp.length === 2 && near(start.y, end.y);
+            const endOk = alongRow
+                ? near(end.x, to.box.x)
+                : near(end.x, firstDay(to)) &&
+                  (near(end.y, to.box.y) || near(end.y, to.box.y + to.box.height));
+            if (!endOk) out.push(`${edge.fromId}->${edge.toId} ends at (${end.x}, ${end.y})`);
             const from = byId.get(edge.fromId);
-            const startY = from ? sourceY(from) : targetY(to);
-            const startX = from ? from.box.x + from.box.width : wp[0].x;
-            if (Math.abs(wp[0].x - startX) > 0.01 || Math.abs(wp[0].y - startY) > 0.01) {
-                out.push(`${edge.fromId}->${edge.toId} starts at (${wp[0].x}, ${wp[0].y})`);
+            const startOk = !from
+                ? near(start.y, rowY(to))
+                : alongRow
+                  ? near(start.x, from.dateSpan.endX) &&
+                    (near(start.y, sourceY(from)) || near(start.y, rowY(to)))
+                  : near(start.x, lastDay(from)) &&
+                    (near(start.y, from.box.y) || near(start.y, from.box.y + from.box.height));
+            if (!startOk) {
+                out.push(`${edge.fromId}->${edge.toId} starts at (${start.x}, ${start.y})`);
             }
         }
         return out;
     }
 
-    /** Every slack arrow leaving an item bar's right edge sits on its final attach y. */
+    /** Every slack arrow leaving an item's end date sits on its final attach y. */
     function slackMismatches(model: Model): string[] {
         const items = allItems(model);
         const out: string[] = [];
         for (const m of model.milestones) {
             for (const arrow of m.slackArrows ?? []) {
-                const sources = items.filter(
-                    (i) => Math.abs(i.box.x + i.box.width - arrow.x) < 0.01,
-                );
+                const sources = items.filter((i) => near(i.dateSpan.endX, arrow.x));
                 if (sources.length === 0) continue;
-                if (!sources.some((i) => Math.abs(slackY(i) - arrow.y) < 0.01)) {
+                if (!sources.some((i) => near(slackY(i), arrow.y))) {
                     out.push(`${m.id} slack arrow at (${arrow.x}, ${arrow.y})`);
                 }
             }
@@ -2045,8 +2075,9 @@ swimlane s "S"
         expect(c.box.y).toBeGreaterThanOrEqual(b.box.y);
         expect(d.box.y).toBeGreaterThanOrEqual(c.box.y);
 
+        // b dropped below a: the arrow lands on b's top edge.
         const ab = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
-        expect(ab.at(-1)?.y).toBe(targetY(b));
+        expect(ab.at(-1)?.y).toBe(b.box.y);
         // d sits right after c on c's row, so position says it: no arrow.
         expect(d.box.y).toBe(c.box.y);
         expect(model.edges.find((e) => e.fromId === 'c' && e.toId === 'd')).toBeUndefined();
@@ -2093,7 +2124,7 @@ milestone ship "Ship" after:[g1, d]
         expect(pinMismatches(model)).toEqual([]);
 
         const ship = model.milestones.find((m) => m.id === 'ship');
-        expect(ship?.slackArrows).toEqual([{ x: g1.box.x + g1.box.width, y: slackY(g1) }]);
+        expect(ship?.slackArrows).toEqual([{ x: g1.dateSpan.endX, y: slackY(g1) }]);
         expect(slackMismatches(model)).toEqual([]);
         expect(arrowMismatches(model)).toEqual([]);
     });
