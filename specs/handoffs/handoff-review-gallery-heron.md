@@ -5,20 +5,24 @@
 - **Mode:** unattended, confirmed 2026-10-16 in session 4adab00a (harness=claude-code runner=cloud). Session choice: new session, started with `create_session` on this branch.
 - **Done before this run:** m1, the local review gallery, in `8e0a60a` and `ac13df1` (pre-orchestration, reviewed by hand: `make pre-commit` and `make pack-mcpb` green, Playwright screenshots at four viewports).
 - **Waves:** 1 `[exec]` m2 s1-s3 (source in the render block, persistent view settings, browser e2e); 2 `[deep]` m3 s1 (lines, baselines, retention); 3 `[exec]` m3 s2-s3 (PR pages, PR e2e). m4-m6 (publish workflow, docs, DNS handoff) are a later run.
-- **Spend:** ~$18.44 logged against ~$11 expected; almost all of it is the session before kickoff (m1 build and planning), logged as one combined orchestrator-kickoff line. Guard max(3x, $50) = $50; projected before wave 1 ~$19.8.
+- **Spend:** ~$35.36 logged against ~$11 expected (~$18.44 of it the session before kickoff); guard $50, never tripped.
 - **Done this run:** wave 1 `[exec]` m2 s1-s3 in `b72b6de`, `2581435`, `0c1a82b` (`make pre-commit` green per step; `make gallery-e2e` 10/10; deliberate mode-carry break turned 3 tests red).
 - **Done this run:** wave 2 `[deep]` m3 s1 in `7f423c9` (39/39 node:test, gallery-e2e 10/10, m1 data dir migrated).
 - **Done this run:** wave 3 `[exec]` m3 s2-s3 in `846dbd8`, `c1fd456`, wave 1 review fixup in `ae13dc0` (42 node:test, gallery-e2e 15/15). A container restart interrupted wave 3 after `ae13dc0`; a resumed agent kept the uncommitted s2 diff.
 - **Done this run:** fixup 2 in `337a95e`: untrusted raw builds validated before publish (names, paths, symlinks, shas, PR line, https-only links), plus the review nits (50 node:test, gallery-e2e 15/15). Reviewed after the skill became readable: wave-3-fix PASS; wave-2-fix CONCERNS (a PR artifact can reuse an existing build's id and replace main history; `--pr` optional).
 - **Group ranges:** nowline m2 s1-s3 `1511b51..0c1a82b` (+ 1-fix `ae13dc0`); nowline m3 s1 `81a3577..7f423c9` (+ 2-fix `337a95e`); nowline m3 s2-s3 `0a6d26d..c1fd456` (+ 3-fix in `337a95e`). Merged `origin/main` in `c34581f`.
 - **Bookkeeping reformatted** to the skill's grammar (step `(done)` markers, Review/Token log rows) once the skill was readable from `GaryRudolph/public`; this run's work commits don't start with step IDs.
-- **Next unit:** 2-fix2 `[deep]` nowline m3 s1 (last fix-up allowed for that group), then final completion. m4-m6 stay untagged for a later run.
+- **Done this run:** 2-fix2 in `237a480`: build ids bound to their line and PR head, cross-line ids refused, publish requires `--pr <n>` / `--trusted-main` / `--trusted-local`, links pinned to github.com, null-proto lines, only named files copied (59 node:test, gallery-e2e 15/15).
+- **Review log:** wave-1 CONCERNS, wave-2 CONCERNS, wave-3 CONCERNS; wave-1-fix PASS, wave-3-fix PASS, wave-2-fix CONCERNS, wave-2-fix2 PASS.
+- **Status:** plan complete 2026-10-16. m4-m6 stay untagged for a later run.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
-- **Pending question:** none.
+- **Pending question:** Open the PR, or not yet? A cleanup commit before merge would remove this handoff and the plan, or promote what's durable (the gallery's trust model and data layout) to `specs/`.
 
 ## m4 must-dos (from fixup 2)
 
-- Publish PR runs with `publish.mjs --pr <number>` from the `workflow_run` event; without it a PR artifact can omit `pr` and claim `line: "main"`.
+- Publish PR runs with `publish.mjs --pr <number>` taken from the `workflow_run` event, never the artifact; `--trusted-main` only when the run was a push to `main` from this repo; never `--trusted-local` (refused under GitHub Actions). Publish now refuses to run without one of them.
+- Set `GALLERY_HEAD_SHA` and the other `GALLERY_PR_*` facts in the collect step; without `pr.headSha` publish rejects a PR build.
+- Consider `--repo ${{ github.repository }}` so repoUrl must equal this repo (2-fix2 review nit).
 - Publish non-PR artifacts only when the triggering run was a push to `main`; skip forks; download the artifact by the triggering run id into a fresh directory.
 - `fetch-depth: 0` in the publish job for the PR ancestor fallback.
 - m5: state in `specs/ci.md` that same-repo PR SVGs are served on the gallery origin (collaborator trust model).

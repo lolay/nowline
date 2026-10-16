@@ -1,9 +1,9 @@
 # Review gallery: per-build QA site for examples/ and tests/
 
 ```text
---- KICKOFF: begin orchestration at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 3/3 groups done | last review: wave-2-fix CONCERNS | current: 2-fix2 nowline m3 s1 | over expected: ~$33 of ~$11 | updated 2026-10-16 | passed unattended: gate 2
+  Status: 3/3 groups done | completed 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -30,17 +30,17 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [exec] nowline m2 s1-s3 | ~3.3M | ~$1.4 |
-| 2 [deep] nowline m3 s1 | ~6.1M | ~$3.2 |
-| 3 [exec] nowline m3 s2-s3 | ~3.0M | ~$1.2 |
-| 1-fix [exec] nowline m2 s1-s3 | — | — |
-| 2-fix [deep] nowline m3 s1 (combined: 3-fix nowline m3 s2-s3) | — | — |
-| 2-fix2 [deep] nowline m3 s1 | — | — |
-| orchestrator | ~5.7M | ~$5.0 |
-| m1 pre-run (build and planning, before kickoff) | — | — |
-| **Total** | ~18M | ~$11 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [exec] nowline m2 s1-s3 | ~3.3M | ~$1.4 | ~5.8M | ~$2.09 |
+| 2 [deep] nowline m3 s1 | ~6.1M | ~$3.2 | ~5.3M | ~$2.01 |
+| 3 [exec] nowline m3 s2-s3 | ~3.0M | ~$1.2 | ~5.6M | ~$2.12 |
+| 1-fix [exec] nowline m2 s1-s3 | — | — | in wave 3 | in wave 3 |
+| 2-fix [deep] nowline m3 s1 (combined: 3-fix nowline m3 s2-s3) | — | — | ~5.1M | ~$1.91 |
+| 2-fix2 [deep] nowline m3 s1 | — | — | ~6.7M | ~$2.29 |
+| orchestrator | ~5.7M | ~$5.0 | ~11M | ~$6.50 |
+| m1 pre-run (build and planning, before kickoff) | — | — | ~37M | ~$18.44 |
+| **Total** | ~18M | ~$11 | ~76M | ~$35.36 |
 
 Expected values are estimates, good to about 2-3× per wave.
 
@@ -300,6 +300,7 @@ review wave-1-fix (nowline m2 s1-s3) 0a6d26d..ae13dc0: PASS - verified by the wa
   - nit `scripts/gallery/publish.mjs:285`: branch lines sorted by raw date string; use `Date.parse`. Fixed in 337a95e.
 review wave-2-fix (nowline m3 s1) 81a3577..337a95e: CONCERNS - blocking: a PR artifact may pick an existing build's id (validate.mjs:88, publish.mjs:131), so it replaces a main or other-PR build and moves it to its line; should-fix: --pr optional, so a PR artifact without pr can still publish to main (publish.mjs:416); nits: repoUrl/runUrl any https host, lines object keyed by line inherits prototype (toString), raw copy keeps unnamed files - 2026-10-16
 review wave-3-fix (nowline m3 s2-s3) 0a6d26d..337a95e: PASS - javascript:/data:/protocol-relative hrefs rejected at publish and render and in gallery.js, branch sort by Date.parse; regression tests fail on pre-fix code - 2026-10-16
+review wave-2-fix2 (nowline m3 s1) a0e7c4c..237a480: PASS - id-reuse probe and cross-PR/PR-to-main takeovers refused, trust flag required, links pinned, null-proto lines, only named files copied; nits: repoUrl any github.com repo (add --repo), local pr-12 branch shares a key with PR 12 locally, -dirty- accepted outside local trust - 2026-10-16
 
 ## Token log
 
@@ -325,3 +326,22 @@ tokens review-wave-3 nowline-m3-s2-s3 (claude-opus-5-5): input ~28 / cache read 
 tokens wave-2-fix nowline-m3-s1 (claude-opus-5-5): input ~78 / cache read ~4.1M / cache write ~140k / output ~0.7k | ~$1.51 API-equiv (combined: wave-3-fix nowline-m3-s2-s3)
 tokens orchestrator-wave-2-fix nowline-m3-s1 (claude-opus-5-5): input ~110 / cache read ~6.1M / cache write ~200k 1h / output ~23k | ~$4.23 API-equiv (combined: skill audit agent ~$0.95, merge of main)
 tokens review-wave-2-fix nowline-m3-s1 (claude-opus-5-5): input ~20 / cache read ~710k / cache write ~50k / output ~0.1k | ~$0.40 API-equiv (combined: review-wave-3-fix nowline-m3-s2-s3)
+tokens wave-2-fix2 nowline-m3-s1 (claude-opus-5-5): input ~82 / cache read ~5.2M / cache write ~130k / output ~0.5k | ~$1.72 API-equiv
+tokens review-wave-2-fix2 nowline-m3-s1 (claude-opus-5-5): input ~32 / cache read ~1.3M / cache write ~62k / output ~0.1k | ~$0.57 API-equiv
+tokens orchestrator-wave-2-fix2 nowline-m3-s1 (claude-opus-5-5): input ~18 / cache read ~1.5M / cache write ~14k 1h / output ~6.8k | ~$0.56 API-equiv
+
+## Completion summary
+
+**Completed**: 2026-10-16
+**What shipped**: m2 and m3 of the review gallery on `claude/compassionate-galileo-jizy6q`. Entry and digest pages show the `.nowline` source inside each compare block (sdiff on wide screens, unified on phones); every view setting (mode, layout, size, source, changed-only) carries across pages through storage and URL params; a Playwright e2e (`make gallery-e2e`) covers it. Builds now belong to lines (`main`, `pr-<n>`, local branches) with per-build baselines, per-line retention and `--open-prs` pruning; the site has Main / Pull requests / Branches sections, `pr/<n>/` pages and PR headers, with e2e coverage. Publishing treats raw builds as untrusted: names, paths, symlinks, shas, links and id-to-line binding are validated before disk is touched, and publish requires an explicit trust flag (`--pr <n>`, `--trusted-main`, `--trusted-local`). 59 node:test cases and 15 e2e tests pass.
+**Deviations from plan**:
+- Run orchestrated without the skill loaded until the end (it wasn't synced into the cloud container); bookkeeping reformatted to the skill's grammar in `a0e7c4c`. Work commits before `237a480` don't start with step IDs; general-purpose agents at default effort stood in for plan-worker / plan-reviewer; reviews ran alongside the next wave instead of before it.
+- Checkpoints passed unattended: gate 2 ([exec] to [deep] before wave 2).
+- Retry: wave 3's worker was killed by a container restart after `ae13dc0`; a second worker resumed from its uncommitted s2 diff instead of a clean relaunch.
+- Fix-ups: 1-fix (wave-1 Changed-only carry) folded into wave 3 as `ae13dc0`; 2-fix (`337a95e`) combined the wave-2 and wave-3 security concerns and was reviewed late; 2-fix2 (`237a480`) closed the id-reuse takeover and optional trust found in that review. m3 s1 used both fix-ups the cap allows.
+- Design deviations are in the handoff's Deviations section.
+- m4-m6 stay untagged under Later milestones, for a later run after review (conservative choice; the skill has no rule for untagged milestones).
+**Follow-ups**:
+- m4 workflow: `--pr` from the `workflow_run` event, never the artifact; `--trusted-main` only when the run was a push to `main` from this repo; never `--trusted-local` in CI; set `GALLERY_HEAD_SHA` and the other `GALLERY_PR_*` facts in collect; `fetch-depth: 0` in the publish job.
+- 2-fix2 review nits: add `--repo` (from `GITHUB_REPOSITORY`) so repoUrl must equal it; a local `pr-12` branch shares the `pr-12` key with real PR 12 builds in a local data dir; allow `-dirty-` ids only under `--trusted-local`.
+- Sync the `personal` plugin into this claude.ai account so cloud runs load the skill.
