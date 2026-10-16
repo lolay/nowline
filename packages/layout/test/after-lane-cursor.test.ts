@@ -55,13 +55,32 @@ function scheduleWeeks(
     return out;
 }
 
+/** The schedule's milestones, in weeks from the roadmap start. */
+function scheduleMilestoneWeeks(
+    file: NowlineFile,
+    resolved: ResolveResult,
+): Record<string, number> {
+    const schedule = scheduleRoadmap(file, resolved, { today: new Date(Date.UTC(2026, 0, 5)) });
+    const out: Record<string, number> = {};
+    for (const [id, d] of schedule.milestones) {
+        out[id] =
+            Math.round(((d.getTime() - schedule.startDate.getTime()) / 86_400_000 / 7) * 100) / 100;
+    }
+    return out;
+}
+
 async function weeksOf(source: string) {
     const { file, resolved } = await parseAndResolve(source);
     const model = layoutRoadmap(file, resolved, {
         theme: 'light',
         today: new Date(Date.UTC(2026, 0, 5)),
     });
-    return { model, chart: chartWeeks(model), schedule: scheduleWeeks(file, resolved) };
+    return {
+        model,
+        chart: chartWeeks(model),
+        schedule: scheduleWeeks(file, resolved),
+        milestones: scheduleMilestoneWeeks(file, resolved),
+    };
 }
 
 /** The placed group `id`, anywhere in the lanes. */
@@ -467,8 +486,103 @@ swimlane s "Subject"
   item b "B" duration:1w after:pp
 `);
         expect(chart.t1[1]).toBeGreaterThan(schedule.t1[1]);
-        // Engine C does not resolve `after:` on a parallel (it starts b on
-        // day 0), so b is checked against t1's scheduled end instead.
         expect(chart.b[0]).toEqual(schedule.t1[1]);
+        expect(chart.b).toEqual(schedule.b);
+    });
+
+    it('after: a group starts at its clamped last child’s duration end', async () => {
+        const { model, chart, schedule } = await weeksOf(`nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+
+swimlane r "Refs"
+  group gg "GG"
+    item g1 "G1" duration:1d
+
+swimlane s "Subject"
+  item b "B" duration:1w after:gg
+`);
+        expect(chart.g1[1]).toBeGreaterThan(schedule.g1[1]);
+        const gg = findGroup(model, 'gg') as PositionedGroup;
+        expect(gg.box.x + gg.box.width).toBeGreaterThan(xOfWeeks(model, schedule.g1[1]));
+        expect(chart.b[0]).toEqual(schedule.g1[1]);
+        expect(chart.b).toEqual(schedule.b);
+    });
+});
+
+/** The x of `weeks` from the roadmap start (calendar:full). */
+const xOfWeeks = (model: PositionedRoadmap, weeks: number): number =>
+    model.timeline.originX + weeks * 7 * model.timeline.pixelsPerDay;
+
+/** The chart's milestone `id`, in weeks from the roadmap start. */
+function chartMilestoneWeeks(model: PositionedRoadmap, id: string): number {
+    const m = model.milestones.find((ms) => ms.id === id);
+    if (!m) throw new Error(`no milestone ${id}`);
+    const { originX, pixelsPerDay } = model.timeline;
+    return Math.round(((m.center.x - originX) / pixelsPerDay / 7) * 100) / 100;
+}
+
+// `after:` naming a parallel or a group (specs/scheduler-unification.md §9,
+// "after: a parallel or a group"): a parallel ends at its latest track end
+// and a group at its last child's end, in both engines. Engine C used to
+// resolve neither (day 0, so the exports started the work on the roadmap
+// start); engine A read a group's painted box, caption spill included.
+describe('after: naming a parallel or a group, both engines agree', () => {
+    /** Lane `build` holds `p` (2w and 4w tracks) then `g` (1w, then `last`). */
+    const source = (lastTitle: string, waves = false): string => `nowline v1
+
+roadmap r "R" start:2026-01-05 calendar:full scale:1w
+${waves ? '\nwave w1 "W1"\nwave w2 "W2"\n' : ''}
+swimlane build "Build"
+  parallel p${waves ? ' wave:w1' : ''}
+    item api "API" duration:2w
+    item sdk "SDK" duration:4w
+  group g "Hardening"${waves ? ' wave:w2' : ''}
+    item perf "Perf" duration:1w
+    item last "${lastTitle}" duration:1w
+
+swimlane ship "Ship"
+  item z1 "After P" duration:1w after:p
+
+swimlane launch "Launch"
+  item z2 "After G" duration:1w after:g
+
+milestone m "Done" after:g
+`;
+
+    it('after: a parallel starts at its latest track end', async () => {
+        const { chart, schedule } = await weeksOf(source('Docs'));
+        expect(schedule.z1).toEqual([4, 5]);
+        expect(chart.z1).toEqual(schedule.z1);
+    });
+
+    it('after: a group starts at its last child’s end', async () => {
+        const { model, chart, schedule, milestones } = await weeksOf(source('Docs'));
+        expect(schedule.z2).toEqual([6, 7]);
+        expect(chart.z2).toEqual(schedule.z2);
+        expect(milestones.m).toEqual(6);
+        expect(chartMilestoneWeeks(model, 'm')).toEqual(6);
+    });
+
+    it('after: a group whose last caption spills starts at its work’s end, not the caption’s', async () => {
+        const { model, chart, schedule, milestones } = await weeksOf(
+            source('Write the onboarding guide and every settings page reference'),
+        );
+        expect(findItem(model, 'last').textSpills).toBe(true);
+        // The group's painted box runs past its work: the caption it owns.
+        const g = findGroup(model, 'g') as PositionedGroup;
+        expect(g.box.x + g.box.width).toBeGreaterThan(xOfWeeks(model, 6) + 1);
+        expect(schedule.z2).toEqual([6, 7]);
+        expect(chart.z2).toEqual(schedule.z2);
+        expect(milestones.m).toEqual(6);
+        expect(chartMilestoneWeeks(model, 'm')).toEqual(6);
+    });
+
+    it('with waves, after: a parallel and a group resolve on every barrier pass', async () => {
+        const { chart, schedule } = await weeksOf(source('Docs', true));
+        expect(schedule.z1).toEqual([4, 5]);
+        expect(schedule.z2).toEqual([6, 7]);
+        expect(chart.z1).toEqual(schedule.z1);
+        expect(chart.z2).toEqual(schedule.z2);
     });
 });

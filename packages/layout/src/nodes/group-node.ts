@@ -164,9 +164,13 @@ export class GroupNode {
         const interRowGap = ctx.bandScale.step() - ctx.bandScale.bandwidth();
         cursor.height = Math.max(cursor.height, headerBand + box.height + interRowGap);
         const id = node.name;
+        // `after:` the group is a time path: its last child's duration end,
+        // not its painted box, which a spilled caption or a bar drawn at its
+        // minimum width can widen (specs/scheduler-unification.md §8
+        // decisions 6, 7).
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
-            ctx.entityRightEdges.set(id, box.x + box.width);
+            ctx.entityRightEdges.set(id, timeCursorX);
         }
         ctx.currentFlowKey = previousFlowKey;
         const inlineDatePins = computeContainerInlineDatePins({
