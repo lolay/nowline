@@ -36,6 +36,7 @@ graph LR
 
     %% standalone
     gallery_serve["gallery-serve"]
+    gallery_e2e["gallery-e2e"]
     init
     format
     clean
@@ -81,6 +82,7 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |
 | `gallery` | Render everything (`build`), then add this tree to the local review gallery: `scripts/gallery/collect.mjs` snapshots the SVGs, sources and commit into `$(GALLERY_DIR)/raw`, and `scripts/gallery/publish.mjs` adds it to the history in `$(GALLERY_DIR)/data` (newest `GALLERY_KEEP`, default 100) and regenerates `$(GALLERY_DIR)/site`. Each run compares against the previous one, so `make gallery` on `main` and then on a branch shows the branch's render drift. Open `.gallery/site/index.html`, or use `gallery-serve` |
 | `gallery-serve` | Serve `$(GALLERY_DIR)/site` over http on every interface at `GALLERY_PORT` (default 8080), so a phone on the same network can browse it; http also enables the pixel diff and per-item history strip, which `file://` blocks |
+| `gallery-e2e` | Browser leg for the review gallery, next to `mcp-app-e2e`: publishes a synthetic three-build history with `scripts/gallery`, serves it with `scripts/gallery/serve.mjs`, and drives `gallery.js` in headless Chromium (view settings carried across pages, source toggle, Changed only, history links, Diff pixel count, layout and no horizontal scroll at phone and tablet sizes, range compare). Installs Chromium through Playwright unless `NOWLINE_E2E_CHROMIUM` points at an existing binary. Needs a browser, so it is not part of `make ci` or `make test` |
 | `clean` | Remove build / binary / package artifacts (keeps `node_modules`) |
 | `lint-workflows` | actionlint the GitHub Actions workflows (`pnpm lint:workflows`); fails fast without shellcheck on PATH, since actionlint would otherwise skip the `run:` script checks CI does |
 | `lint-man` | `mandoc -T lint` every man page at warning level, minus the two warnings translated pages raise for their localized `NAME` section. Needs `mandoc` on PATH (apt `mandoc`; ships with macOS). Not part of `ci`: Windows has no mandoc, so CI runs it in one Linux job |

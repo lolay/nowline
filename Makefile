@@ -26,7 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci ci-platform pre-commit doctor clean \
-        gallery gallery-serve \
+        gallery gallery-serve gallery-e2e \
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
@@ -183,6 +183,10 @@ mcp-app-e2e: ## MCP Apps preview leg: render the widget in a Claude-like sandbox
 	pnpm --filter @nowline/mcp build
 	pnpm --filter @nowline/integration-tests exec playwright install chromium
 	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.mcp-app.config.ts
+
+gallery-e2e: ## Review gallery browser leg: drive gallery.js over a fixture site (needs a browser, or NOWLINE_E2E_CHROMIUM; not in `make ci`)
+	if [ -z "$$NOWLINE_E2E_CHROMIUM" ]; then pnpm --filter @nowline/integration-tests exec playwright install chromium; fi
+	pnpm --filter @nowline/integration-tests exec vitest run --config vitest.review-gallery.config.ts
 
 mcp-inspector-smoke: ## MCP Inspector CLI smoke: cross-process stdio tools/list + validate + render (not in `make ci`)
 	pnpm --filter @nowline/mcp build
