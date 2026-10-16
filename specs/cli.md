@@ -420,7 +420,7 @@ The one environment input is locale (see below): Nowline honors `LC_ALL` / `LC_M
 
 ## Localization
 
-Nowline localizes axis tick labels, the now-pill text, the quarter prefix, footnote sort, validator messages, and the man page. DSL keywords stay English/ASCII.
+Nowline localizes axis tick labels, the now-pill text, the quarter prefix, validator messages, and the man page. DSL keywords stay English/ASCII.
 
 Two independent locale chains, one per surface:
 

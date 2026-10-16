@@ -156,7 +156,7 @@ footnote zz "Later" on:${id}-a
 footnote aa "Earlier" on:${id}-b
 `;
 
-    it('numbers each region on after the host, in include order, in the one panel', async () => {
+    it('numbers each region on after the host, in include order and then document order, in the one panel', async () => {
         const twoRegions = host.replace(
             'include "./child.nowline" roadmap:isolate',
             'include "./one.nowline" roadmap:isolate\ninclude "./two.nowline" roadmap:isolate',
@@ -172,10 +172,10 @@ footnote aa "Earlier" on:${id}-b
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
         expect(model.footnotes.entries.map((e) => [e.number, e.title, e.region ?? null])).toEqual([
             [1, 'Vendor', null],
-            [2, 'Earlier', 'Region One'],
-            [3, 'Later', 'Region One'],
-            [4, 'Earlier', 'Region Two'],
-            [5, 'Later', 'Region Two'],
+            [2, 'Later', 'Region One'],
+            [3, 'Earlier', 'Region One'],
+            [4, 'Later', 'Region Two'],
+            [5, 'Earlier', 'Region Two'],
         ]);
         // Each superscript carries the panel's number.
         const indicators = (i: number, id: string) =>
@@ -184,8 +184,8 @@ footnote aa "Earlier" on:${id}-b
             );
         const oneA = indicators(0, 'one-a');
         const twoB = indicators(1, 'two-b');
-        expect(oneA?.kind === 'item' && oneA.footnoteIndicators).toEqual([3]);
-        expect(twoB?.kind === 'item' && twoB.footnoteIndicators).toEqual([4]);
+        expect(oneA?.kind === 'item' && oneA.footnoteIndicators).toEqual([2]);
+        expect(twoB?.kind === 'item' && twoB.footnoteIndicators).toEqual([5]);
         // Header, five entries and two region headings, then the padding.
         expect(model.footnotes.box.height).toBe(28 + 7 * 18 + 16);
     });

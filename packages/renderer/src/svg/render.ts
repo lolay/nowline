@@ -44,9 +44,7 @@ import {
     estimateCapacitySuffixWidth,
     FONT_STACK,
     FOOTNOTE_HEADER_BASELINE_OFFSET_PX,
-    FOOTNOTE_HEADER_HEIGHT_PX,
     FOOTNOTE_PANEL_PADDING_PX,
-    FOOTNOTE_ROW_HEIGHT,
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
     frameTabGeometry,
@@ -2056,23 +2054,17 @@ function renderFootnotes(
             'Footnotes',
         ),
     );
-    // First entry baseline = panel-top + header band + one panel padding
-    // (the gap between the header band and the first row).
-    const firstEntryBaselineY = f.box.y + FOOTNOTE_HEADER_HEIGHT_PX + FOOTNOTE_PANEL_PADDING_PX;
+    // Layout places every row: the entry's number on its first row, the
+    // title and description lines (wrapped ones included) at their own
+    // baselines, and a region's heading row above its first entry.
     const numberX = f.box.x + FOOTNOTE_PANEL_PADDING_PX;
-    const titleX = numberX + FOOTNOTE_PANEL_PADDING_PX;
-    // An isolated region's footnotes follow the host's under a heading row
-    // with the region's title, so every heading takes a row of its own.
-    let row = 0;
-    let region: string | undefined;
     for (const e of f.entries) {
-        if (e.region !== undefined && e.region !== region) {
-            region = e.region;
+        if (e.region !== undefined && e.regionHeadingY !== undefined) {
             parts.push(
                 textTag(
                     {
                         x: num(numberX),
-                        y: num(firstEntryBaselineY + row * FOOTNOTE_ROW_HEIGHT),
+                        y: num(e.regionHeadingY),
                         'font-family': fonts.sans,
                         'font-size': 10,
                         'font-weight': 700,
@@ -2081,15 +2073,12 @@ function renderFootnotes(
                     e.region,
                 ),
             );
-            row += 1;
         }
-        const y = firstEntryBaselineY + row * FOOTNOTE_ROW_HEIGHT;
-        row += 1;
         parts.push(
             textTag(
                 {
                     x: num(numberX),
-                    y: num(y),
+                    y: num(e.y),
                     'font-family': fonts.sans,
                     'font-size': 10,
                     'font-weight': 700,
@@ -2098,30 +2087,32 @@ function renderFootnotes(
                 String(e.number),
             ),
         );
-        parts.push(
-            textTag(
-                {
-                    x: num(titleX),
-                    y: num(y),
-                    'font-family': fonts.sans,
-                    'font-size': 11,
-                    'font-weight': 600,
-                    fill: titleColor,
-                },
-                e.title,
-            ),
-        );
-        if (e.description) {
+        for (const line of e.titleLines) {
             parts.push(
                 textTag(
                     {
-                        x: num(titleX + Math.max(120, e.title.length * 6)),
-                        y: num(y),
+                        x: num(line.x),
+                        y: num(line.y),
+                        'font-family': fonts.sans,
+                        'font-size': 11,
+                        'font-weight': 600,
+                        fill: titleColor,
+                    },
+                    line.text,
+                ),
+            );
+        }
+        for (const line of e.descriptionLines ?? []) {
+            parts.push(
+                textTag(
+                    {
+                        x: num(line.x),
+                        y: num(line.y),
                         'font-family': fonts.sans,
                         'font-size': 11,
                         fill: descColor,
                     },
-                    `— ${e.description}`,
+                    line.text,
                 ),
             );
         }

@@ -810,10 +810,32 @@ export interface PositionedFootnoteEntry {
      * host's own footnotes.
      */
     region?: string;
+    /**
+     * Baseline of the region's heading row, on the first entry of each
+     * region's run only.
+     */
+    regionHeadingY?: number;
     number: number;
+    /** Baseline of the entry's first row, where its number sits. */
+    y: number;
     title: string;
+    /** The title's rows: one unless it is wider than the panel. */
+    titleLines: PositionedFootnoteLine[];
     description?: string;
+    /**
+     * The description's rows, the first led by `— `: beside the title when
+     * its first word fits there, the rest wrapped at the title's x. Omitted
+     * when the footnote has no description.
+     */
+    descriptionLines?: PositionedFootnoteLine[];
     style: ResolvedStyle;
+}
+
+/** One row of footnote text, at its baseline. */
+export interface PositionedFootnoteLine {
+    x: number;
+    y: number;
+    text: string;
 }
 
 export interface PositionedIncludeRegion {
