@@ -1,4 +1,5 @@
 import { URI } from 'langium';
+import { collectDocumentDiagnostics, type RawDiagnostic } from '../diagnostics/index.js';
 import type {
     AnchorDeclaration,
     CalendarBlock,
@@ -47,6 +48,7 @@ import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js
 import { isRealIsoDate } from '../util/props.js';
 import {
     checkWaveAgreement,
+    hasParseErrors,
     participates,
     runResolverWaveChecks,
     type WaveIncludeEdge,
@@ -154,16 +156,27 @@ export interface ResolveDiagnostic {
      * resolver diagnostic. See `isRoutedResolveDiagnostic`.
      */
     rule?: 'wave';
+    /**
+     * The lexer or parser error of an included file that failed to parse
+     * (specs/dsl.md, Include rule 13), as `collectDocumentDiagnostics`
+     * reports it. A surface adapts it with its own lexer/parser adapter, so it
+     * reads as it does when that file is checked on its own. Absent on every
+     * other resolver diagnostic.
+     */
+    syntax?: IncludedSyntaxError;
 }
+
+/** A lexer or parser error of an included file. */
+export type IncludedSyntaxError = Extract<RawDiagnostic, { origin: 'lexer' | 'parser' }>;
 
 /**
  * True for a resolver diagnostic that consumers report like a validator
- * diagnostic (file, line, localized, exit 1): a coded one, or one from the
- * wave checks. Every other resolver diagnostic keeps the include-error path
- * (specs/waves.md §6.1).
+ * diagnostic (file, line, localized, exit 1): a coded one, one from the
+ * wave checks, or an included file's syntax error. Every other resolver
+ * diagnostic keeps the include-error path (specs/waves.md §6.1).
  */
 export function isRoutedResolveDiagnostic(d: ResolveDiagnostic): boolean {
-    return d.code !== undefined || d.rule === 'wave';
+    return d.code !== undefined || d.rule === 'wave' || d.syntax !== undefined;
 }
 
 export interface ResolveResult {
@@ -175,6 +188,8 @@ export interface ResolveResult {
 
 interface ResolveContext {
     services: NowlineServices;
+    /** Absolute path of the root file, whose syntax errors the validator reports. */
+    rootAbs: string;
     diagnostics: ResolveDiagnostic[];
     resolving: string[];
     processed: Map<string, { config: ResolvedConfig; content: ResolvedContent }>;
@@ -232,8 +247,10 @@ export async function resolveIncludes(
             const { nodeReadFile } = await import('../util/node-read-file.js');
             return nodeReadFile(p);
         });
+    const absPath = resolvePath('', filePath);
     const ctx: ResolveContext = {
         services: options.services,
+        rootAbs: absPath,
         diagnostics: [],
         resolving: [],
         processed: new Map(),
@@ -243,7 +260,6 @@ export async function resolveIncludes(
         stubs: new Set(),
         failedWaves: new Set(),
     };
-    const absPath = resolvePath('', filePath);
     const { config, content } = await resolveFile(file, absPath, ctx);
     // The wave S, P and G evaluations run once, over everything resolved.
     ctx.diagnostics.push(
@@ -283,6 +299,10 @@ async function resolveFile(
         ctx.processed.set(absPath, empty);
         return empty;
     }
+
+    // Each included file once, in every include mode: a `roadmap:ignore`
+    // child's config is still merged (Include rule 13).
+    if (absPath !== ctx.rootAbs) ctx.diagnostics.push(...syntaxDiagnostics(file, absPath));
 
     ctx.resolving.push(absPath);
     // The root is parsed from a `memory:` URI by every surface, so files are
@@ -363,7 +383,11 @@ async function resolveFile(
             ctx.diagnostics,
         );
 
-        if (roadmapMode === 'isolate' && !childContent.roadmap) {
+        // A partial AST would report a roadmap or start: the parser lost, as
+        // an include error that hides the syntax error (Include rule 13).
+        const isParsed = !hasParseErrors(childFile);
+
+        if (isParsed && roadmapMode === 'isolate' && !childContent.roadmap) {
             ctx.diagnostics.push({
                 severity: 'error',
                 message: `Cannot isolate "${childRelPath}": it has no roadmap declaration.`,
@@ -375,7 +399,7 @@ async function resolveFile(
         // Non-ignored includes with a child roadmap must agree on start: with the parent.
         // Deliberate divergence from the usual "parent wins with warning" merge behaviour
         // because start: defines the shared timeline baseline.
-        if (roadmapMode !== 'ignore' && childFile.roadmapDecl) {
+        if (isParsed && roadmapMode !== 'ignore' && childFile.roadmapDecl) {
             const parentStart = readStartProp(file.roadmapDecl);
             const childStart = readStartProp(childFile.roadmapDecl);
             if (parentStart !== childStart) {
@@ -403,6 +427,30 @@ async function resolveFile(
     const result = { config, content };
     ctx.processed.set(absPath, result);
     return result;
+}
+
+/**
+ * An included file's lexer and parser errors, at their line in that file.
+ * An included file is parsed without validation, so nothing else reports
+ * them.
+ */
+function syntaxDiagnostics(file: NowlineFile, absPath: string): ResolveDiagnostic[] {
+    const doc = file.$document;
+    if (!doc) return [];
+    const out: ResolveDiagnostic[] = [];
+    for (const raw of collectDocumentDiagnostics(doc)) {
+        if (raw.origin === 'validation') continue;
+        // Chevrotain lines are 1-based; an error at end of input has NaN.
+        const line = raw.origin === 'lexer' ? raw.error.line : raw.error.token?.startLine;
+        out.push({
+            severity: 'error',
+            message: raw.error.message,
+            sourcePath: absPath,
+            ...(line !== undefined && Number.isFinite(line) ? { line: line - 1 } : {}),
+            syntax: raw,
+        });
+    }
+    return out;
 }
 
 function getIncludeMode(

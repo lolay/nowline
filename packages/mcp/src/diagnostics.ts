@@ -101,11 +101,22 @@ export function collectMcpDiagnostics(
 }
 
 /**
- * A routed (wave-rule) include-resolver diagnostic (specs/waves.md §6.1) as
- * an MCP diagnostic: its stable code, the file it points into and a 1-based
- * line. WV8, the one uncoded wave rule, is labelled like the validator's copy.
+ * A routed include-resolver diagnostic (specs/waves.md §6.1) as an MCP
+ * diagnostic: its stable code, the file it points into and a 1-based line.
+ * WV8, the one uncoded wave rule, is labelled like the validator's copy.
  */
 export function resolveDiagnosticToMcp(diag: ResolveDiagnostic): McpDiagnostic {
+    // An included file's syntax error, labelled like the root file's own.
+    if (diag.syntax) {
+        return {
+            file: diag.sourcePath,
+            line: (diag.line ?? 0) + 1,
+            column: 1,
+            severity: 'error',
+            code: diag.syntax.origin === 'lexer' ? 'lexing-error' : 'parsing-error',
+            message: diag.message,
+        };
+    }
     const suggestion = extractSuggestion(diag.message);
     return {
         file: diag.sourcePath,

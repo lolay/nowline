@@ -689,6 +689,109 @@ describeBuilt('render: include diagnostics', () => {
         });
     });
 
+    // Include rule 13: an included file's syntax error is reported in that
+    // file, exactly as checking the file on its own reports it.
+    describe('an included file that fails to parse', () => {
+        const host = (options = '') =>
+            [
+                'nowline v1',
+                '',
+                `include "./child.nowline"${options}`,
+                '',
+                'roadmap host "Host" start:2026-01-05',
+                '',
+                'swimlane core "Core"',
+                '  item api "API" duration:3w',
+                '',
+            ].join('\n');
+        const child = [
+            'nowline v1',
+            '',
+            'roadmap child "Child" start:2026-01-05',
+            '',
+            'swimlane plugin "Plugin"',
+            '  item alpha "Plugin alpha" duration:3w',
+            'swimlane "unterminated',
+            '',
+        ].join('\n');
+
+        for (const mode of [['-n'], ['-o', '-']]) {
+            it(`fails the host like the child (${mode.join(' ')})`, async () => {
+                await withTempDir(async (dir) => {
+                    await writeFiles(dir, { 'host.nowline': host(), 'child.nowline': child });
+                    const own = await runCliBuilt(['child.nowline', ...mode], {
+                        cwd: dir,
+                        env: NO_LOCALE_ENV,
+                    });
+                    expect(own.exitCode).toBe(1);
+                    expect(own.stderr).toContain('child.nowline:7:10 error: ');
+
+                    const r = await runCliBuilt(['host.nowline', ...mode], {
+                        cwd: dir,
+                        env: NO_LOCALE_ENV,
+                    });
+                    expect(r.exitCode).toBe(1);
+                    expect(r.stdout).toBe('');
+                    expect(r.stderr).toBe(own.stderr);
+                });
+            });
+        }
+
+        it('--diagnostic-format json reports the child diagnostic the child reports', async () => {
+            await withTempDir(async (dir) => {
+                await writeFiles(dir, { 'host.nowline': host(), 'child.nowline': child });
+                const args = ['-n', '--diagnostic-format', 'json'];
+                const own = await runCliBuilt(['child.nowline', ...args], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                const r = await runCliBuilt(['host.nowline', ...args], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(r.exitCode).toBe(1);
+                const diagnostics = JSON.parse(r.stderr).diagnostics;
+                expect(diagnostics).toEqual(JSON.parse(own.stderr).diagnostics);
+                expect(diagnostics).toMatchObject([
+                    { file: 'child.nowline', line: 7, column: 10, code: 'lex-error' },
+                ]);
+            });
+        });
+
+        it('fails a roadmap:ignore style library too', async () => {
+            await withTempDir(async (dir) => {
+                await writeFiles(dir, {
+                    'host.nowline': host(' roadmap:ignore'),
+                    'child.nowline': 'config\n\nstyle s "S" ,\n',
+                });
+                const r = await runCliBuilt(['host.nowline', '-n'], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(r.exitCode).toBe(1);
+                expect(r.stderr).toContain('child.nowline:3:13 error: ');
+            });
+        });
+
+        it('reports the syntax error, not a start: mismatch (exit 1, not 3)', async () => {
+            await withTempDir(async (dir) => {
+                // The unterminated title swallows `start:`.
+                await writeFiles(dir, {
+                    'host.nowline': host(),
+                    'child.nowline': child.replace('"Child"', '"Child'),
+                });
+                const r = await runCliBuilt(['host.nowline', '-n'], {
+                    cwd: dir,
+                    env: NO_LOCALE_ENV,
+                });
+                expect(r.exitCode).toBe(1);
+                expect(r.stderr).toContain('child.nowline:5:18 error: ');
+                expect(r.stderr).not.toContain('Both files must declare the same start date');
+                expect(r.stderr).not.toContain('include error');
+            });
+        });
+    });
+
     it('REGRESSION: a missing include keeps exit 3 and the same message', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'parent.nowline');

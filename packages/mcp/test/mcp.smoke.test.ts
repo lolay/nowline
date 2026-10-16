@@ -451,6 +451,17 @@ describe('@nowline/mcp — wave-rule include diagnostics', () => {
             'include "./warn-child.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
             'utf-8',
         );
+        // Include rule 13: the unterminated string is a lexer error on line 4.
+        writeFileSync(
+            path.join(dir, 'broken-parent.nowline'),
+            'include "./broken-child.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
+            'utf-8',
+        );
+        writeFileSync(
+            path.join(dir, 'broken-child.nowline'),
+            'roadmap c "C"\nswimlane c "C"\n  item y duration:1w\nswimlane "unterminated\n',
+            'utf-8',
+        );
         writeFileSync(
             path.join(dir, 'warn-child.nowline'),
             'swimlane c "C"\n  item y duration:1w wave:w1\n',
@@ -488,6 +499,18 @@ describe('@nowline/mcp — wave-rule include diagnostics', () => {
         expect(structured.ok).toBe(true);
         expect(structured.diagnostics.map(brief)).toEqual([
             ['NL.W0702', 'warning', path.join(tmpDir, 'waves', 'warn-child.nowline'), 2],
+        ]);
+    });
+
+    it("validate reports an included file's syntax error in that file", async () => {
+        const result = await client.callTool({
+            name: 'validate',
+            arguments: { path: 'waves/broken-parent.nowline' },
+        });
+        const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
+        expect(structured.ok).toBe(false);
+        expect(structured.diagnostics.map(brief)).toEqual([
+            ['lexing-error', 'error', path.join(tmpDir, 'waves', 'broken-child.nowline'), 4],
         ]);
     });
 
