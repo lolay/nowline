@@ -1898,10 +1898,10 @@ swimlane t "T"
 });
 
 describe('layoutRoadmap geometry after a late vertical shift', () => {
-    // Layout moves bars down AFTER placing them in two places: a row that
-    // grows retroactively (a taller item lands back on an earlier row)
-    // pushes every later row down, and a marker band that outgrows its
-    // sizing pushes the whole chart down. Everything attached to a bar has
+    // Layout moves bars down AFTER placing them when a marker band outgrows
+    // its sizing and pushes the whole chart down; a row that grew after
+    // later rows were placed did the same until rows stopped moving up
+    // (specs/true-width-layout.md §3.2). Everything attached to a bar has
     // to move with it: dependency-arrow ends, milestone slack arrows, and
     // inline-date glyphs. The attach rules are restated here (see
     // specs/rendering.md "Dependency Arrows" and "Inline-date glyph"), not

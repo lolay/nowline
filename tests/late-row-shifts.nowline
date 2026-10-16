@@ -1,23 +1,19 @@
 nowline v1
 
 // Fixture for geometry that must follow a bar when layout moves it down
-// AFTER placing it. Layout does that in two places:
-//
-//   - Retroactive row growth: an item that lands back on an existing row
-//     and is taller than it grows that row after the rows below it were
-//     placed, so every later row moves down.
-//   - Marker-band growth: when the anchors and milestones need more
-//     marker rows than the band was sized for, the band grows and the
-//     whole chart moves down.
+// AFTER placing it: when the anchors and milestones need more marker rows
+// than the band was sized for, the band grows and the whole chart moves
+// down. (Retroactive row growth, an item landing back on an earlier row
+// and growing it, went away when rows stopped moving up,
+// specs/true-width-layout.md §3.2; the first lane keeps that shape.)
 //
 // What to look for when rendering this:
-//   - Retroactive lane: "Auth refactor" spills, so "Next" and "Plain
-//     thing" drop to row 1. "Next one" fits back on row 0 and wraps,
-//     growing row 0 by 16px after rows 1-3 were placed. The a -> b arrow
-//     must end on "Next"'s midline, the c -> d arrow must leave "Plain
-//     thing" at its progress strip, and the calendar glyphs on "Plain
-//     thing", the filled group's chiclet row and the parallel's header
-//     band must sit on their own (moved) boxes.
+//   - First lane: "Auth refactor" spills, so "Next" and "Plain thing"
+//     drop to row 1, and every later child stays at or below the one
+//     before it. The a -> b arrow must end on "Next"'s midline, the
+//     c -> d arrow must leave "Plain thing" at its progress strip, and the
+//     calendar glyphs on "Plain thing", the filled group's chiclet row and
+//     the parallel's header band must sit on their own (moved) boxes.
 //   - The "Ship" milestone's slack arrow leaves "Gamma" (row 2) at its
 //     progress strip, not 16px above it.
 //   - Marker band: the anchor and the "Beta" milestone collide, so the band

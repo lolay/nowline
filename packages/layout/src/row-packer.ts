@@ -1,8 +1,10 @@
-// RowPacker — the topmost-fit row-pack engine shared by `SwimlaneNode`
-// and `GroupNode`. A child never lands above the one before it. Tracks rows of variable height (each row's height is
-// the max of its placed children's heights, with a per-packer minimum)
-// and bumps a child to a new row when it would collide with a sibling's
-// `rightEdge`, caption `spillX`, or a slack-arrow corridor.
+// RowPacker — the row-pack engine shared by `SwimlaneNode` and
+// `GroupNode`. A child never lands above the one before it
+// (specs/true-width-layout.md §3.2), so it either joins the last row or
+// opens a new one below it: it drops a row when it would collide with the
+// last row's `rightEdge`, caption `spillX`, or a slack-arrow corridor.
+// Each row's height is the max of its placed children's heights, with a
+// per-packer minimum.
 //
 // Two-phase API per child:
 //   1) `placeItem(...)` / `placeBlock(...)` decides which row the child
@@ -12,15 +14,9 @@
 //      back into the packer so the row's `rightEdge` / `spillX` advance
 //      and the row's height grows to accommodate the new child.
 //
-// When a row's height grows after later rows already exist, the packer
-// shifts every subsequent row (and every positioned child placed in it)
-// downward by the delta, through the shared `shiftTrackChildY` (see
-// `positioned-shift.ts`). Items keep their row-anchored top edge; the
-// row simply gets taller. This keeps the contract "all children in a
-// row share that row's top y" intact while letting individual children
-// grow vertically (e.g. wrapped label-chiclet stacks in m3).
+// A child only ever commits to the last row, so a row that grows has no
+// rows below it to move.
 
-import { shiftTrackChildY } from './positioned-shift.js';
 import type { PositionedItem, PositionedTrackChild, SlackCorridor } from './types.js';
 
 export interface PackedRow {
@@ -33,10 +29,6 @@ export interface PackedRow {
     /** Reserved x for caption spill. Items whose `desiredStart < spillX`
      *  bump to a new row even if `rightEdge` would let them in. */
     spillX: number;
-    /** Children placed in this row. Used when the row's height grows
-     *  after later rows exist — every child in every later row shifts
-     *  down by the delta. */
-    placedChildren: PositionedTrackChild[];
 }
 
 export interface RowPackerOptions {
@@ -133,12 +125,6 @@ export class RowPacker {
     private readonly opts: RowPackerOptions;
     /** Rightmost `BlockCommitInput.paintedRight` committed so far. */
     private paintedRightX: number;
-    /**
-     * Row of the last committed child. The next child never lands above it,
-     * so a track reads top to bottom in DSL order
-     * (specs/true-width-layout.md §3.2).
-     */
-    private lastRowIndex = 0;
 
     constructor(opts: RowPackerOptions) {
         this.opts = opts;
@@ -149,28 +135,26 @@ export class RowPacker {
                 height: opts.minRowHeight,
                 rightEdge: opts.laneLeftX,
                 spillX: opts.laneLeftX,
-                placedChildren: [],
             },
         ];
     }
 
     /**
-     * Find the topmost row, at or below the last committed child's, where
-     * the item's natural extent fits without colliding with sibling content
-     * or a slack corridor; appending a fresh row at the bottom when none of
-     * those rows fit.
+     * Join the last row (the last committed child's) when the item's natural
+     * extent fits there without colliding with sibling content or a slack
+     * corridor; otherwise append a fresh row below it.
      */
     placeItem(input: ItemPlacementInput): ItemPlacement {
-        for (let i = this.lastRowIndex; i < this.rows.length; i += 1) {
-            const r = this.rows[i];
-            if (input.desiredStart < r.rightEdge) continue;
-            if (input.desiredStart < r.spillX) continue;
-            if (this.rowIntersectsCorridor(r, input)) continue;
-            if (this.rowCrossesOwnCorridor(r, input)) continue;
-            return { rowIndex: i, y: r.y };
-        }
-        const fresh = this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
-        return { rowIndex: this.rows.length - 1, y: fresh.y };
+        const last = this.rows[this.rows.length - 1];
+        const fits =
+            input.desiredStart >= last.rightEdge &&
+            input.desiredStart >= last.spillX &&
+            !this.rowIntersectsCorridor(last, input) &&
+            !this.rowCrossesOwnCorridor(last, input);
+        const row = fits
+            ? last
+            : this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
+        return { rowIndex: this.rows.length - 1, y: row.y };
     }
 
     /**
@@ -190,17 +174,13 @@ export class RowPacker {
 
     /**
      * Record a placed item back into its row. Grows the row's height to
-     * fit the item, advances `rightEdge`, sets the caption spill, and
-     * shifts later rows down if this row got taller.
+     * fit the item, advances `rightEdge` and sets the caption spill.
      */
     commitItem(input: ItemCommitInput): void {
         const row = this.rows[input.rowIndex];
-        const target = Math.max(input.placed.box.height, input.rowHeight ?? 0);
-        this.growRowHeight(input.rowIndex, target);
+        row.height = Math.max(row.height, input.placed.box.height, input.rowHeight ?? 0);
         row.rightEdge = input.logicalEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
-        row.placedChildren.push(input.placed);
-        this.lastRowIndex = input.rowIndex;
     }
 
     /**
@@ -209,11 +189,9 @@ export class RowPacker {
      */
     commitBlock(input: BlockCommitInput): void {
         const row = this.rows[input.rowIndex];
-        this.growRowHeight(input.rowIndex, input.blockHeight);
+        row.height = Math.max(row.height, input.blockHeight);
         row.rightEdge = input.blockEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
-        row.placedChildren.push(input.placed);
-        this.lastRowIndex = input.rowIndex;
         if (input.paintedRight !== undefined && input.paintedRight > this.paintedRightX) {
             this.paintedRightX = input.paintedRight;
         }
@@ -272,23 +250,8 @@ export class RowPacker {
             height,
             rightEdge: this.opts.laneLeftX,
             spillX: this.opts.laneLeftX,
-            placedChildren: [],
         };
         this.rows.push(r);
         return r;
-    }
-
-    private growRowHeight(rowIndex: number, newHeight: number): void {
-        const row = this.rows[rowIndex];
-        const delta = newHeight - row.height;
-        if (delta <= 0) return;
-        row.height = newHeight;
-        for (let i = rowIndex + 1; i < this.rows.length; i += 1) {
-            const r = this.rows[i];
-            r.y += delta;
-            for (const child of r.placedChildren) {
-                shiftTrackChildY(child, delta);
-            }
-        }
     }
 }
