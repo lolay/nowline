@@ -3,7 +3,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/3 groups done | last review: wave 2 (1 security should-fix, 3 nits); wave 3 pending | current: fixup 2 (wave 2 review: manifest path validation) | over expected: ~$26 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
+  Status: 3/3 groups done | last review: wave 2 (1 security should-fix, 3 nits); wave 3 (1 security should-fix, 1 nit) | current: fixup 2 (manifest path and URL validation) | over expected: ~$26 of ~$11 (session before kickoff: m1 build and planning) | updated 2026-10-16
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2 | confirmed 2026-10-16 session 4adab00a-71c4-5a6e-9eb4-2d2721d1a6e6: Unattended (Recommended)
 
@@ -287,10 +287,13 @@ Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNA
   - nit `gallery.js:69`: an invalid URL param shadows a valid stored value; validate against `choices` before falling back.
   - nit `scripts/gallery/lib/html.mjs:183`: unchanged/new status note renders below the open source; emit it above `.source-row`.
 - wave 2 (7f423c9), log-only: 0 blocking, 1 should-fix (security, blocks m4), 3 nits. Migration, baseline choice, id replacement, `--open-prs` parsing, pinned-baseline release, HTML escaping and Make changes clean.
-  - should-fix `scripts/gallery/publish.mjs:116` (also `:140`, `:226`, `:233`): raw-manifest fields are trusted as paths. In m4 the privileged `workflow_run` job publishes a PR-produced artifact, so `"id": "../../x"` makes `addBuild` `rm -r` outside the data dir (reproduced); `group.id` / `entry.slug` steer writes; `entry.files` can read any runner file (e.g. `.git/config`) into the public site; `line: "main"` from a PR artifact lands on main and `latest/`. Fix: validate id/slug as `[A-Za-z0-9._-]+` (not `.`/`..`), file paths relative with no `..` and resolved inside the source root, and for PR artifacts `line === 'pr-' + pr.number`. Queued as fixup 2 after wave 3; must land before m4.
+  - should-fix `scripts/gallery/publish.mjs:116` (also `:140`, `:226`, `:233`): raw-manifest fields are trusted as paths. In m4 the privileged `workflow_run` job publishes a PR-produced artifact, so `"id": "../../x"` makes `addBuild` `rm -r` outside the data dir (reproduced); `group.id` / `entry.slug` steer writes; `entry.files` can read any runner file (e.g. `.git/config`) into the public site; `line: "main"` from a PR artifact lands on main and `latest/`. Fix: validate id/slug as `[A-Za-z0-9._-]+` (not `.`/`..`), file paths relative with no `..` and resolved inside the source root, and for PR artifacts `line === 'pr-' + pr.number`. In fixup 2; must land before m4.
   - nit `publish.mjs:60`, `collect.mjs:137`: shas passed to git positionally; add `--end-of-options` or require 40-hex.
   - nit `scripts/gallery/lib/lines.mjs:95`: pinned candidates sorted by `date` string across timezone offsets; sort by `Date.parse`.
   - nit `lines.mjs:135`: a local branch named `pr-12` is treated as a PR line; classify by the manifest's `pr` field.
+- wave 3 (ae13dc0, 846dbd8, c1fd456), log-only: 0 blocking, 1 should-fix (security, blocks m4), 1 nit. ae13dc0 verified to fix all wave 1 findings; s2 sections, redirects, headers, builds.json, pickers and escaping clean; s3 assertions complete (`toContain` hrefs and "4 unchanged" judged sound).
+  - should-fix `scripts/gallery/lib/html.mjs:105` (also `:450`, `:529`, `:306`, `:84`, `gallery.js:607`): `pr.url`, `runUrl`, `repoUrl` go into `href` HTML-escaped only, so `javascript:` passes (reproduced with `renderPrBuilds`). Fix: `safeUrl()` allowing only `https:` (PR URL pinned to `https://github.com/<repo>/pull/<n>`), at validation and render. Added to fixup 2.
+  - nit `scripts/gallery/publish.mjs:285`: branch lines sorted by raw date string; use `Date.parse`. Added to fixup 2.
 
 ## Token log
 
