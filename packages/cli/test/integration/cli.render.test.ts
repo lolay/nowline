@@ -891,6 +891,67 @@ describeBuilt('render: unresolved references in an included file', () => {
     });
 });
 
+// An included file's syntax error (specs/dsl.md, Include rule 13) is reported
+// in that file at its position, exit 1, in every include mode.
+describeBuilt('render: syntax errors in an included file', () => {
+    const host = (mode: string) =>
+        [
+            'nowline v1',
+            '',
+            `include "./child.nowline" roadmap:${mode}`,
+            '',
+            'roadmap host "Host" start:2026-01-05',
+            '',
+            'swimlane core "Core"',
+            '  item api "API" duration:3w',
+            '',
+        ].join('\n');
+    const child = [
+        'nowline v1',
+        '',
+        'roadmap child "Child" start:2026-01-05',
+        '',
+        'swimlane plugin "Plugin"',
+        '  item alpha "Plugin alpha" duration:3w',
+        'swimlane "unterminated',
+        '',
+    ].join('\n');
+
+    async function run(args: string[]) {
+        let result: Awaited<ReturnType<typeof runCliBuilt>> | undefined;
+        await withTempDir(async (dir) => {
+            await fs.writeFile(path.join(dir, 'host.nowline'), host(args[0]));
+            await fs.writeFile(path.join(dir, 'child.nowline'), child);
+            result = await runCliBuilt(['host.nowline', '-n', ...args.slice(1)], { cwd: dir });
+        });
+        return result!;
+    }
+
+    for (const mode of ['merge', 'isolate', 'ignore']) {
+        it(`roadmap:${mode} fails with the child's error at its position (exit 1)`, async () => {
+            const r = await run([mode]);
+            expect(r.exitCode).toBe(1);
+            expect(r.stderr).toContain('child.nowline:7:10 error: unexpected character');
+        });
+    }
+
+    it('--diagnostic-format json carries the code and the child file', async () => {
+        const r = await run(['merge', '--diagnostic-format', 'json']);
+        expect(r.exitCode).toBe(1);
+        const doc = JSON.parse(r.stderr);
+        expect(
+            doc.diagnostics.map(
+                (d: { file: string; line: number; column: number; code: string }) => [
+                    d.file,
+                    d.line,
+                    d.column,
+                    d.code,
+                ],
+            ),
+        ).toEqual([['child.nowline', 7, 10, 'lex-error']]);
+    });
+});
+
 // The render-time non-working display (specs/working-calendar.md §4.2; m2p
 // phase 4). Precedence: --non-working, then the file's
 // `default roadmap non-working:` key, then hide. "Unset" is undefined, so the

@@ -49,8 +49,9 @@ export {
 export type { StagedRoadmap, StageResult } from '@nowline/renderer';
 
 /**
- * Thrown when include resolution reports a wave-rule error (a coded or
- * `rule: 'wave'` diagnostic, specs/waves.md §6.1) and no other include error.
+ * Thrown when include resolution reports a routed error (a coded diagnostic,
+ * or one with a `rule`: a wave rule, specs/waves.md §6.1, or an included
+ * file's syntax error) and no other include error.
  * `message` is the same `@nowline/export: include error in …` text as the
  * plain include error; `diagnostics` carries every resolver diagnostic, errors
  * and warnings, so a surface can report the routed ones (see

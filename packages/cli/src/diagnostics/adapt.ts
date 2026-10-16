@@ -91,8 +91,8 @@ function mapSeverity(severity: number | undefined): DiagnosticSeverity {
 }
 
 /**
- * Adapt a routed (wave-rule) include-resolver diagnostic, which carries only
- * a 0-based line. `contents` is the text of the file it points into, when
+ * Adapt a routed include-resolver diagnostic, which carries a 0-based line
+ * (and, for an included file's syntax error, a 0-based column). `contents` is the text of the file it points into, when
  * known: the span covers the line's text, so the code frame underlines the
  * declaration like a validator diagnostic does. A coded diagnostic keeps
  * `{ code, args }` in `data` for re-localization.
@@ -104,6 +104,20 @@ export function adaptResolveDiagnostic(
 ): CliDiagnostic {
     const line = (diag.line ?? 0) + 1;
     const text = contents?.split(/\r?\n/)[line - 1]?.trimEnd() ?? '';
+    // A syntax error points at a character, as the root's does; every other
+    // routed diagnostic underlines its line.
+    if (diag.column !== undefined) {
+        const column = diag.column + 1;
+        return {
+            file,
+            line,
+            column,
+            severity: diag.severity,
+            span: { start: { line, column }, end: { line, column: column + 1 } },
+            code: diag.code ?? diag.rule ?? inferCodeFromMessage(diag.message),
+            message: diag.message,
+        };
+    }
     const column = text.length - text.trimStart().length + 1;
     return {
         file,

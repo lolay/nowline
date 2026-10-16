@@ -1,0 +1,3 @@
+```release-note:fixed
+Validating or rendering a roadmap now reports a lexer or parser error inside a file it includes, at that file's line and column with exit 1, in every include mode. Before, the root exited clean and rendered whatever partial content the parser recovered from the child.
+```

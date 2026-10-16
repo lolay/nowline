@@ -142,6 +142,8 @@ export interface ResolveDiagnostic {
     sourcePath: string;
     /** 0-based line in `sourcePath`. */
     line?: number;
+    /** 0-based column in `sourcePath`; set on a syntax diagnostic only. */
+    column?: number;
     /**
      * Stable code of a coded diagnostic (the wave rules, specs/waves.md
      * §7.4, and an included file's unresolved reference, NL.E0302). Absent
@@ -152,20 +154,23 @@ export interface ResolveDiagnostic {
     args?: unknown[];
     /**
      * `'wave'` on every diagnostic of the wave checks (specs/waves.md §6.1),
-     * coded or not (WV8 reuses an uncoded message). Absent on every other
-     * resolver diagnostic. See `isRoutedResolveDiagnostic`.
+     * coded or not (WV8 reuses an uncoded message). `'lex-error'` or
+     * `'parse-error'` on an included file's syntax error, whose text is the
+     * parser's own, as in the validator's report of the root's. Absent on
+     * every other resolver diagnostic. See `isRoutedResolveDiagnostic`.
      */
-    rule?: 'wave';
+    rule?: 'wave' | 'lex-error' | 'parse-error';
 }
 
 /**
  * True for a resolver diagnostic that consumers report like a validator
  * diagnostic (file, line, localized, exit 1): a coded one (the wave rules and
- * NL.E0302), or one from the wave checks. Every other resolver diagnostic
- * keeps the include-error path (specs/waves.md §6.1).
+ * NL.E0302), one from the wave checks, or an included file's syntax error.
+ * Every other resolver diagnostic keeps the include-error path
+ * (specs/waves.md §6.1).
  */
 export function isRoutedResolveDiagnostic(d: ResolveDiagnostic): boolean {
-    return d.code !== undefined || d.rule === 'wave';
+    return d.code !== undefined || d.rule !== undefined;
 }
 
 export interface ResolveResult {
@@ -189,6 +194,8 @@ interface ResolveContext {
     stubs: Set<ResolvedContent>;
     /** Children that failed include rule 12 (NL.E0202). */
     failedWaves: Set<string>;
+    /** Files whose syntax errors were reported (the root's are the validator's). */
+    syntaxChecked: Set<string>;
 }
 
 function emptyConfig(): ResolvedConfig {
@@ -244,8 +251,10 @@ export async function resolveIncludes(
         edges: new Map(),
         stubs: new Set(),
         failedWaves: new Set(),
+        syntaxChecked: new Set(),
     };
     const absPath = resolvePath('', filePath);
+    ctx.syntaxChecked.add(absPath);
     const { config, content } = await resolveFile(file, absPath, ctx);
     // The wave S, P and G evaluations run once, over everything resolved.
     ctx.diagnostics.push(
@@ -340,6 +349,14 @@ async function resolveFile(
             });
             continue;
         }
+        // An included file is never validated, so its syntax errors are
+        // reported here, in that file, whatever the include's modes: a
+        // `roadmap:ignore` child's config still merges, and a partial AST
+        // would merge or drop declarations silently.
+        if (!ctx.syntaxChecked.has(childAbsPath)) {
+            ctx.syntaxChecked.add(childAbsPath);
+            ctx.diagnostics.push(...syntaxDiagnostics(childFile, childAbsPath));
+        }
 
         const { config: childConfig, content: childContent } = await resolveFile(
             childFile,
@@ -408,6 +425,41 @@ async function resolveFile(
     const result = { config, content };
     ctx.processed.set(absPath, result);
     return result;
+}
+
+/** The lexer and parser errors of a parsed file, as resolver diagnostics. */
+function syntaxDiagnostics(file: NowlineFile, absPath: string): ResolveDiagnostic[] {
+    const result = file.$document?.parseResult;
+    if (!result) return [];
+    const out: ResolveDiagnostic[] = [];
+    // Chevrotain positions are 1-based; a resolver diagnostic's are 0-based.
+    // An error at end of input has no position (NaN or -1), so it has none.
+    const at = (line: number | undefined, column: number | undefined) =>
+        line === undefined || !(line >= 1)
+            ? {}
+            : {
+                  line: line - 1,
+                  ...(column !== undefined && column >= 1 ? { column: column - 1 } : {}),
+              };
+    for (const err of result.lexerErrors) {
+        out.push({
+            severity: 'error',
+            message: err.message,
+            sourcePath: absPath,
+            ...at(err.line, err.column),
+            rule: 'lex-error',
+        });
+    }
+    for (const err of result.parserErrors) {
+        out.push({
+            severity: 'error',
+            message: err.message,
+            sourcePath: absPath,
+            ...at(err.token.startLine, err.token.startColumn),
+            rule: 'parse-error',
+        });
+    }
+    return out;
 }
 
 function getIncludeMode(

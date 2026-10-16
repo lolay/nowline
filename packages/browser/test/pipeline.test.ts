@@ -240,6 +240,15 @@ swimlane eng "Engineering"
         ]);
     });
 
+    it("reports a child's syntax error at the child path, line and column", async () => {
+        const result = await render('swimlane c "C"\n  item y duration:1w\nswimlane "oops\n');
+        expect(result.kind).toBe('diagnostics');
+        if (result.kind !== 'diagnostics') return;
+        expect(result.diagnostics.map((d) => [d.code, d.file, d.line, d.column])).toEqual([
+            ['lex-error', '/workspace/other.nowline', 3, 10],
+        ]);
+    });
+
     it('keeps an uncoded include error as an include row, verbatim', async () => {
         const result = await renderSource(parent, {
             filePath: '/workspace/main.nowline',
