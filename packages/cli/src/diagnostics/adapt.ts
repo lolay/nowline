@@ -91,33 +91,56 @@ function mapSeverity(severity: number | undefined): DiagnosticSeverity {
 }
 
 /**
- * Adapt a routed (wave-rule) include-resolver diagnostic, which carries only
- * a 0-based line. `contents` is the text of the file it points into, when
- * known: the span covers the line's text, so the code frame underlines the
- * declaration like a validator diagnostic does. A coded diagnostic keeps
- * `{ code, args }` in `data` for re-localization.
+ * Adapt a routed include-resolver diagnostic (a wave rule or an included
+ * file's NL.E0302). With a `range`, the column and span are the validator's
+ * for the same finding. Without one, the diagnostic carries only a 0-based
+ * line: `contents` is the text of the file it points into, when known, and
+ * the span covers the line's text, so the code frame still underlines the
+ * declaration. A coded diagnostic keeps `{ code, args }` in `data` for
+ * re-localization.
  */
 export function adaptResolveDiagnostic(
     diag: ResolveDiagnostic,
     file: string,
     contents?: string,
 ): CliDiagnostic {
-    const line = (diag.line ?? 0) + 1;
-    const text = contents?.split(/\r?\n/)[line - 1]?.trimEnd() ?? '';
-    const column = text.length - text.trimStart().length + 1;
     return {
         file,
-        line,
-        column,
+        ...resolveLocation(diag, contents),
         severity: diag.severity,
-        span:
-            text.trim() === ''
-                ? undefined
-                : { start: { line, column }, end: { line, column: text.length + 1 } },
         // WV8 is uncoded; label it the way the validator's copy is labelled.
         code: diag.code ?? inferCodeFromMessage(diag.message),
         message: diag.message,
         suggestion: extractSuggestion(diag.message),
         data: diag.code === undefined ? undefined : { code: diag.code, args: diag.args ?? [] },
+    };
+}
+
+function resolveLocation(
+    diag: ResolveDiagnostic,
+    contents: string | undefined,
+): Pick<CliDiagnostic, 'line' | 'column' | 'span'> {
+    if (diag.range) {
+        const line = diag.range.start.line + 1;
+        const column = diag.range.start.character + 1;
+        return {
+            line,
+            column,
+            span: {
+                start: { line, column },
+                end: { line: diag.range.end.line + 1, column: diag.range.end.character + 1 },
+            },
+        };
+    }
+    const line = (diag.line ?? 0) + 1;
+    const text = contents?.split(/\r?\n/)[line - 1]?.trimEnd() ?? '';
+    const column = text.length - text.trimStart().length + 1;
+    return {
+        line,
+        column,
+        span:
+            text.trim() === ''
+                ? undefined
+                : { start: { line, column }, end: { line, column: text.length + 1 } },
     };
 }

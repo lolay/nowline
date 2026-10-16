@@ -41,6 +41,7 @@ export {
     type ResolvedConfig,
     type ResolvedContent,
     type ResolveIncludesOptions,
+    type ResolveRange,
     type ResolveResult,
     resolveIncludes,
 } from './language/include-resolver.js';

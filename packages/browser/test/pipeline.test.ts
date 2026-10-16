@@ -311,6 +311,13 @@ describe('fromResolveDiagnostic', () => {
         expect(fromResolveDiagnostic(coded).line).toBe(5);
     });
 
+    it("takes the column from a routed diagnostic's range", () => {
+        const range = { start: { line: 4, character: 21 }, end: { line: 4, character: 28 } };
+        const row = fromResolveDiagnostic({ ...coded, range });
+        expect([row.line, row.column]).toEqual([5, 22]);
+        expect(fromResolveDiagnostic(coded).column).toBe(1);
+    });
+
     it('labels WV8 (uncoded, wave-marked) like the validator, not as an include row', () => {
         const row = fromResolveDiagnostic({
             severity: 'error',

@@ -13,7 +13,7 @@
 // (`code` + `args`, the shape `acceptTr` stores), except WV8's fixed rule-23
 // text.
 
-import type { AstNode } from 'langium';
+import { type AstNode, getDiagnosticRange, type Properties } from 'langium';
 import type { IncludeDeclaration, NowlineFile, WaveDeclaration } from '../generated/ast.js';
 import {
     isNowlineFile,
@@ -28,7 +28,12 @@ import { basename } from '../util/posix-path.js';
 import { propKey } from '../util/props.js';
 import { singleLine } from '../util/single-line.js';
 import { forEachDeclaredId } from './ast-walk.js';
-import type { IncludeMode, ResolveDiagnostic, ResolvedContent } from './include-resolver.js';
+import type {
+    IncludeMode,
+    ResolveDiagnostic,
+    ResolvedContent,
+    ResolveRange,
+} from './include-resolver.js';
 import {
     checkWaveDeclarations,
     evaluateWaveProperties,
@@ -85,11 +90,38 @@ export function participates(
     );
 }
 
+/** Where a resolver diagnostic points: both fields, or neither when unknown. */
+export interface ResolveLocation {
+    line?: number;
+    range?: ResolveRange;
+}
+
+/**
+ * The location of a diagnostic about `node`, narrowed to `property` the way
+ * the validator narrows its copy (Langium's `getDiagnosticRange`), so the
+ * routed diagnostic points at the same column and span. Empty when the node
+ * has no CST node.
+ */
+export function nodeLocation(node: AstNode, property?: string): ResolveLocation {
+    if (!node.$cstNode) return {};
+    const { start, end } = getDiagnosticRange({
+        node,
+        ...(property === undefined ? {} : { property: property as Properties<AstNode> }),
+    });
+    return {
+        line: start.line,
+        range: {
+            start: { line: start.line, character: start.character },
+            end: { line: end.line, character: end.character },
+        },
+    };
+}
+
 /** A coded resolver diagnostic: the en-US text plus `code` and `args`. */
 function coded<K extends MessageCode>(
     severity: 'error' | 'warning',
     sourcePath: string,
-    line: number | undefined,
+    at: ResolveLocation,
     code: K,
     ...args: MessageArgs<K>
 ): ResolveDiagnostic {
@@ -97,7 +129,7 @@ function coded<K extends MessageCode>(
         severity,
         message: tr('en-US', code, ...args),
         sourcePath,
-        ...(line === undefined ? {} : { line }),
+        ...at,
         code,
         args,
         rule: 'wave',
@@ -151,7 +183,7 @@ export function checkWaveAgreement(
     if (edge.childFile.roadmapEntries.some((e) => isWaveDeclaration(e) && !e.name)) return none;
 
     const at = edge.parentAbs;
-    const line = edge.inc.$cstNode?.range.start.line;
+    const loc = nodeLocation(edge.inc);
     const path = edge.childRelPath;
     const parent = ownWaves(parentFile);
     const child = ownWaves(edge.childFile);
@@ -160,7 +192,7 @@ export function checkWaveAgreement(
     if (parent.length === 0 && child.length === 0) return none;
     if (child.length === 0) {
         return fail(
-            coded('error', at, line, 'NL.E0202', {
+            coded('error', at, loc, 'NL.E0202', {
                 reason: 'child-none',
                 path,
                 parent: waveIds(parent),
@@ -169,7 +201,7 @@ export function checkWaveAgreement(
     }
     if (parent.length === 0) {
         return fail(
-            coded('error', at, line, 'NL.E0202', {
+            coded('error', at, loc, 'NL.E0202', {
                 reason: 'parent-none',
                 path,
                 child: waveIds(child),
@@ -178,7 +210,7 @@ export function checkWaveAgreement(
     }
     if (parent.length !== child.length || parent.some((w, i) => w.name !== child[i].name)) {
         return fail(
-            coded('error', at, line, 'NL.E0202', {
+            coded('error', at, loc, 'NL.E0202', {
                 reason: 'mismatch',
                 path,
                 child: waveIds(child),
@@ -195,7 +227,7 @@ export function checkWaveAgreement(
         const childFloor = waveFloorDate(child[i], childLookup)?.date ?? null;
         if (parentFloor === childFloor) continue;
         return fail(
-            coded('error', at, line, 'NL.E0202', {
+            coded('error', at, loc, 'NL.E0202', {
                 reason: 'floor',
                 id: parent[i].name as string,
                 path,
@@ -216,7 +248,7 @@ export function checkWaveAgreement(
         }));
         if (fields.length === 0) continue;
         diagnostics.push(
-            coded('warning', at, line, 'NL.W0701', {
+            coded('warning', at, loc, 'NL.W0701', {
                 id: parent[i].name as string,
                 path,
                 fields,
@@ -267,20 +299,20 @@ export function runResolverWaveChecks(input: ResolverWaveInput): ResolveDiagnost
         return file ? files.get(file) : undefined;
     };
     const toDiagnostic = (finding: WaveFinding, sourcePath: string): ResolveDiagnostic => {
-        const line = finding.node.$cstNode?.range.start.line;
+        const at = nodeLocation(finding.node, finding.property);
         if ('message' in finding) {
             return {
                 severity: finding.severity,
                 message: finding.message,
                 sourcePath,
-                ...(line === undefined ? {} : { line }),
+                ...at,
                 rule: 'wave',
             };
         }
         return coded(
             finding.severity,
             sourcePath,
-            line,
+            at,
             finding.code as 'NL.E1100',
             finding.args as MessageArgs<'NL.E1100'>[0],
         );
@@ -318,7 +350,7 @@ export function runResolverWaveChecks(input: ResolverWaveInput): ResolveDiagnost
             if (!wave || isWaveDeclaration(node)) return;
             const waveLine = wave.$cstNode ? wave.$cstNode.range.start.line + 1 : 0;
             push(
-                coded('error', abs, node.$cstNode?.range.start.line, 'NL.E0300', {
+                coded('error', abs, nodeLocation(node), 'NL.E0300', {
                     name: name as string,
                     location: `${basename(rootAbs)}:${waveLine}`,
                 }),
