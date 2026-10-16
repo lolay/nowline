@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { collect } from '../collect.mjs';
+import { collect, readCommit } from '../collect.mjs';
 import { escapeHtml, html, jsonForScript } from '../lib/html.mjs';
 import { publish } from '../publish.mjs';
 
@@ -60,7 +61,10 @@ const GROUPS = [
 ];
 
 // One commit's worth of repo files, collected into a raw build.
-async function build(n, { parentSvg, childText, plainSvg = '<svg>plain</svg>' }) {
+async function build(
+    n,
+    { parentSvg, childText, plainSvg = '<svg>plain</svg>', raw: rawName, commit = {} },
+) {
     const repo = join(work, `repo${n}`);
     await put(
         join(repo, 'examples/parent.nowline'),
@@ -72,7 +76,7 @@ async function build(n, { parentSvg, childText, plainSvg = '<svg>plain</svg>' })
     await put(join(repo, 'examples/plain.svg'), plainSvg);
     await put(join(repo, 'tests/today.nowline'), 'nowline v1\nroadmap t "Today"\n');
     await put(join(repo, 'tests/today.svg'), `<svg>today ${n}</svg>`);
-    const raw = join(work, `raw${n}`);
+    const raw = join(work, rawName ?? `raw${n}`);
     await collect({
         repoRoot: repo,
         outDir: raw,
@@ -86,6 +90,7 @@ async function build(n, { parentSvg, childText, plainSvg = '<svg>plain</svg>' })
             runUrl: '',
             repoUrl: 'https://github.com/lolay/nowline',
             dirty: false,
+            ...commit,
         },
     });
     return raw;
@@ -130,7 +135,7 @@ test('publish builds history, classifies changes and prunes to keep', async () =
 
     assert.equal(result.path, 'b/333333333333/changes.html');
     const index = JSON.parse(await readFile(join(data, 'builds.json'), 'utf8'));
-    assert.deepEqual(index.builds, ['333333333333', '222222222222']);
+    assert.deepEqual(index, { lines: { main: ['333333333333', '222222222222'] } });
     assert.ok(!existsSync(join(data, 'b', '111111111111')), 'oldest raw build pruned');
     assert.ok(!existsSync(join(site, 'b', '111111111111')), 'oldest pages pruned');
 
@@ -186,8 +191,287 @@ test('republishing the same build replaces it instead of duplicating', async () 
     await publish({ dataDir: data, rawDir: raw, siteDir: site });
     const result = await publish({ dataDir: data, rawDir: raw, siteDir: site });
     const index = JSON.parse(await readFile(join(data, 'builds.json'), 'utf8'));
-    assert.deepEqual(index.builds, ['444444444444']);
+    assert.deepEqual(index, { lines: { main: ['444444444444'] } });
     assert.equal(result.path, 'b/444444444444/');
+});
+
+async function readJson(path) {
+    return JSON.parse(await readFile(path, 'utf8'));
+}
+
+test('an m1 data dir migrates: its flat builds.json becomes the main line', async () => {
+    const data = join(work, 'data-m1');
+    const site = join(work, 'site-m1');
+    const old = await build(5, { parentSvg: '<svg>p5</svg>', childText: 'swimlane s "S"\n' });
+    // What m1 left behind: a schema 1 manifest with no line and no baseId,
+    // listed in `{ builds: [ids] }`.
+    const legacy = await readJson(join(old, 'manifest.json'));
+    delete legacy.line;
+    delete legacy.pr;
+    legacy.schema = 1;
+    await cp(old, join(data, 'b', legacy.id), { recursive: true });
+    await put(join(data, 'b', legacy.id, 'manifest.json'), JSON.stringify(legacy));
+    await put(join(data, 'builds.json'), JSON.stringify({ builds: [legacy.id] }));
+
+    const next = await build(6, { parentSvg: '<svg>p6</svg>', childText: 'swimlane s "S"\n' });
+    const result = await publish({ dataDir: data, rawDir: next, siteDir: site });
+    assert.equal(result.path, 'b/666666666666/changes.html');
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { main: ['666666666666', '555555555555'] },
+    });
+    const stored = await readJson(join(data, 'b/666666666666/manifest.json'));
+    assert.equal(stored.line, 'main');
+    assert.equal(stored.baseId, '555555555555');
+    const builds = await readJson(join(site, 'builds.json'));
+    assert.deepEqual(
+        builds.map((b) => [b.id, b.counts.drift]),
+        [
+            ['666666666666', 1],
+            ['555555555555', 0],
+        ],
+    );
+    const oldPage = await readFile(join(site, 'b/555555555555/index.html'), 'utf8');
+    assert.match(oldPage, /First build in the history/);
+    assert.match(oldPage, /href="..\/666666666666\/index.html">newer build/);
+});
+
+test('a local branch build compares with main and is listed above it', async () => {
+    const data = join(work, 'data-branch');
+    const site = join(work, 'site-branch');
+    const child = 'swimlane s "S"\n';
+    await publish({
+        dataDir: data,
+        siteDir: site,
+        rawDir: await build(6, { parentSvg: '<svg>m</svg>', childText: child, raw: 'raw-b6' }),
+    });
+    const result = await publish({
+        dataDir: data,
+        siteDir: site,
+        rawDir: await build(6, {
+            parentSvg: '<svg>branch</svg>',
+            childText: child,
+            raw: 'raw-b-feat',
+            commit: { line: 'feat/x', ref: 'feat/x', sha: 'e'.repeat(40) },
+        }),
+    });
+    const id = 'feat-x-eeeeeeeeeeee';
+    assert.equal(result.path, `b/${id}/changes.html`);
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { main: ['666666666666'], 'feat/x': [id] },
+    });
+    assert.equal((await readJson(join(data, 'b', id, 'manifest.json'))).baseId, '666666666666');
+    const builds = await readJson(join(site, 'builds.json'));
+    assert.deepEqual(
+        builds.map((b) => [b.id, b.counts.drift]),
+        [
+            [id, 1],
+            ['666666666666', 0],
+        ],
+    );
+    const latest = await readFile(join(site, 'latest/index.html'), 'utf8');
+    assert.match(latest, /url=..\/b\/666666666666\//, 'latest stays on main');
+});
+
+function prCommit(number, headSha, baseSha) {
+    return {
+        sha: headSha,
+        ref: 'feature',
+        line: `pr-${number}`,
+        pr: {
+            number,
+            title: 'Feature',
+            url: `https://github.com/lolay/nowline/pull/${number}`,
+            headRef: 'feature',
+            headSha,
+            baseSha,
+        },
+    };
+}
+
+test("a PR build's statuses compare against main, not its own previous push", async () => {
+    const data = join(work, 'data-pr');
+    const site = join(work, 'site-pr');
+    const options = { dataDir: data, siteDir: site, isAncestor: () => false };
+    const child = 'swimlane s "S"\n';
+    await publish({
+        ...options,
+        rawDir: await build(7, { parentSvg: '<svg>main</svg>', childText: child }),
+    });
+    const head1 = 'a'.repeat(40);
+    const head2 = 'b'.repeat(40);
+    for (const head of [head1, head2]) {
+        await publish({
+            ...options,
+            rawDir: await build(7, {
+                parentSvg: '<svg>pr</svg>',
+                childText: child,
+                raw: `raw-${head[0]}`,
+                commit: prCommit(12, head, '7'.repeat(40)),
+            }),
+        });
+    }
+    const second = 'pr-12-bbbbbbbbbbbb';
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { main: ['777777777777'], 'pr-12': [second, 'pr-12-aaaaaaaaaaaa'] },
+    });
+    const stored = await readJson(join(data, 'b', second, 'manifest.json'));
+    assert.equal(stored.baseId, '777777777777');
+    assert.equal(stored.sha, head2, 'the head sha, not a merge commit');
+
+    // Push 2 has the same SVG as push 1, but main differs: still changed.
+    const page = await readFile(join(site, 'b', second, 'examples/parent.html'), 'utf8');
+    assert.match(page, /renderer drift/);
+    assert.match(page, /data-prev-src="..\/..\/777777777777\/examples\/parent.svg"/);
+    // History walks the PR's own pushes.
+    assert.match(
+        page,
+        /class="older-build" href="..\/..\/pr-12-aaaaaaaaaaaa\/examples\/parent.html"/,
+    );
+    const digest = await readFile(join(site, 'b', second, 'changes.html'), 'utf8');
+    assert.match(digest, /examples\/parent/);
+    const index = await readFile(join(site, 'b', second, 'index.html'), 'utf8');
+    assert.match(index, /href="..\/pr-12-aaaaaaaaaaaa\/index.html">‹ older build/);
+});
+
+test('retention keeps a pruned main baseline while its PR is open', async () => {
+    const data = join(work, 'data-keep');
+    const site = join(work, 'site-keep');
+    const options = { dataDir: data, siteDir: site, keep: 1, isAncestor: () => false };
+    const child = 'swimlane s "S"\n';
+    await publish({
+        ...options,
+        rawDir: await build(8, { parentSvg: '<svg>m8</svg>', childText: child, raw: 'raw-k8' }),
+    });
+    await publish({
+        ...options,
+        rawDir: await build(8, {
+            parentSvg: '<svg>pr</svg>',
+            childText: child,
+            raw: 'raw-k-pr',
+            commit: prCommit(3, 'c'.repeat(40), '8'.repeat(40)),
+        }),
+    });
+    await publish({
+        ...options,
+        rawDir: await build(9, { parentSvg: '<svg>m9</svg>', childText: child, raw: 'raw-k9' }),
+    });
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { main: ['999999999999'], 'pr-3': ['pr-3-cccccccccccc'] },
+    });
+    assert.ok(existsSync(join(data, 'b/888888888888')), 'main baseline of the open PR kept');
+    assert.ok(existsSync(join(site, 'b/888888888888/examples/parent.svg')));
+    const prPage = await readFile(join(site, 'b/pr-3-cccccccccccc/examples/parent.html'), 'utf8');
+    assert.match(prPage, /data-prev-src="..\/..\/888888888888\/examples\/parent.svg"/);
+    const builds = await readJson(join(site, 'builds.json'));
+    assert.deepEqual(
+        builds.map((b) => b.id),
+        ['999999999999'],
+        'the pinned build is not listed in main',
+    );
+
+    // The PR closes: its line and the baseline it pinned both go.
+    await publish({
+        ...options,
+        openPrs: [],
+        rawDir: await build(9, {
+            parentSvg: '<svg>m10</svg>',
+            childText: child,
+            raw: 'raw-k10',
+            commit: { sha: 'd'.repeat(40) },
+        }),
+    });
+    assert.deepEqual(await readJson(join(data, 'builds.json')), {
+        lines: { main: ['dddddddddddd'] },
+    });
+    for (const gone of ['888888888888', '999999999999', 'pr-3-cccccccccccc']) {
+        assert.ok(!existsSync(join(data, 'b', gone)), `${gone} pruned`);
+    }
+});
+
+test('readCommit takes the line and PR facts from GALLERY_* variables', async () => {
+    const repo = join(work, 'git-repo');
+    const git = (...args) =>
+        execFileSync('git', ['-c', 'user.name=Ada', '-c', 'user.email=ada@example.com', ...args], {
+            cwd: repo,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+        }).trim();
+    await put(join(repo, 'a.txt'), 'a\n');
+    git('init', '-q', '-b', 'main');
+    git('add', '.');
+    git('commit', '-q', '-m', 'First commit');
+    const head = git('rev-parse', 'HEAD');
+
+    const onMain = readCommit(repo, { CI: '1' });
+    assert.equal(onMain.line, 'main');
+    assert.equal(onMain.pr, null);
+    assert.equal(onMain.sha, head);
+    assert.equal(onMain.subject, 'First commit');
+
+    git('checkout', '-q', '-b', 'feature/x');
+    assert.equal(readCommit(repo, { CI: '1' }).line, 'feature/x');
+    assert.equal(readCommit(repo, { CI: '1', GALLERY_LINE: 'main' }).line, 'main');
+
+    const headSha = 'f'.repeat(40);
+    const env = {
+        CI: '1',
+        GITHUB_REF_NAME: '42/merge',
+        GALLERY_PR_NUMBER: '42',
+        GALLERY_PR_TITLE: 'Add x',
+        GALLERY_PR_URL: 'https://github.com/lolay/nowline/pull/42',
+        GALLERY_HEAD_REF: 'feature/x',
+        GALLERY_HEAD_SHA: headSha,
+        GALLERY_BASE_SHA: head,
+        GALLERY_AUTHOR: 'Grace',
+        GALLERY_DATE: '2026-04-01T09:00:00Z',
+    };
+    const commit = readCommit(repo, env);
+    assert.deepEqual(
+        {
+            sha: commit.sha,
+            subject: commit.subject,
+            author: commit.author,
+            date: commit.date,
+            ref: commit.ref,
+            line: commit.line,
+            dirty: commit.dirty,
+        },
+        {
+            sha: headSha,
+            // The head commit isn't in this clone, so the PR title stands in.
+            subject: 'Add x',
+            author: 'Grace',
+            date: '2026-04-01T09:00:00Z',
+            ref: 'feature/x',
+            line: 'pr-42',
+            dirty: false,
+        },
+    );
+    assert.deepEqual(commit.pr, {
+        number: 42,
+        title: 'Add x',
+        url: 'https://github.com/lolay/nowline/pull/42',
+        headRef: 'feature/x',
+        headSha,
+        baseSha: head,
+    });
+    assert.equal(
+        readCommit(repo, { ...env, GALLERY_HEAD_SHA: head }).subject,
+        'First commit',
+        'a head commit the clone has gives its own subject',
+    );
+
+    const raw = await build(4, {
+        parentSvg: '<svg>p</svg>',
+        childText: 'swimlane s "S"\n',
+        raw: 'raw-pr42',
+        commit,
+    });
+    const manifest = await readJson(join(raw, 'manifest.json'));
+    assert.equal(manifest.id, 'pr-42-ffffffffffff');
+    assert.equal(manifest.line, 'pr-42');
+    assert.equal(manifest.pr.number, 42);
+    assert.equal(manifest.schema, 2);
 });
 
 test('html escapes interpolations unless marked raw; script JSON cannot close its tag', () => {

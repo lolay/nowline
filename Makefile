@@ -26,7 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci ci-platform pre-commit doctor clean \
-        gallery gallery-serve gallery-e2e \
+        gallery gallery-collect gallery-serve gallery-e2e \
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
@@ -46,6 +46,7 @@ NPM_DIST_TAG ?= latest
 # (data/), the latest collected build (raw/) and the generated site (site/).
 GALLERY_DIR ?= .gallery
 GALLERY_KEEP ?= 100
+GALLERY_KEEP_PR ?= 10
 GALLERY_PORT ?= 8080
 
 # The review gallery's scripts are plain Node, outside the pnpm workspace,
@@ -121,9 +122,12 @@ ci-platform: build-fast ## Slim CI gate for the OS/Node cells: build-fast + Vite
 	pnpm -r test
 	$(SCRIPT_TESTS)
 
-gallery: build ## Add this tree's renders to the local review gallery (.gallery/site): compare each example and test against the previous build
+gallery: build ## Add this tree's renders to the local review gallery (.gallery/site): compare each example and test against its baseline build
+	@$(MAKE) --no-print-directory gallery-collect
+	node scripts/gallery/publish.mjs --data $(GALLERY_DIR)/data --raw $(GALLERY_DIR)/raw --site $(GALLERY_DIR)/site --keep $(GALLERY_KEEP) --keep-pr $(GALLERY_KEEP_PR)
+
+gallery-collect: ## Snapshot the already-rendered examples and tests into .gallery/raw (no build first; reads GALLERY_* PR facts in CI)
 	node scripts/gallery/collect.mjs $(GALLERY_DIR)/raw
-	node scripts/gallery/publish.mjs --data $(GALLERY_DIR)/data --raw $(GALLERY_DIR)/raw --site $(GALLERY_DIR)/site --keep $(GALLERY_KEEP)
 
 gallery-serve: ## Serve the local review gallery over http on every interface (phone/iPad on the same network)
 	node scripts/gallery/serve.mjs $(GALLERY_DIR)/site $(GALLERY_PORT)

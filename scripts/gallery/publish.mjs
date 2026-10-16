@@ -2,16 +2,25 @@
 // Add one raw build (from collect.mjs) to the gallery's history and
 // regenerate the whole review site from that history.
 //
-// Usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> [--keep 100]
+// Usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir>
+//          [--keep 100] [--keep-pr 10] [--open-prs 12,34]
 //
-// `--data` holds raw builds only (SVGs, sources, manifests), newest first in
-// builds.json, pruned to `--keep`. `--site` is rebuilt from scratch every
-// run, so every page reflects the current templates and every build links to
-// its newer neighbours. In CI the data dir round-trips through the
-// `gallery-data` branch; locally it accumulates under .gallery/.
+// `--data` holds raw builds only (SVGs, sources, manifests) and builds.json,
+// which lists each line's build ids newest first (see lib/lines.mjs). Adding
+// a build records its baseline (`baseId`) in its data manifest, then applies
+// retention: `--keep` builds in main and in each local branch line,
+// `--keep-pr` in each `pr-<n>` line, and with `--open-prs` every PR line not
+// listed is dropped. Raw builds no line lists are deleted, except a build
+// that a retained build in another line compares against.
+//
+// `--site` is rebuilt from scratch every run, so every page reflects the
+// current templates and every build links to its newer neighbours. In CI the
+// data dir round-trips through the `gallery-data` branch; locally it
+// accumulates under .gallery/.
 
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { appendFile, cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -24,6 +33,15 @@ import {
     renderRootIndex,
 } from './lib/html.mjs';
 import {
+    chooseBaseline,
+    lineOf,
+    MAIN_LINE,
+    normalizeIndex,
+    prNumberOf,
+    resolveBaseId,
+    retainLines,
+} from './lib/lines.mjs';
+import {
     compareManifests,
     entryHistory,
     flattenEntries,
@@ -32,6 +50,23 @@ import {
 } from './lib/model.mjs';
 
 const ASSETS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'assets');
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+// Git ancestry for PR baselines: is `ancestor` reachable from `sha`? A
+// commit this clone doesn't have (shallow history, a fork) counts as no.
+export function gitIsAncestor(repoRoot = REPO_ROOT) {
+    return (ancestor, sha) => {
+        try {
+            execFileSync('git', ['merge-base', '--is-ancestor', ancestor, sha], {
+                cwd: repoRoot,
+                stdio: 'ignore',
+            });
+            return true;
+        } catch {
+            return false;
+        }
+    };
+}
 
 async function readJson(path, fallback) {
     if (!existsSync(path)) return fallback;
@@ -43,30 +78,59 @@ async function write(path, content) {
     await writeFile(path, content);
 }
 
-// Adds the raw build to the data dir and prunes it. Returns ids newest first.
-export async function addBuild({ dataDir, rawDir, keep }) {
+// Every raw build in the data dir, by id.
+async function loadAllManifests(dataDir) {
+    const manifests = new Map();
+    const dir = resolve(dataDir, 'b');
+    if (!existsSync(dir)) return manifests;
+    for (const id of (await readdir(dir)).sort()) {
+        const manifest = await readJson(resolve(dir, id, 'manifest.json'), null);
+        if (manifest) manifests.set(id, manifest);
+    }
+    return manifests;
+}
+
+// Adds the raw build to the data dir with its baseline, applies retention
+// and deletes raw builds nothing keeps. Returns the new index's lines and
+// the build's id.
+export async function addBuild({
+    dataDir,
+    rawDir,
+    keep = 100,
+    keepPr = 10,
+    openPrs = null,
+    isAncestor = gitIsAncestor(),
+}) {
     const manifest = await readJson(resolve(rawDir, 'manifest.json'), null);
     if (!manifest) throw new Error(`no manifest.json in ${rawDir}`);
-    const index = await readJson(resolve(dataDir, 'builds.json'), { builds: [] });
+    const { lines } = normalizeIndex(await readJson(resolve(dataDir, 'builds.json'), null));
+    // Republishing an id replaces it wherever it was.
+    for (const line of Object.keys(lines)) {
+        lines[line] = lines[line].filter((id) => id !== manifest.id);
+    }
+    const manifests = await loadAllManifests(dataDir);
+    manifests.delete(manifest.id);
+    const line = lineOf(manifest);
+    const baseId = await chooseBaseline({ manifest, lines, manifests, isAncestor });
+    const stored = { ...manifest, line, baseId };
     const target = resolve(dataDir, 'b', manifest.id);
     await rm(target, { recursive: true, force: true });
     await cp(rawDir, target, { recursive: true });
-    const ids = [manifest.id, ...index.builds.filter((id) => id !== manifest.id)];
-    for (const old of ids.slice(keep)) {
-        await rm(resolve(dataDir, 'b', old), { recursive: true, force: true });
-    }
-    const kept = ids.slice(0, keep);
-    await write(resolve(dataDir, 'builds.json'), `${JSON.stringify({ builds: kept }, null, 2)}\n`);
-    return kept;
-}
+    await write(resolve(target, 'manifest.json'), `${JSON.stringify(stored, null, 2)}\n`);
+    manifests.set(manifest.id, stored);
+    lines[line] = [manifest.id, ...(lines[line] ?? [])];
 
-async function loadManifests(dataDir, ids) {
-    const manifests = [];
-    for (const id of ids) {
-        const manifest = await readJson(resolve(dataDir, 'b', id, 'manifest.json'), null);
-        if (manifest) manifests.push(manifest);
+    const retained = retainLines({ lines, manifests, keep, keepPr, openPrs, currentLine: line });
+    for (const id of await readdir(resolve(dataDir, 'b'))) {
+        if (!retained.onDisk.has(id)) {
+            await rm(resolve(dataDir, 'b', id), { recursive: true, force: true });
+        }
     }
-    return manifests;
+    await write(
+        resolve(dataDir, 'builds.json'),
+        `${JSON.stringify({ lines: retained.lines }, null, 2)}\n`,
+    );
+    return { id: manifest.id, lines: retained.lines };
 }
 
 // Every source file behind an entry, with the previous build's text beside
@@ -111,24 +175,49 @@ function groupOrder(manifests) {
     return groups;
 }
 
-export async function renderSite({ dataDir, siteDir, ids }) {
-    const manifests = await loadManifests(dataDir, ids);
+// Renders every build in the data dir. `lines` is the data index's lines;
+// `focusId` picks the build whose page `path` names (default: the newest
+// main build). Each build compares against its `baseId`; history and
+// older/newer links walk its own line. A build kept only as another line's
+// baseline gets pages (they are linked from that line) but no line links.
+// The root index, range compare and site builds.json cover main and local
+// branch lines; latest/ and history/ cover main. PR lines get pages only.
+export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
+    const all = await loadAllManifests(dataDir);
     await rm(siteDir, { recursive: true, force: true });
     await cp(ASSETS_DIR, resolve(siteDir, 'assets'), { recursive: true });
 
+    const lineIdsOf = new Map();
     const histories = new Map();
-    for (const group of groupOrder(manifests)) {
-        for (const key of group.keys) histories.set(key, entryHistory(manifests, key));
+    for (const [line, ids] of Object.entries(lines)) {
+        const present = ids.filter((id) => all.has(id));
+        const manifests = present.map((id) => all.get(id));
+        const byKey = new Map();
+        for (const group of groupOrder(manifests)) {
+            for (const key of group.keys) byKey.set(key, entryHistory(manifests, key));
+        }
+        histories.set(line, byKey);
+        for (const id of present) lineIdsOf.set(id, { line, ids: present });
     }
+    const order = [
+        ...Object.values(lines)
+            .flat()
+            .filter((id) => all.has(id)),
+        ...[...all.keys()].filter((id) => !lineIdsOf.has(id)),
+    ];
 
-    const builds = [];
-    for (let i = 0; i < manifests.length; i++) {
-        const build = manifests[i];
-        const prev = manifests[i + 1] ?? null;
+    const rendered = new Map();
+    for (const id of order) {
+        const build = all.get(id);
+        const own = lineIdsOf.get(id) ?? { line: null, ids: [] };
+        const at = own.ids.indexOf(id);
+        const baseId = resolveBaseId(build, own.ids, all);
+        const prev = baseId ? all.get(baseId) : null;
         const comparison = compareManifests(prev, build);
         const flat = flattenEntries(build);
         const prevByKey = new Map(prev ? flattenEntries(prev).map((f) => [f.key, f.entry]) : []);
         const nav = itemNavigation(flat, comparison.statuses);
+        const lineHistory = histories.get(own.line) ?? new Map();
         const buildDir = resolve(siteDir, 'b', build.id);
         const sourcesByKey = new Map();
 
@@ -148,7 +237,7 @@ export async function renderSite({ dataDir, siteDir, ids }) {
                     item,
                     result: comparison.statuses.get(item.key),
                     nav: nav.get(item.key),
-                    history: historyNavigation(histories.get(item.key), build.id),
+                    history: historyNavigation(lineHistory.get(item.key) ?? [], build.id),
                     sources,
                     hasChanges: comparison.hasChanges,
                 }),
@@ -161,8 +250,8 @@ export async function renderSite({ dataDir, siteDir, ids }) {
                 prev,
                 flat,
                 comparison,
-                older: prev?.id ?? null,
-                newer: manifests[i - 1]?.id ?? null,
+                older: at === -1 ? null : (own.ids[at + 1] ?? null),
+                newer: at > 0 ? own.ids[at - 1] : null,
             }),
         );
         await write(
@@ -170,16 +259,24 @@ export async function renderSite({ dataDir, siteDir, ids }) {
             renderChangesPage({ build, prev, flat, comparison, sources: sourcesByKey }),
         );
         await write(resolve(buildDir, 'manifest.json'), `${JSON.stringify(build, null, 2)}\n`);
-        builds.push({ manifest: build, comparison });
+        rendered.set(id, { manifest: build, comparison });
     }
 
-    for (const [key, rows] of histories) {
+    // Until the index gets per-line sections, it lists local branch builds
+    // above main, as m1's single history did; PR lines aren't listed yet.
+    const mainIds = (lines[MAIN_LINE] ?? []).filter((id) => all.has(id));
+    const branchIds = Object.entries(lines)
+        .filter(([line]) => line !== MAIN_LINE && prNumberOf(line) === null)
+        .flatMap(([, ids]) => ids.filter((id) => all.has(id)));
+    const builds = [...branchIds, ...mainIds].map((id) => rendered.get(id));
+    const listed = builds.map((b) => b.manifest);
+    for (const [key, rows] of histories.get(MAIN_LINE) ?? []) {
         await write(resolve(siteDir, 'history', `${key}.json`), JSON.stringify(rows));
     }
     await write(resolve(siteDir, 'index.html'), renderRootIndex({ builds }));
     await write(
         resolve(siteDir, 'compare.html'),
-        renderComparePage({ builds, groups: groupOrder(manifests) }),
+        renderComparePage({ builds, groups: groupOrder(listed) }),
     );
     await write(
         resolve(siteDir, 'builds.json'),
@@ -197,26 +294,43 @@ export async function renderSite({ dataDir, siteDir, ids }) {
             2,
         )}\n`,
     );
-    if (builds.length > 0) {
-        await write(
-            resolve(siteDir, 'latest', 'index.html'),
-            renderLatestRedirect(builds[0].manifest.id),
-        );
+    if (mainIds.length > 0) {
+        await write(resolve(siteDir, 'latest', 'index.html'), renderLatestRedirect(mainIds[0]));
     }
     // Pages serves the site as-is; no Jekyll processing.
     await write(resolve(siteDir, '.nojekyll'), '');
 
-    const newest = builds[0];
-    if (!newest) return { id: null, path: '' };
+    const focus = rendered.get(focusId ?? mainIds[0] ?? order[0]);
+    if (!focus) return { id: null, path: '' };
     return {
-        id: newest.manifest.id,
-        path: `b/${newest.manifest.id}/${newest.comparison.hasChanges ? 'changes.html' : ''}`,
+        id: focus.manifest.id,
+        path: `b/${focus.manifest.id}/${focus.comparison.hasChanges ? 'changes.html' : ''}`,
     };
 }
 
-export async function publish({ dataDir, rawDir, siteDir, keep = 100 }) {
-    const ids = await addBuild({ dataDir, rawDir, keep });
-    return renderSite({ dataDir, siteDir, ids });
+export async function publish({
+    dataDir,
+    rawDir,
+    siteDir,
+    keep = 100,
+    keepPr = 10,
+    openPrs = null,
+    isAncestor = gitIsAncestor(),
+}) {
+    const { id, lines } = await addBuild({ dataDir, rawDir, keep, keepPr, openPrs, isAncestor });
+    return renderSite({ dataDir, siteDir, lines, focusId: id });
+}
+
+const USAGE =
+    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> [--keep 100] [--keep-pr 10] [--open-prs 12,34]';
+
+function positiveInt(name, text) {
+    const value = Number(text);
+    if (!Number.isInteger(value) || value < 1) {
+        console.error(`${name} must be a positive integer, got ${text}`);
+        process.exit(2);
+    }
+    return value;
 }
 
 async function main() {
@@ -226,24 +340,30 @@ async function main() {
             raw: { type: 'string' },
             site: { type: 'string' },
             keep: { type: 'string', default: '100' },
+            'keep-pr': { type: 'string', default: '10' },
+            'open-prs': { type: 'string' },
         },
     });
     if (!values.data || !values.raw || !values.site) {
-        console.error(
-            'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> [--keep 100]',
-        );
+        console.error(USAGE);
         process.exit(2);
     }
-    const keep = Number.parseInt(values.keep, 10);
-    if (!Number.isInteger(keep) || keep < 1) {
-        console.error(`--keep must be a positive integer, got ${values.keep}`);
-        process.exit(2);
-    }
+    // Omitted keeps every PR line; an empty list means no PR is open.
+    const openPrs =
+        values['open-prs'] === undefined
+            ? null
+            : values['open-prs']
+                  .split(',')
+                  .map((n) => n.trim())
+                  .filter(Boolean)
+                  .map((n) => positiveInt('--open-prs', n));
     const result = await publish({
         dataDir: resolve(values.data),
         rawDir: resolve(values.raw),
         siteDir: resolve(values.site),
-        keep,
+        keep: positiveInt('--keep', values.keep),
+        keepPr: positiveInt('--keep-pr', values['keep-pr']),
+        openPrs,
     });
     console.log(`published ${result.id} -> ${resolve(values.site, result.path)}`);
     if (process.env.GITHUB_OUTPUT) {
