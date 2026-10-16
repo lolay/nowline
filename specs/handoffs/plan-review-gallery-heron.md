@@ -1,8 +1,43 @@
-# Build gallery: per-build QA site for examples/ and tests/
+# Review gallery: per-build QA site for examples/ and tests/
 
-Status: m1 (done), paused for review before m2. Branch: `claude/compassionate-galileo-jizy6q`. Runner scratch, to be removed or promoted before merge.
+```text
+--- KICKOFF: begin orchestration at [deep] ---
 
-m1 deviations: `publish.mjs` (planned as m2.s1) landed in m1, because `make gallery` runs the same collect + publish path CI will, keeping local history in `.gallery/data`, so no `GALLERY_PREV` is needed: run it on `main`, then on a branch. Added `make gallery-serve` (LAN http server) since the pixel diff and the history strip need http. In phone landscape the history strip hides (older/newer links stay) instead of sitting behind a toggle. m2 is now only `gallery.yml` plus Slack.
+  Status: 0/3 groups done | last review: — | current: nowline m2 s1-s3 [exec] | BLOCKED at gate mode | updated 2026-10-16
+
+  mode: pending | proposed unattended (harness=claude-code runner=cloud; cloud runner, branch assigned by the harness) | guard 3x min $50 | fixups 2
+
+  review: every-wave (log-only)
+
+  Next model
+    Cursor:      claude-opus-5-5[effort=high]
+    Claude Code: /model opus                (/effort high)
+
+  Prompt to paste into the next chat:
+    In lolay/nowline, read specs/handoffs/plan-review-gallery-heron.md. The plan is already tagged.
+    On branch claude/compassionate-galileo-jizy6q (task branch): subagents commit each finished step.
+    Run the personal-plan-orchestrate skill from the top: walk to
+    each tier boundary, dispatch subagents per the skill's procedure,
+    and pause only where the recorded mode stops. Do not execute plan
+    work inline. Update plan progress after each wave returns per the
+    skill's procedure. The mode line above is the kickoff answer. If the
+    Status line shows BLOCKED, re-post that question and wait; otherwise
+    record the mode, print the kickoff summary and begin dispatching.
+
+---
+```
+
+**Cost (API-equiv, Claude Code models)**
+
+| wave | expected tokens | expected $ |
+|---|---|---|
+| 1 [exec] nowline m2 s1-s3 | ~3.3M | ~$1.4 |
+| 2 [deep] nowline m3 s1 | ~6.1M | ~$3.2 |
+| 3 [exec] nowline m3 s2-s3 | ~3.0M | ~$1.2 |
+| orchestrator | ~5.7M | ~$5.0 |
+| **Total** | ~18M | ~$11 |
+
+Expected values are estimates, good to about 2-3× per wave.
 
 ## Context
 
@@ -63,7 +98,7 @@ The comparison is the centrepiece. "Previous" means the previous published build
    - `‹ Older build` / `Newer build ›` move one build at a time.
    - `« Older change` / `Newer change »` jump to the nearest build where this item's SVG hash differs from the build before it.
    - A compact strip shows one dot per retained build (up to 100), filled where the item changed. Tapping a dot jumps to that build.
-   - Every link and the strip are written statically, because the whole site is regenerated on each publish (see m2.s1). `history/<group>/<slug>.json` also ships for `compare.html`.
+   - Every link and the strip are written statically, because the whole site is regenerated on each publish (see the publish step, m4). `history/<group>/<slug>.json` also ships for `compare.html`.
 7. **Item navigation:** a sticky bottom bar holds `‹ Prev · 12 / 57 · Next ›`, a *Changed only* switch, and an Index link.
    - With *Changed only* on, prev/next skips unchanged entries. It's a query flag carried on the links, and it defaults on when the build has any changes.
    - Swipe and arrow keys also navigate.
@@ -96,91 +131,141 @@ The build index lists changed entries first, then new, then unchanged, then remo
 
 Previous SVGs are referenced by relative path into `b/<prev-sha>/`, so nothing is copied. A build only compares against one that is still inside the 100-build window.
 
-## Implementation
+## m1 - Local review gallery (done before this run)
 
-### m1 - Shared manifest and gallery generator (local)
+Shipped on this branch in `8e0a60a` (render lists moved to `scripts/lib/render-manifest.mjs`) and `ac13df1` (`make gallery`, `make gallery-serve`, `scripts/gallery/{collect,publish,serve}.mjs`, `scripts/gallery/lib/{source,diff,model,html}.mjs`, `scripts/gallery/assets/gallery.{js,css}`, 18 `node:test` specs under `scripts/gallery/test/` wired into `make test` and `make ci-platform`). Everything below builds on that code; read it before changing it.
 
-#### s1 - Extract manifests [exec]
-- Move the `MANIFEST` arrays from `scripts/render-samples.mjs` and `scripts/render-tests.mjs` into a new `scripts/lib/render-manifest.mjs`, which exports `EXAMPLES` and `TESTS`. Both render scripts import from there, and their behaviour is unchanged.
-- Reorder `EXAMPLES` so it matches the progressive order in the root `README.md` § Examples (minimal → capacity → sizing → teams → product → long → nested → waves → waves-program, then the rest).
-- Add an optional `description`. When it's absent, the generator falls back to the `.nowline` file's leading `//` comment block. Tests already carry these comments. Examples get descriptions lifted from the root README list.
+## m2 - Source in the render block, persistent view settings, browser e2e
 
-#### s2 - Generator [deep]
-- **Split into two stages**, because "changed" is only knowable once the previous build is in hand.
-  - `scripts/gallery/collect.mjs` copies the rendered SVGs and their sources (with include children) into a raw build dir. It also writes a `manifest.json` holding the entries, sha256 per SVG and per source, and commit metadata: sha, subject, author name, author date (ISO), ref, and run URL. The metadata comes from `git log -1 --format=...`.
-  - `scripts/gallery/build-pages.mjs <buildDir> [--prev <prevBuildDir>]` writes the HTML for that build, including the compare blocks and the source diff.
-- **Code layout:**
-  - Keep the HTML in small pure functions in `scripts/gallery/html.mjs`. Every embedded string goes through one `escapeHtml`.
-  - The line diff is a small LCS in `scripts/gallery/diff.mjs`, so there's no dependency. The sources are small.
-  - The compare, blink, slider, lockstep-scroll and nav behaviour lives in one inline script of about 150 lines, with no framework.
-- Include children are found by parsing `include "..."` lines.
-- `defaults-no-start-no-now` renders against today's date, so it gets an "expected to change every build" note and never counts as changed.
+Common to every step in m2 and m3:
+- Repo rules: `AGENTS.md` (Makefile only, 4-space TypeScript and JS, `.js` suffix on TS imports, no emojis). Run `make pre-commit` and see it pass before each commit; a step's commit is not done until it is green.
+- No changelog fragment: this is internal tooling.
+- Local check of the generated site: `make gallery` (or `node scripts/gallery/collect.mjs .gallery/raw` then `node scripts/gallery/publish.mjs --data .gallery/data --raw .gallery/raw --site .gallery/site` when the renders are already built), then `make gallery-serve GALLERY_PORT=<free port>` in the background and drive it with Playwright.
 
-#### s3 - Make targets [exec]
-- `make gallery` (depends on `build`) writes `.gallery/` (gitignored), which you can open locally via `file://`.
-- `make gallery GALLERY_PREV=<dir>` compares against another local gallery, for example one built from `main` in a second worktree. That gives the same compare view before you push.
-- Update `Makefile.md`.
+--- WAVE 1 [exec] ---
 
-#### s4 - Tests [exec]
-- Add `node --test` specs under `scripts/gallery/`. They cover:
-  - escaping;
-  - prev/next wrap and ordering across groups, plus *Changed only* skipping;
-  - description fallback and include discovery;
-  - changed / new / unchanged / removed classification, and the drift vs source-edit split;
-  - range classification between two non-adjacent manifests;
-  - history rows, and older/newer-change resolution across a seeded history;
-  - the line diff.
-- Wire them into `make test`.
+#### s1 - [exec] Show the source inside the render block
 
-### m2 - Publish workflow
+Show the `.nowline` source within each compare block, collapsible, instead of the separate Source section at the bottom of entry pages.
 
-#### s1 - Site index script [deep]
-- Add `scripts/gallery/publish-site.mjs <dataDir> <rawBuildDir> <outDir>`.
-- `dataDir` holds **raw builds only**: per build, its SVGs, its sources and `manifest.json`. No HTML is stored.
-- It adds the new raw build and prunes `dataDir` to the newest 100.
-- Then it regenerates the **entire** HTML site into `outDir` from all retained raw builds. That covers every `b/<sha>/` page, each with `--prev` set to its predecessor, plus `builds.json`, the root `index.html`, `latest/` and `history/<group>/<slug>.json`.
-  - Regenerating takes milliseconds at about 6,000 small pages.
-  - Older builds pick up static "newer build" links and any template improvements.
-  - Pruning never leaves stale history rows.
-  - The oldest retained build shows "history starts here".
-- With an Actions-source deploy, a `CNAME` file in the artifact is ignored, so the domain is set only in repo settings (see manual setup).
-- It gets unit tests as well.
+- **Toggle.** Every compare block on entry pages and on the changes digest gets a **Source** button in its toolbar, next to Fit / Actual size. Open, the source appears directly under the render(s), inside the same block. Default: open on entry pages, collapsed on the changes digest. *Collapse all* on the digest also collapses sources. (s2 makes the state persist across pages; s1 only needs the per-page default and the toggle.)
+- **sdiff view.** When the previous and this build both exist and the source differs, show a two-column, line-aligned table per file: prev | this. Changed rows are highlighted: deleted lines on the left in red, added lines on the right in green, blank cells keeping rows aligned. Show the whole file (sources are under 250 lines).
+- **Unified view on phones.** The pair collapses to a unified +/- list when the panes are stacked: CSS shows the pair at 768px and up with layout *Auto*, or whenever the layout is *Side*; the unified list when the layout is *Stack* or the screen is narrower than 768px, mirroring the `.panes` rules in `gallery.css`.
+- **Unchanged source** (drift, unchanged, new, first build): a single column with this build's source.
+- **Includes** (`examples/nested/*`, `examples/waves-program/*`, `tests/partner-multi`, …): each file in its own `<details>`; the main file open, includes collapsed unless that include changed.
+- Remove the old bottom Source section from entry pages (`sourcePanel` in `scripts/gallery/lib/html.mjs`).
+- `compare.html` (client-side range compare) gets no source; its card titles already link to the entry page.
 
-#### s2 - `.github/workflows/gallery.yml` [deep]
-- Triggers on push to `main` (same `paths-ignore` as `canary.yml`) and on `workflow_dispatch` (any ref, labelled with its branch).
-- **`render` job** (`contents: read`): checkout, `./.github/actions/setup-node-pnpm`, `make build`, then `collect`. It uploads the raw build dir as an artifact. The HTML is generated in `publish`, where the previous build is available.
-- **`publish` job**:
-  - Permissions: `contents: write`, `pages: write`, `id-token: write`.
-  - `environment: github-pages`, with `url: ${{ steps.publish.outputs.url }}`. That's `b/<sha>/changes.html` when the build has changes, else `b/<sha>/`.
-  - Steps:
-    1. Check out the default branch's trusted scripts.
-    2. Fetch the `gallery-data` branch into `data/`. On the first run it doesn't exist yet, so start empty.
-    3. Download the render artifact.
-    4. Run `publish-site.mjs data/ <raw> site/`.
-    5. Commit `data/` as one orphan commit and force-push `gallery-data`. It's a bot-owned storage branch with no shared history with `main`, and branch rulesets only cover `~DEFAULT_BRANCH`. Identical SVGs dedupe to the same git blob, so the branch stays at a few MB.
-    6. `actions/upload-pages-artifact` (`site/`) + `actions/deploy-pages`.
-  - Concurrency: `gallery-publish`, `cancel-in-progress: false`.
-  - Known gap: GitHub keeps one pending run per group, so a burst of three or more merges inside a publish window (about 1 min) can skip a middle hash. The merge queue makes this rare, and we accept it.
-- Write the build URL to the job summary.
+Implementation:
+- `scripts/gallery/lib/diff.mjs`: add `sideBySideRows(diff)`, zipping each run of `-` lines with the `+` lines that follow into aligned `{ left, right, kind }` rows, kind `same | change | del | add`.
+- `scripts/gallery/lib/html.mjs`: replace `sourcePanel` with a `sourceBlock(sources)` that renders `.source-row` holding, per file, a `.source-pair` table and a `.source-unified` list. All text through the `html` tag so it is escaped. `compareBlock` takes `sources` and emits the `.source-row` inside the section; `renderChangesPage` passes each card's sources.
+- `scripts/gallery/publish.mjs`: pass `entrySources(...)` to the changes digest too (reuse the per-item value it already computes for entry pages).
+- `scripts/gallery/assets/gallery.js`: `buildCompare` keeps the server-rendered `.source-row` instead of clearing it; add the Source toggle (sets `section.dataset.source = open | closed`); *Collapse all* closes every section's source.
+- `scripts/gallery/assets/gallery.css`: `.source-row` below the panes or stage; `.source-pair` as `grid-template-columns: minmax(0,1fr) minmax(0,1fr)` with monospace cells, each column scrolling horizontally on its own, highlights reusing `--add-bg` / `--del-bg`; pair vs unified visibility as above; under `(max-height: 500px)` the source block is capped at 50vh with its own scroll.
 
-#### s3 - Notification [exec, mostly manual]
-There's no Slack integration in the repo today. Use the GitHub Slack app with `/github subscribe lolay/nowline deployments`. Each `github-pages` deployment posts with its environment URL, which is the per-build page. That needs no secret and no code in nowline. Verify the posted link is the per-build URL. If it's only the root, add an incoming-webhook step as a follow-up.
+Acceptance:
+- `scripts/gallery/test/source.test.mjs`: `sideBySideRows` cases for a modification, a pure add, a pure delete and identical input.
+- `scripts/gallery/test/publish.test.mjs`: entry-page assertions updated to the new markup (the `swimlane s "S2"` line appears as an added row in the right-hand column, the old bottom panel is gone), and a changes-digest card contains a `.source-row`.
+- No page has horizontal page scroll at 390x844 with the source open (long lines scroll inside their column).
 
-### m3 - Docs [exec]
-- `AGENTS.md` § OSS boundary: add "GitHub Pages deploy of the build gallery (`review.nowline.dev`, same repo)" to the permitted list.
-- `specs/ci.md`: new section covering what `gallery.yml` runs, retention, the data branch, and the concurrency gap.
-- `tests/README.md` § How they're rendered, and the root `README.md` § Examples: link to `review.nowline.dev`.
-- No changelog fragment, since this is internal CI. The PR gets the `no-changelog` label.
+#### s2 - [exec] Carry view settings across pages
 
-### m4 - Hand off DNS to nowline-infra [fast]
+Today *layout* and *size* persist across pages but the compare *mode* resets to side by side on every page. Make every view setting one global preference that carries from item to item, build to build, and onto the changes digest and range compare: mode (side / blink / slider / diff), layout (auto / stack / side), size (fit / actual), Source open or closed, and Changed only.
 
-Once the PR is up, queue a suggested-task card with `spawn_task`. It's a cloud session you start with one click, and its prompt stands alone:
-- Work in `lolay/nowline-infra` (attach it with `add_repo`).
-- Add a `CNAME` record from `review.nowline.dev` to `lolay.github.io.` in the `nowline.dev` zone, following the repo's existing DNS/Terraform pattern.
-- Add the GitHub Pages org-verification `TXT` record (`_github-pages-challenge-lolay.nowline.dev`). The value comes from GitHub org Settings → Pages → Verified domains, so the session asks you for it rather than guessing.
-- Open a PR there.
+- Keep each in `localStorage` (every access in try/catch, as `store` in `gallery.js` already does).
+- Also carry the current values as query params on every in-gallery link (prev/next, history row links and dots, older/newer build, tiles, crumbs, range-compare cards): `?mode=blink&layout=side&size=fit&src=1&changed=1`, so the view survives private browsing or blocked storage and a pasted link opens the same view. Skip external links (commit URLs, run URLs) and raw-SVG links.
+- URL params win over storage when both exist.
+- Picking a mode on one card of the changes digest applies it to every card, as layout already does.
+- Blink restarts its flip on page load; a page opened in Diff mode computes its diff immediately.
+- The Source default (open on entry pages, collapsed on the digest) applies only until the viewer first toggles it; after that their choice is used everywhere.
+- Fold the existing `changed` param handling in `setupEntryNav` into the same mechanism.
 
-nowline itself never writes to nowline-infra. The card is a human-started session, so the push-direction rule holds.
+Implementation: in `scripts/gallery/assets/gallery.js`, one `prefs` object read from URL then storage (`mode, layout, size, src, changed`), a `linkWithPrefs(href)` helper applied to all in-gallery `<a>`, and every widget reading its mode from `prefs`; any change re-applies to all widgets and rewrites the links in place.
+
+Acceptance: covered by s3's e2e assertions; s2 must leave `make pre-commit` green.
+
+#### s3 - [exec] Browser e2e for the gallery
+
+Add an automated browser test of `gallery.js`, following the repo's existing browser legs (`make mcp-app-e2e`, `packages/integration-tests/vitest.mcp-app.config.ts`, `packages/integration-tests/test/mcp-app-preview.e2e.test.ts`).
+
+- `scripts/gallery/serve.mjs`: export `createGalleryServer(siteDir)` (returns a Node `http.Server`); the CLI becomes a thin wrapper.
+- `packages/integration-tests/test/review-gallery.e2e.test.ts` plus `packages/integration-tests/vitest.review-gallery.config.ts`. The default config already excludes `**/*.e2e.test.ts`, so `make test` and the macOS/Windows cells never need a browser. Import the `.mjs` gallery modules with a dynamic `import()` of a computed path, as the MCP e2e does for sibling builds, so `tsc` doesn't resolve them.
+- Fixture: synthetic raw builds written to a temp dir (one entry with renderer drift, one with a source edit in an include, one volatile, one unchanged; three builds so a range exists), published with `publish()` and served on an ephemeral port by `createGalleryServer`. Drift SVGs must differ visibly (a moved `<rect>` or changed `<text>`), so the pixel diff has something to count.
+- Launch Chromium with `executablePath: process.env.NOWLINE_E2E_CHROMIUM || undefined`.
+- Assertions:
+  - pick Blink, then Next: the next item opens in Blink with layout and size kept; repeat for Diff and Slider;
+  - the same carry-over with storage blocked (a context whose `localStorage` throws, for example via an init script), through URL params;
+  - Changed only skips unchanged items, and the counter reads `n / N changed`;
+  - the Source toggle shows the pair table on desktop (1440x900) and the unified list at 390x844, and its state persists to the next page;
+  - Diff mode reports a non-zero changed-pixel count on the drift entry;
+  - older/newer build and older/newer change links land on the right build;
+  - no horizontal page scroll at 390x844 and 956x440; panes side by side at 956x440 and 820x1180;
+  - no console errors on any visited page;
+  - the range compare page classifies the three-build range correctly.
+- New Make target `gallery-e2e` (help text says it needs a browser and isn't in `make ci`): unless `NOWLINE_E2E_CHROMIUM` is set, `pnpm --filter @nowline/integration-tests exec playwright install chromium`; then `pnpm --filter @nowline/integration-tests exec vitest run --config vitest.review-gallery.config.ts`. Add it to `.PHONY` and document it in `Makefile.md` beside `mcp-app-e2e`. CI wiring is m4, not this step.
+
+Acceptance: `make gallery-e2e NOWLINE_E2E_CHROMIUM=/opt/pw-browsers/chromium` passes in this container, and the test fails if `gallery.js` stops carrying the mode across pages (check by temporarily breaking it locally; don't commit that).
+
+## m3 - Branch and PR support
+
+Scope: branches with an open PR in this repo, plus any local branch under `make gallery`. Fork PRs are excluded (their SVGs would be untrusted content on our origin). The CI wiring (ci.yml artifact, `gallery.yml` on `workflow_run`, commit status) is m4, not this milestone; m3 makes the scripts and site ready for it.
+
+--- WAVE 2 [deep] ---
+
+#### s1 - [deep] Lines, baselines and retention in the data model
+
+- **Lines.** Every build belongs to a line: `main`, `pr-<n>`, or locally the current git branch. `builds.json` in the data dir becomes `{ "lines": { "main": [ids], "pr-123": [ids] } }`, newest first. Read the m1 shape `{ "builds": [ids] }` as the `main` line (existing local `.gallery/data`).
+- **Manifest fields** (`collect.mjs`): `line`, and for PR builds `pr: { number, title, url, headRef, headSha, baseSha }`. In CI the checkout is the PR merge commit, so take the PR facts from environment variables the workflow will set (`GALLERY_LINE`, `GALLERY_PR_NUMBER`, `GALLERY_PR_TITLE`, `GALLERY_PR_URL`, `GALLERY_HEAD_REF`, `GALLERY_HEAD_SHA`, `GALLERY_BASE_SHA`, `GALLERY_AUTHOR`, `GALLERY_DATE`); a PR build's `sha` is the head sha and its id stays unique per push. Locally the line is `git rev-parse --abbrev-ref HEAD`, and `main` when on `main`.
+- **Baseline** (`baseId`, chosen at publish time and stored in the build's data manifest):
+  - a `main` build compares with the previous build in the `main` line;
+  - a PR build compares with the `main` build whose sha is `pr.baseSha`; if none is retained, with the newest retained `main` build that is an ancestor of `pr.baseSha` (ancestry from an injectable function, `git merge-base --is-ancestor` / `git rev-list` by default, so tests can fake it); if none, no baseline (first build);
+  - a local non-main line's first build compares with the newest `main`-line build; later builds compare with the previous build in their own line.
+- **Statuses**, changed-only navigation and the changes digest follow `baseId`. Per-entry history rows and older/newer build and change navigation stay within the build's own line.
+- **Retention** (`publish.mjs`): `--keep` (default 100) for `main`; `--keep-pr` (default 10) per PR line; `--open-prs <comma-separated numbers>` drops every `pr-<n>` line not listed (omitted: keep all). Prune raw builds no line references, except a `main` build that a retained PR build uses as its baseline.
+- **Make:** new target `gallery-collect` (collect only, no `build` prerequisite, `GALLERY_DIR`-aware); `gallery` becomes `build` then `gallery-collect` then publish. Update `Makefile.md`.
+- Keep the existing site rendering working for `main`; s2 adds the PR pages.
+
+Acceptance (`node:test` in `scripts/gallery/test/`):
+- baseline: exact base sha, ancestor fallback, no main build at all, local branch first build and later builds;
+- the m1 `builds.json` shape migrates to the `main` line;
+- per-line retention, closed-PR pruning, and a pruned-but-referenced main baseline kept;
+- a PR build's statuses are computed against main, not against its own previous push;
+- `collect` reads the `GALLERY_*` variables.
+
+--- WAVE 3 [exec] ---
+
+#### s2 - [exec] PR pages and headers
+
+- **Root index:** two sections, **Main** (the last builds, as now) and **Pull requests** (each PR line: `#<n>` linked to the PR URL, title, author, latest push's sha and local time, its counts vs main, link to its changes page).
+- `pr/<n>/index.html` redirects to the PR line's latest build; `pr/<n>/builds.html` lists the line's pushes with counts.
+- A PR build's header (build index, changes page, entry pages): `PR #<n> · <title> · <headRef>`, then head sha, author and date, then `vs main <base sha>` (linked to that build), then a `vs previous push` link to `compare.html?from=<previous push id>&to=<this id>` when the line has an earlier push.
+- `builds.json` in the site gains `line` and `pr` per build; `compare.html`'s data and pickers include PR builds, labelled by line.
+- `latest/` keeps pointing at the newest `main` build.
+
+Acceptance: `node:test` cases for the root page's PR section, `pr/<n>/` redirect and list, and the PR header links; `make pre-commit` green.
+
+#### s3 - [exec] Branch and PR browser tests
+
+Extend `packages/integration-tests/test/review-gallery.e2e.test.ts` (from m2.s3) with a fixture that has a `main` line and one PR line of two pushes. Assert: the root page lists the PR; `pr/<n>/` lands on its latest push; the PR build's statuses compare against main (an entry the PR changed shows as changed even if the previous push had the same SVG); the `vs previous push` link opens a range compare with the right counts; settings still carry across PR pages.
+
+Acceptance: `make gallery-e2e NOWLINE_E2E_CHROMIUM=/opt/pw-browsers/chromium` passes; `make pre-commit` green.
+
+## Later milestones (not in this run)
+
+These follow after review of m2 and m3, in a later run; they stay untagged until then.
+
+### m4 - Publish workflow
+- `ci.yml` canonical cell (ubuntu, Node 26): after `make ci`, `make gallery-collect` with the PR's `GALLERY_*` facts from the event, upload `gallery-raw`; on `push` to `main` and same-repo `pull_request` only, never `merge_group`, condition `!cancelled()`. Run `make gallery-e2e` in the Linux job that already provisions Chromium.
+- `.github/workflows/gallery.yml` on `workflow_run` of CI (`completed`), default-branch context, never executing PR code, skipping forks and runs without the artifact: download `gallery-raw` (`actions: read`), fetch the orphan `gallery-data` branch, `publish.mjs --open-prs <open PR numbers>` (`pull-requests: read`), commit `gallery-data` as one orphan commit and force-push it, `actions/upload-pages-artifact` + `actions/deploy-pages` (`pages: write`, `id-token: write`, `environment: github-pages` with the changes-page URL), and an informational commit status `review/renders` on the head sha linking to the changes page (`statuses: write`). Concurrency `gallery-publish`, `cancel-in-progress: false`.
+- Slack: the GitHub Slack app, `/github subscribe lolay/nowline deployments`.
+
+### m5 - Docs
+- `AGENTS.md` § OSS boundary: add "GitHub Pages deploy of the review gallery (`review.nowline.dev`, same repo)" to the permitted writes.
+- `specs/ci.md`: what `gallery.yml` runs, retention, the data branch, the concurrency gap, the e2e leg.
+- `tests/README.md`, root `README.md` § Examples: link to `review.nowline.dev`. `no-changelog` label.
+
+### m6 - Hand off DNS to nowline-infra
+Once the PR is up, queue a suggested-task card for `lolay/nowline-infra`: a `CNAME` from `review.nowline.dev` to `lolay.github.io.` in the `nowline.dev` zone following its existing DNS pattern, and the GitHub Pages org-verification `TXT` record (`_github-pages-challenge-lolay.nowline.dev`, value from org Settings → Pages → Verified domains, asked of Gary, never guessed); open a PR there. nowline itself never writes to nowline-infra.
 
 ## One-time manual setup (you)
 1. Repo Settings → Pages → Source: **GitHub Actions**. Custom domain: `review.nowline.dev`. Enforce HTTPS.
@@ -193,12 +278,14 @@ nowline itself never writes to nowline-infra. The card is a human-started sessio
 - Edited: `scripts/render-samples.mjs`, `scripts/render-tests.mjs`, `Makefile`, `Makefile.md`, `.gitignore` (`.gallery/`), `AGENTS.md`, `specs/ci.md`, `tests/README.md`, `README.md`.
 - Reused: `scripts/lib/check-dist-fresh.mjs`, `.github/actions/setup-node-pnpm`, the CLI `dist/index.js` render path (unchanged).
 
-## Verification
-- Run `make pre-commit` (lint, build, typecheck, and test, including the new `node --test` specs), then `make pack-mcpb`.
-- Build two local galleries, one from `main` and one from a branch that nudges a renderer constant. Run `make gallery GALLERY_PREV=...` and load the result in Playwright (Chromium) at 390x844 (phone), 956x440 (iPhone Pro Max landscape), 820x1180 (iPad portrait) and 1440x900.
-  - Screenshot a changed entry at each size. It should be stacked on the phone in portrait, and side by side in phone landscape, on the iPad and on desktop. In landscape, the compact chrome should leave at least 60% of the height for the diagrams.
-  - Open `changes.html` and `compare.html` across a three-build range. The counts should match the nudged entries, and Diff mode should highlight the shifted pixels.
-  - Check that blink and slider work, that actual-size panes scroll in lockstep, and that *Changed only* navigation skips unchanged entries.
-  - Check that phone width in fit mode has no horizontal page scroll.
-- Run `publish-site.mjs` against a temp site seeded with 101 fake builds. The oldest should be pruned, and changed badges should be correct.
-- After merging: trigger `workflow_dispatch` on the branch, confirm the deployment URL loads on a phone and `latest/` redirects, and confirm the Slack post links the build.
+## Review log
+
+## Token log
+
+**Counting header (Claude Code)**
+
+- Line, one per model a chat ran, appended below: `tokens <row> <group-id> (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv`. `<row>` is `wave-N`, `review-wave-N`, or `wave-N-fix` and `review-wave-N-fix` for a fix-up wave; `<group-id>` is the wave's group id with hyphens (`nowline-m2-s1-s3`); `<model>` is `message.model` without a date suffix. Round counts to two significant figures with `k` or `M`.
+- Usage: `~/.claude/projects/<slug>/$CLAUDE_CODE_SESSION_ID.jsonl` (`<slug>` is the working directory with every character but a letter or digit turned into `-`), plus its subagents' `<session-id>/subagents/**/agent-*.jsonl`. Sum `message.usage` over assistant lines once per `message.id`, from the line with `stop_reason`: input `input_tokens`, cache read `cache_read_input_tokens`, cache write `cache_creation.ephemeral_5m_input_tokens` (with `ephemeral_1h_input_tokens` too, `cache write ~40k 5m + ~8k 1h`), output `output_tokens`. A call with no `stop_reason` line keeps its input-side counts, takes output as about 1,000, and its line ends `(output est.) session <id>`.
+- Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
+- `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
+- In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
