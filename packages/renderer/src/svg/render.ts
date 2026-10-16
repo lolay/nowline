@@ -1441,6 +1441,11 @@ function renderContainer(
                 }),
             );
         }
+        // The title and the bracket share one ink, the header's: a group's
+        // `fg`, a parallel's bracket stroke. The title sits on the lane band,
+        // never on the body, so a `text:` colour chosen to read on `bg`
+        // (white on a filled chiclet, before the header) would vanish.
+        const ink = c.kind === 'group' ? c.style.fg : palette.parallel.bracketStroke;
         if (c.headerHeight > 0 && c.style.bracket !== 'none') {
             const lineY = c.box.y + CONTAINER_BRACKET_LINE_OFFSET_PX;
             const x0 = c.box.x;
@@ -1449,7 +1454,7 @@ function renderContainer(
                 tag('path', {
                     d: `M${num(x0)} ${num(bodyY)} V${num(lineY)} H${num(x1)} V${num(bodyY)}`,
                     fill: 'none',
-                    stroke: c.kind === 'group' ? c.style.fg : palette.parallel.bracketStroke,
+                    stroke: ink,
                     'stroke-width': 1.2,
                     'stroke-dasharray': c.style.bracket === 'dashed' ? '3 2' : null,
                 }),
@@ -1465,7 +1470,7 @@ function renderContainer(
                         y: num(c.box.y + CONTAINER_HEADER_TITLE_BASELINE_PX),
                         ...fontAttrs(c.style, fonts, CONTAINER_HEADER_TITLE_FONT_SIZE_PX),
                         'font-weight': 600,
-                        'fill-opacity': 0.75,
+                        fill: ink,
                     },
                     c.title,
                 ),
