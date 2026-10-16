@@ -14,10 +14,7 @@
 // renderer (the bracket, the title, the body) both read these helpers, so the
 // painted header and the space layout keeps for it can't drift apart.
 
-import {
-    INLINE_DATE_GLYPH_GAP_PX,
-    INLINE_DATE_GLYPH_TILE_SIZE_PX,
-} from './item-bar-geometry.js';
+import { INLINE_DATE_GLYPH_GAP_PX, INLINE_DATE_GLYPH_TILE_SIZE_PX } from './item-bar-geometry.js';
 import { TEXT_SIZE_PX } from './themes/shared.js';
 import type { PositionedTrackChild } from './types.js';
 

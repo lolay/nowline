@@ -1,10 +1,6 @@
 import { isItemDeclaration, isSwimlaneDeclaration, type NowlineFile } from '@nowline/core';
 import { describe, expect, it, vi } from 'vitest';
-import {
-    layoutRoadmap,
-    type PositionedItem,
-    type PositionedTrackChild,
-} from '../src/index.js';
+import { layoutRoadmap, type PositionedItem, type PositionedTrackChild } from '../src/index.js';
 import { measureItem } from '../src/nodes/item-measure.js';
 import { SwimlaneNode } from '../src/nodes/swimlane-node.js';
 import { ITEM_SEAM_PX } from '../src/themes/shared.js';

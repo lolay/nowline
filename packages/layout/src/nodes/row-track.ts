@@ -11,7 +11,10 @@
 import type { GroupBlock, SwimlaneDeclaration } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
 import { type TrackNode, trackChildren } from '@nowline/core/internal';
-import { CONTAINER_HEADER_CLEARANCE_PX, containerHeaderRightX } from '../container-header-geometry.js';
+import {
+    CONTAINER_HEADER_CLEARANCE_PX,
+    containerHeaderRightX,
+} from '../container-header-geometry.js';
 import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';

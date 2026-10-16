@@ -36,7 +36,8 @@ export function trackChildPaintedRightX(child: PositionedTrackChild): number {
     if (child.kind === 'item') {
         // `decorationsRightX` leads the spill column even when nothing
         // spills, so it counts only when something does.
-        const spills = child.textSpills || child.dotSpills || child.iconSpills || child.footnoteSpills;
+        const spills =
+            child.textSpills || child.dotSpills || child.iconSpills || child.footnoteSpills;
         return Math.max(
             child.box.x + child.box.width,
             spills ? child.decorationsRightX : Number.NEGATIVE_INFINITY,

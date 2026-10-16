@@ -222,9 +222,7 @@ describe('container inline-date glyph clearance', () => {
                     right: 26 + 5 * 10 * 0.58,
                     bottom: 32.5,
                 },
-                glyphs: [
-                    { side: 'after', rect: { left: 10, top: 20.5, right: 22, bottom: 32.5 } },
-                ],
+                glyphs: [{ side: 'after', rect: { left: 10, top: 20.5, right: 22, bottom: 32.5 } }],
             },
             {
                 kind: 'parallel',

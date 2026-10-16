@@ -66,9 +66,7 @@ function containersIn(children: PositionedTrackChild[]): Container[] {
 }
 
 function itemsIn(children: PositionedTrackChild[]): PositionedItem[] {
-    return children.flatMap((child) =>
-        child.kind === 'item' ? [child] : itemsIn(child.children),
-    );
+    return children.flatMap((child) => (child.kind === 'item' ? [child] : itemsIn(child.children)));
 }
 
 /** Every container the model carries: main lanes and the lanes of include regions. */
