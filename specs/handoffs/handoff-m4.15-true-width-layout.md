@@ -19,14 +19,7 @@ Spec: [`../true-width-layout.md`](../true-width-layout.md). Milestone entry: [`.
 
 ## The prototype
 
-[`true-width-prototype/`](./true-width-prototype/) is a browser page: pick or edit a `.nowline` file and see today's render beside the proposed one, both from one staging, so they share one schedule.
-
-```bash
-make build-fast
-node specs/handoffs/true-width-prototype/build.mjs   # writes out/index.html + out/proto.js
-```
-
-Open `out/index.html` in a browser (it loads `proto.js` from beside it). `src/proposed.js` is the proposed renderer: about 400 lines that take the AST, the resolved content and the schedule and return an SVG. It is a reference for the rules, not code to port: it estimates text widths, draws one-line captions in a 22 px bar, ignores footnotes, labels, owners, links, logos, isolated regions and `before:`, and does no channel bundling.
+The design was worked out in a browser page (`true-width-prototype/`) that drew today's render beside the proposed one from one staging. It was removed when m4.15 closed (spec §5 m4); its five stress files are described in spec §6, and the page is in git history at aa0c0a1 (`git show aa0c0a1:specs/handoffs/true-width-prototype/README.md`).
 
 ## First step (m1)
 
@@ -37,4 +30,4 @@ Bars at true width in `packages/layout`: drop the `MIN_ITEM_WIDTH` clamp and the
 - Every sample moves. Render all of `examples/` and `tests/` in three themes before and after each step, and list every moved file, snapshot and determinism cell in the commit and PR. Never bump a golden just to get green.
 - The exports must not move; if xlsx, msproj or mermaid bytes change, something touched the schedule.
 - `make pre-commit` is the gate. The repo pins Node 26 (`.nvmrc`).
-- Remove or promote `true-width-prototype/` before m4.15 closes; it is reference material, not shipped code.
+- ~~Remove or promote `true-width-prototype/` before m4.15 closes.~~ Removed in m4; see above.
