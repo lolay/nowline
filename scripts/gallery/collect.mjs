@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { GALLERY_GROUPS } from '../lib/render-manifest.mjs';
 import { buildId, MAIN_LINE } from './lib/lines.mjs';
 import { extractLeadingComment, findIncludes, roadmapTitle } from './lib/source.mjs';
+import { assertSha } from './lib/validate.mjs';
 
 // 2 added `line` and `pr`, and publish adds `baseId`. Schema 1 manifests
 // (m1) read as main-line builds.
@@ -125,8 +126,8 @@ function readPr(env) {
         title: env.GALLERY_PR_TITLE ?? '',
         url: env.GALLERY_PR_URL ?? '',
         headRef: env.GALLERY_HEAD_REF ?? '',
-        headSha: env.GALLERY_HEAD_SHA || null,
-        baseSha: env.GALLERY_BASE_SHA || null,
+        headSha: env.GALLERY_HEAD_SHA ? assertSha('GALLERY_HEAD_SHA', env.GALLERY_HEAD_SHA) : null,
+        baseSha: env.GALLERY_BASE_SHA ? assertSha('GALLERY_BASE_SHA', env.GALLERY_BASE_SHA) : null,
     };
 }
 
@@ -139,6 +140,7 @@ function commitFacts(repoRoot, rev) {
             'log',
             '-1',
             '--format=%s%x00%an%x00%aI',
+            '--end-of-options',
             rev,
             '--',
         ).split('\0');
@@ -163,7 +165,7 @@ function commitFacts(repoRoot, rev) {
 export function readCommit(repoRoot, env = process.env) {
     const head = git(repoRoot, 'rev-parse', 'HEAD');
     const pr = readPr(env);
-    const sha = env.GALLERY_HEAD_SHA || head;
+    const sha = env.GALLERY_HEAD_SHA ? assertSha('GALLERY_HEAD_SHA', env.GALLERY_HEAD_SHA) : head;
     const headFacts = commitFacts(repoRoot, 'HEAD');
     const facts = (sha === head ? headFacts : commitFacts(repoRoot, sha)) ?? {
         subject: pr?.title || headFacts.subject,

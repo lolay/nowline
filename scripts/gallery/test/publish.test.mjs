@@ -1,13 +1,23 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { after, before, test } from 'node:test';
 import { collect, readCommit } from '../collect.mjs';
-import { escapeHtml, html, jsonForScript } from '../lib/html.mjs';
-import { publish } from '../publish.mjs';
+import {
+    escapeHtml,
+    html,
+    jsonForScript,
+    renderBuildIndex,
+    renderComparePage,
+    renderPrBuilds,
+    renderRootIndex,
+} from '../lib/html.mjs';
+import { compareManifests, flattenEntries } from '../lib/model.mjs';
+import { safeUrl } from '../lib/validate.mjs';
+import { gitIsAncestor, publish } from '../publish.mjs';
 
 let work;
 
@@ -631,4 +641,269 @@ test('html escapes interpolations unless marked raw; script JSON cannot close it
     );
     assert.equal(html`<p>${['a', html`<b>${'<'}</b>`]}</p>`.value, '<p>a<b>&lt;</b></p>');
     assert.doesNotMatch(jsonForScript({ s: evil }).value, /<\/script>/);
+});
+
+// --- Untrusted raw builds ---------------------------------------------------
+
+// Every file under `dir` with its bytes, to show a rejected publish changed
+// nothing.
+async function snapshot(dir) {
+    if (!existsSync(dir)) return null;
+    const out = {};
+    for (const entry of await readdir(dir, { recursive: true, withFileTypes: true })) {
+        const path = join(entry.parentPath, entry.name);
+        out[relative(dir, path)] = entry.isFile() ? await readFile(path, 'utf8') : 'dir';
+    }
+    return out;
+}
+
+// A data dir with one main build, and a fresh raw build to tamper with.
+async function untrusted(name) {
+    const data = join(work, `data-${name}`);
+    const site = join(work, `site-${name}`);
+    const child = 'swimlane s "S"\n';
+    await publish({
+        dataDir: data,
+        siteDir: site,
+        isAncestor: () => false,
+        rawDir: await build(5, {
+            parentSvg: '<svg>m</svg>',
+            childText: child,
+            raw: `raw-${name}-ok`,
+        }),
+    });
+    const raw = await build(6, { parentSvg: '<svg>x</svg>', childText: child, raw: `raw-${name}` });
+    const tamper = async (edit) => {
+        const path = join(raw, 'manifest.json');
+        const manifest = await readJson(path);
+        edit(manifest);
+        await writeFile(path, JSON.stringify(manifest));
+    };
+    // Publishing `raw` must fail with `pattern` and leave data and site as they were.
+    const rejects = async (pattern, options = {}) => {
+        const before = [await snapshot(data), await snapshot(site)];
+        await assert.rejects(
+            publish({
+                dataDir: data,
+                siteDir: site,
+                rawDir: raw,
+                isAncestor: () => false,
+                ...options,
+            }),
+            pattern,
+        );
+        assert.deepEqual([await snapshot(data), await snapshot(site)], before, 'nothing changed');
+    };
+    return { data, site, raw, tamper, rejects };
+}
+
+const prFacts = (number) => ({
+    number,
+    title: 'Feature',
+    url: `https://github.com/lolay/nowline/pull/${number}`,
+    headRef: 'feature',
+    headSha: 'a'.repeat(40),
+    baseSha: '5'.repeat(40),
+});
+
+test('a traversal build id is rejected before anything outside the data dir is removed', async () => {
+    const { tamper, rejects } = await untrusted('trav');
+    const victim = join(work, 'victim');
+    await put(join(victim, 'keep.txt'), 'precious\n');
+    // data-trav/b/../../victim is work/victim.
+    await tamper((m) => {
+        m.id = '../../victim';
+    });
+    await rejects(/unsafe build id/);
+    assert.equal(await readFile(join(victim, 'keep.txt'), 'utf8'), 'precious\n');
+    for (const id of ['..', '.', 'a/b', '', 'a b']) {
+        await tamper((m) => {
+            m.id = id;
+        });
+        await rejects(/unsafe build id/);
+    }
+});
+
+test('unsafe group ids and slugs are rejected', async () => {
+    const { tamper, rejects } = await untrusted('slug');
+    await tamper((m) => {
+        m.groups[0].id = '../examples';
+    });
+    await rejects(/unsafe group id/);
+    for (const slug of ['..', '../../x', 'a/b', '/abs']) {
+        await tamper((m) => {
+            m.groups[0].id = 'examples';
+            m.groups[0].entries[0].slug = slug;
+        });
+        await rejects(/unsafe slug/);
+    }
+});
+
+test('source paths must be relative, without .., and plain files in the raw build', async () => {
+    const { raw, tamper, rejects } = await untrusted('files');
+    for (const file of ['../secret', '/etc/passwd', 'examples/../../.git/config', 'a//b', 'a\\b']) {
+        await tamper((m) => {
+            m.groups[0].entries[0].files = [file];
+        });
+        await rejects(/unsafe source path/);
+    }
+    await tamper((m) => {
+        m.groups[0].entries[0].files = ['examples/parent.nowline', 'examples/missing.nowline'];
+    });
+    await rejects(/src\/examples\/missing.nowline is missing/);
+    await tamper((m) => {
+        m.groups[0].entries[0].files = ['examples/parent.nowline'];
+    });
+
+    // A symlinked source file, or a symlinked directory, pointing out of the raw build.
+    const secret = join(work, 'secret.txt');
+    await writeFile(secret, 'token\n');
+    const plain = join(raw, 'src/examples/plain.nowline');
+    await rm(plain);
+    await symlink(secret, plain);
+    await rejects(/not a plain file or directory/);
+    await rm(plain);
+    await writeFile(plain, 'nowline v1\n');
+    const outside = join(work, 'outside-dir');
+    await put(join(outside, 'today.nowline'), 'token\n');
+    await rm(join(raw, 'src/tests'), { recursive: true });
+    await symlink(outside, join(raw, 'src/tests'));
+    await rejects(/not a plain file or directory/);
+});
+
+test('a PR build must be on its own pr-<n> line, and the one the workflow expects', async () => {
+    const { tamper, rejects } = await untrusted('prline');
+    await tamper((m) => {
+        m.pr = prFacts(12);
+        m.line = 'main';
+    });
+    await rejects(/must be on line pr-12, not main/);
+    await tamper((m) => {
+        m.line = 'pr-13';
+    });
+    await rejects(/must be on line pr-12/);
+    for (const number of [0, -1, 1.5, '12']) {
+        await tamper((m) => {
+            m.pr = { ...prFacts(12), number };
+            m.line = 'pr-12';
+        });
+        await rejects(/pr.number must be a positive integer/);
+    }
+    // --pr: a main-looking or other PR's build can't stand in for PR 12.
+    await tamper((m) => {
+        m.pr = null;
+        m.line = 'main';
+    });
+    await rejects(/expected a build of PR #12, got line main/, { expectPr: 12 });
+    await tamper((m) => {
+        m.pr = prFacts(13);
+        m.line = 'pr-13';
+    });
+    await rejects(/expected a build of PR #12, got PR #13/, { expectPr: 12 });
+});
+
+test('shas must be hex: option-shaped shas never reach git', async () => {
+    const { tamper, rejects } = await untrusted('sha');
+    for (const sha of ['--output=/tmp/pwned', 'HEAD', 'A'.repeat(40), '123456']) {
+        await tamper((m) => {
+            m.sha = sha;
+        });
+        await rejects(/sha must be 7-40 lowercase hex/);
+    }
+    await tamper((m) => {
+        m.sha = '6'.repeat(40);
+        m.line = 'pr-12';
+        m.pr = { ...prFacts(12), baseSha: '--upload-pack=x' };
+    });
+    await rejects(/pr.baseSha must be 7-40 lowercase hex/);
+
+    const repo = join(work, 'sha-repo');
+    const git = (...args) =>
+        execFileSync('git', ['-c', 'user.name=Ada', '-c', 'user.email=ada@example.com', ...args], {
+            cwd: repo,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+        }).trim();
+    await put(join(repo, 'a.txt'), 'a\n');
+    git('init', '-q', '-b', 'main');
+    git('add', '.');
+    git('commit', '-q', '-m', 'One');
+    const one = git('rev-parse', 'HEAD');
+    git('commit', '-q', '--allow-empty', '-m', 'Two');
+    const two = git('rev-parse', 'HEAD');
+    const isAncestor = gitIsAncestor(repo);
+    assert.equal(isAncestor(one, two), true);
+    assert.equal(isAncestor(two, one), false);
+    const out = join(work, 'sha-pwned');
+    assert.equal(isAncestor(`--output=${out}`, two), false);
+    assert.equal(existsSync(out), false);
+    assert.throws(
+        () => readCommit(repo, { CI: '1', GALLERY_HEAD_SHA: '--all' }),
+        /GALLERY_HEAD_SHA/,
+    );
+    assert.throws(
+        () => readCommit(repo, { CI: '1', GALLERY_PR_NUMBER: '3', GALLERY_BASE_SHA: '-n1' }),
+        /GALLERY_BASE_SHA/,
+    );
+});
+
+test('links from manifests must be https: rejected at publish, dropped at render', async () => {
+    const { tamper, rejects } = await untrusted('url');
+    const evil = 'javascript:alert(document.domain)';
+    await tamper((m) => {
+        m.runUrl = evil;
+    });
+    await rejects(/runUrl must be an https URL/);
+    await tamper((m) => {
+        m.runUrl = '';
+        m.repoUrl = 'data:text/html,<script>alert(1)</script>';
+    });
+    await rejects(/repoUrl must be an https URL/);
+    for (const url of [
+        evil,
+        'https://evil.example/pull/12',
+        'https://github.com/lolay/nowline/pull/13',
+    ]) {
+        await tamper((m) => {
+            m.repoUrl = 'https://github.com/lolay/nowline';
+            m.line = 'pr-12';
+            m.pr = { ...prFacts(12), url };
+        });
+        await rejects(/pr.url must be an https URL/);
+    }
+
+    // Render-time: the same fields, bypassing validation, produce no link.
+    const manifest = {
+        ...(await readJson(join(work, 'raw-url', 'manifest.json'))),
+        id: 'pr-12-aaaaaaaaaaaa',
+        repoUrl: 'javascript:alert(1)//',
+        runUrl: evil,
+        pr: { ...prFacts(12), url: evil },
+    };
+    const comparison = compareManifests(null, manifest);
+    const flat = flattenEntries(manifest);
+    const pages = [
+        renderPrBuilds({ number: 12, builds: [{ manifest, comparison }] }),
+        renderRootIndex({
+            main: [],
+            prs: [{ line: 'pr-12', number: 12, builds: [{ manifest, comparison }] }],
+        }),
+        renderBuildIndex({
+            build: manifest,
+            prev: null,
+            flat,
+            comparison,
+            older: null,
+            newer: null,
+        }),
+        renderComparePage({ builds: [{ manifest, comparison }], groups: [] }),
+    ].map(String);
+    for (const page of pages) {
+        assert.doesNotMatch(page, /href="javascript:/i);
+        assert.doesNotMatch(page, /javascript:alert\(1\)\/\/\/commit/);
+    }
+    assert.match(pages[0], /PR #12/);
+    assert.equal(safeUrl(evil), '');
+    assert.equal(safeUrl('data:text/html,x'), '');
+    assert.equal(safeUrl('https://github.com/x'), 'https://github.com/x');
 });

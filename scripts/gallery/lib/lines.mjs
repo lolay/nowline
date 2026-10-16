@@ -21,6 +21,16 @@ export function prNumberOf(line) {
     return match ? Number(match[1]) : null;
 }
 
+// The PR number of a line whose builds are pull request builds, else null.
+// Classified by the builds' `pr` field, not the name alone, so a local branch
+// called `pr-12` stays a branch line (retained by --keep, listed as a branch).
+export function linePrNumber(line, ids, manifests) {
+    const number = prNumberOf(line);
+    if (number === null) return null;
+    const isPr = (ids ?? []).some((id) => manifests.get(id)?.pr?.number === number);
+    return isPr ? number : null;
+}
+
 export function lineOf(manifest) {
     return manifest.line ?? MAIN_LINE;
 }
@@ -92,7 +102,7 @@ function mainCandidates(lines, manifests, selfId) {
     const listed = new Set(inLine);
     const pinned = [...manifests.values()]
         .filter((m) => m.id !== selfId && !listed.has(m.id) && lineOf(m) === MAIN_LINE && !m.pr)
-        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+        .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
     return [...inLine.map((id) => manifests.get(id)), ...pinned];
 }
 
@@ -113,7 +123,7 @@ export function resolveBaseId(manifest, lineIds, available) {
 // Applies retention to the lines and returns the retained lines with the
 // ids whose raw builds stay on disk.
 //   keep     newest builds kept in main and in every local branch line
-//   keepPr   newest builds kept in each `pr-<n>` line
+//   keepPr   newest builds kept in each PR line (see linePrNumber)
 //   openPrs  when given, every `pr-<n>` line not listed is dropped, except
 //            `currentLine` (the build just published, whose PR was open when
 //            CI ran)
@@ -132,7 +142,7 @@ export function retainLines({
     const open = openPrs ? new Set(openPrs) : null;
     const kept = {};
     for (const [line, ids] of Object.entries(lines)) {
-        const number = prNumberOf(line);
+        const number = linePrNumber(line, ids, manifests);
         if (number !== null && open && !open.has(number) && line !== currentLine) continue;
         const limited = ids.slice(0, number !== null ? keepPr : keep);
         if (limited.length > 0) kept[line] = limited;

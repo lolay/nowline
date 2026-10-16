@@ -3,7 +3,7 @@
 // regenerate the whole review site from that history.
 //
 // Usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir>
-//          [--keep 100] [--keep-pr 10] [--open-prs 12,34]
+//          [--keep 100] [--keep-pr 10] [--open-prs 12,34] [--pr 12]
 //
 // `--data` holds raw builds only (SVGs, sources, manifests) and builds.json,
 // which lists each line's build ids newest first (see lib/lines.mjs). Adding
@@ -17,6 +17,11 @@
 // current templates and every build links to its newer neighbours. In CI the
 // data dir round-trips through the `gallery-data` branch; locally it
 // accumulates under .gallery/.
+//
+// The raw build is untrusted (in CI, pull-request code produced it), so it is
+// validated (lib/validate.mjs) before anything on disk changes. `--pr <n>`
+// names the PR the publishing workflow knows it is handling; the raw build
+// must then be that PR's build, so it can't claim main or another PR.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -37,9 +42,9 @@ import {
 import {
     chooseBaseline,
     lineOf,
+    linePrNumber,
     MAIN_LINE,
     normalizeIndex,
-    prNumberOf,
     resolveBaseId,
     retainLines,
 } from './lib/lines.mjs';
@@ -50,19 +55,26 @@ import {
     historyNavigation,
     itemNavigation,
 } from './lib/model.mjs';
+import { checkRawTree, inside, isSafeName, isSha, validateManifest } from './lib/validate.mjs';
 
 const ASSETS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'assets');
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 // Git ancestry for PR baselines: is `ancestor` reachable from `sha`? A
-// commit this clone doesn't have (shallow history, a fork) counts as no.
+// commit this clone doesn't have (shallow history, a fork) counts as no, as
+// does anything that isn't a plain hex sha (shas come from manifests).
 export function gitIsAncestor(repoRoot = REPO_ROOT) {
     return (ancestor, sha) => {
+        if (!isSha(ancestor) || !isSha(sha)) return false;
         try {
-            execFileSync('git', ['merge-base', '--is-ancestor', ancestor, sha], {
-                cwd: repoRoot,
-                stdio: 'ignore',
-            });
+            execFileSync(
+                'git',
+                ['merge-base', '--is-ancestor', '--end-of-options', ancestor, sha],
+                {
+                    cwd: repoRoot,
+                    stdio: 'ignore',
+                },
+            );
             return true;
         } catch {
             return false;
@@ -80,31 +92,42 @@ async function write(path, content) {
     await writeFile(path, content);
 }
 
-// Every raw build in the data dir, by id.
+// Every raw build in the data dir, by id. Each was validated when it was
+// published; checking again keeps a hand-edited data branch from steering
+// paths either.
 async function loadAllManifests(dataDir) {
     const manifests = new Map();
     const dir = resolve(dataDir, 'b');
     if (!existsSync(dir)) return manifests;
     for (const id of (await readdir(dir)).sort()) {
+        if (!isSafeName(id)) throw new Error(`unsafe build directory ${JSON.stringify(id)}`);
         const manifest = await readJson(resolve(dir, id, 'manifest.json'), null);
-        if (manifest) manifests.set(id, manifest);
+        if (!manifest) continue;
+        validateManifest(manifest);
+        if (manifest.id !== id) throw new Error(`b/${id}/manifest.json has id ${manifest.id}`);
+        manifests.set(id, manifest);
     }
     return manifests;
 }
 
 // Adds the raw build to the data dir with its baseline, applies retention
 // and deletes raw builds nothing keeps. Returns the new index's lines and
-// the build's id.
+// the build's id. The raw build is validated first; an invalid one throws
+// with the data dir untouched.
 export async function addBuild({
     dataDir,
     rawDir,
     keep = 100,
     keepPr = 10,
     openPrs = null,
+    expectPr = null,
     isAncestor = gitIsAncestor(),
 }) {
     const manifest = await readJson(resolve(rawDir, 'manifest.json'), null);
     if (!manifest) throw new Error(`no manifest.json in ${rawDir}`);
+    validateManifest(manifest, { expectPr });
+    await checkRawTree(rawDir, manifest);
+    const target = inside(dataDir, 'b', manifest.id);
     const { lines } = normalizeIndex(await readJson(resolve(dataDir, 'builds.json'), null));
     // Republishing an id replaces it wherever it was.
     for (const line of Object.keys(lines)) {
@@ -115,7 +138,6 @@ export async function addBuild({
     const line = lineOf(manifest);
     const baseId = await chooseBaseline({ manifest, lines, manifests, isAncestor });
     const stored = { ...manifest, line, baseId };
-    const target = resolve(dataDir, 'b', manifest.id);
     await rm(target, { recursive: true, force: true });
     await cp(rawDir, target, { recursive: true });
     await write(resolve(target, 'manifest.json'), `${JSON.stringify(stored, null, 2)}\n`);
@@ -125,7 +147,7 @@ export async function addBuild({
     const retained = retainLines({ lines, manifests, keep, keepPr, openPrs, currentLine: line });
     for (const id of await readdir(resolve(dataDir, 'b'))) {
         if (!retained.onDisk.has(id)) {
-            await rm(resolve(dataDir, 'b', id), { recursive: true, force: true });
+            await rm(inside(dataDir, 'b', id), { recursive: true, force: true });
         }
     }
     await write(
@@ -139,7 +161,7 @@ export async function addBuild({
 // it. A file only one side has gets null on the other.
 async function entrySources(dataDir, build, prev, entry, prevEntry) {
     const read = async (buildId, path) =>
-        readFile(resolve(dataDir, 'b', buildId, 'src', path), 'utf8').catch(() => null);
+        readFile(inside(dataDir, 'b', buildId, 'src', path), 'utf8').catch(() => null);
     const paths = [...entry.files];
     for (const path of prevEntry?.files ?? []) {
         if (!paths.includes(path)) paths.push(path);
@@ -223,19 +245,19 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
         const prevByKey = new Map(prev ? flattenEntries(prev).map((f) => [f.key, f.entry]) : []);
         const nav = itemNavigation(flat, comparison.statuses);
         const lineHistory = histories.get(own.line) ?? new Map();
-        const buildDir = resolve(siteDir, 'b', build.id);
+        const buildDir = inside(siteDir, 'b', build.id);
         const sourcesByKey = new Map();
 
         for (const item of flat) {
             await cp(
-                resolve(dataDir, 'b', build.id, 'svg', `${item.key}.svg`),
-                resolve(buildDir, `${item.key}.svg`),
+                inside(dataDir, 'b', build.id, 'svg', `${item.key}.svg`),
+                inside(buildDir, `${item.key}.svg`),
             );
             const prevEntry = prevByKey.get(item.key);
             const sources = await entrySources(dataDir, build, prev, item.entry, prevEntry);
             sourcesByKey.set(item.key, sources);
             await write(
-                resolve(buildDir, `${item.key}.html`),
+                inside(buildDir, `${item.key}.html`),
                 renderEntryPage({
                     build,
                     prev,
@@ -273,20 +295,23 @@ export async function renderSite({ dataDir, siteDir, lines, focusId = null }) {
         (lines[line] ?? []).filter((id) => all.has(id)).map((id) => rendered.get(id));
     const mainIds = (lines[MAIN_LINE] ?? []).filter((id) => all.has(id));
     const main = listed(MAIN_LINE);
-    // Local branches, most recently pushed first; pull requests, highest number first.
+    // Local branches, most recently pushed first; pull requests, highest number
+    // first. A line is a PR line when its builds carry `pr`, not by its name.
+    const prNumber = (line) => linePrNumber(line, lines[line], all);
+    const pushedAt = (g) => Date.parse(g.builds[0].manifest.date) || 0;
     const branches = Object.keys(lines)
-        .filter((line) => line !== MAIN_LINE && prNumberOf(line) === null)
+        .filter((line) => line !== MAIN_LINE && prNumber(line) === null)
         .map((line) => ({ line, builds: listed(line) }))
         .filter((g) => g.builds.length > 0)
-        .sort((a, b) => b.builds[0].manifest.date.localeCompare(a.builds[0].manifest.date));
+        .sort((a, b) => pushedAt(b) - pushedAt(a));
     const prs = Object.keys(lines)
-        .filter((line) => prNumberOf(line) !== null)
-        .map((line) => ({ line, number: prNumberOf(line), builds: listed(line) }))
+        .filter((line) => prNumber(line) !== null)
+        .map((line) => ({ line, number: prNumber(line), builds: listed(line) }))
         .filter((g) => g.builds.length > 0)
         .sort((a, b) => b.number - a.number);
     const builds = [...main, ...branches.flatMap((g) => g.builds), ...prs.flatMap((g) => g.builds)];
     for (const [key, rows] of histories.get(MAIN_LINE) ?? []) {
-        await write(resolve(siteDir, 'history', `${key}.json`), JSON.stringify(rows));
+        await write(inside(siteDir, 'history', `${key}.json`), JSON.stringify(rows));
     }
     for (const { number, builds: pushes } of prs) {
         await write(
@@ -342,14 +367,23 @@ export async function publish({
     keep = 100,
     keepPr = 10,
     openPrs = null,
+    expectPr = null,
     isAncestor = gitIsAncestor(),
 }) {
-    const { id, lines } = await addBuild({ dataDir, rawDir, keep, keepPr, openPrs, isAncestor });
+    const { id, lines } = await addBuild({
+        dataDir,
+        rawDir,
+        keep,
+        keepPr,
+        openPrs,
+        expectPr,
+        isAncestor,
+    });
     return renderSite({ dataDir, siteDir, lines, focusId: id });
 }
 
 const USAGE =
-    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> [--keep 100] [--keep-pr 10] [--open-prs 12,34]';
+    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> [--keep 100] [--keep-pr 10] [--open-prs 12,34] [--pr 12]';
 
 function positiveInt(name, text) {
     const value = Number(text);
@@ -369,6 +403,7 @@ async function main() {
             keep: { type: 'string', default: '100' },
             'keep-pr': { type: 'string', default: '10' },
             'open-prs': { type: 'string' },
+            pr: { type: 'string' },
         },
     });
     if (!values.data || !values.raw || !values.site) {
@@ -391,6 +426,7 @@ async function main() {
         keep: positiveInt('--keep', values.keep),
         keepPr: positiveInt('--keep-pr', values['keep-pr']),
         openPrs,
+        expectPr: values.pr === undefined ? null : positiveInt('--pr', values.pr),
     });
     console.log(`published ${result.id} -> ${resolve(values.site, result.path)}`);
     if (process.env.GITHUB_OUTPUT) {

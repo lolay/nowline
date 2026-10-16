@@ -5,6 +5,7 @@
 import { lineDiff, sideBySideRows } from './diff.mjs';
 import { lineOf, MAIN_LINE } from './lines.mjs';
 import { CHANGED_STATUSES, entryKey } from './model.mjs';
+import { safeUrl } from './validate.mjs';
 
 class Raw {
     constructor(value) {
@@ -81,7 +82,7 @@ export function commitMeta(manifest) {
         subject: manifest.subject,
         author: manifest.author,
         date: manifest.date,
-        url: manifest.repoUrl ? `${manifest.repoUrl}/commit/${manifest.sha}` : '',
+        url: safeUrl(manifest.repoUrl) ? safeUrl(`${manifest.repoUrl}/commit/${manifest.sha}`) : '',
         dirty: Boolean(manifest.dirty),
     };
 }
@@ -101,8 +102,8 @@ function commitLine(manifest) {
 function prLine(build) {
     const pr = build.pr;
     if (!pr) return '';
-    const number = pr.url
-        ? html`<a class="pr-number" href="${pr.url}">PR #${pr.number}</a>`
+    const number = safeUrl(pr.url)
+        ? html`<a class="pr-number" href="${safeUrl(pr.url)}">PR #${pr.number}</a>`
         : html`<span class="pr-number">PR #${pr.number}</span>`;
     return html`<p class="meta pr-line">${number} · <span class="pr-title">${pr.title}</span>${pr.headRef ? html` · <span class="chip">${pr.headRef}</span>` : ''}</p>`;
 }
@@ -303,7 +304,7 @@ function buildHeader({ build, prev, prevPushId = null, comparison, toRoot, title
   <h1>${title}</h1>
   ${prLine(build)}
   <p class="meta">${commitLine(build)}</p>
-  <p class="meta small">${build.ref ? html`<span class="chip">${build.ref}</span> ` : ''}${build.runUrl ? html`<a href="${build.runUrl}">workflow run</a>` : ''}</p>
+  <p class="meta small">${build.ref ? html`<span class="chip">${build.ref}</span> ` : ''}${safeUrl(build.runUrl) ? html`<a href="${safeUrl(build.runUrl)}">workflow run</a>` : ''}</p>
   ${build.pr ? prVs({ build, prev, prevPushId, toBuilds: '../', toRoot }) : prev ? html`<p class="meta small">vs ${commitLine(prev)}</p>` : html`<p class="meta small">First build in the history.</p>`}
   <p class="summary">${chips(comparison.counts)}</p>
 </header>`;
@@ -446,8 +447,8 @@ function lineRow({ line, number = null, builds }) {
     const label =
         number === null
             ? html`<span class="chip line-name">${line}</span>`
-            : pr?.url
-              ? html`<a class="pr-number" href="${pr.url}">#${number}</a>`
+            : safeUrl(pr?.url)
+              ? html`<a class="pr-number" href="${safeUrl(pr.url)}">#${number}</a>`
               : html`<span class="pr-number">#${number}</span>`;
     const pushes = `${builds.length} ${builds.length === 1 ? 'push' : 'pushes'}`;
     const pushesLink =
@@ -526,7 +527,7 @@ export function renderPrBuilds({ number, builds }) {
         bodyAttrs: ' class="pr-builds-page"',
         body: html`<header class="top">
   <nav class="crumbs"><a href="../../index.html">Builds</a> / PR #${number}</nav>
-  <h1>${pr?.url ? html`<a href="${pr.url}">PR #${number}</a>` : `PR #${number}`} ${pr?.title ?? ''}</h1>
+  <h1>${safeUrl(pr?.url) ? html`<a href="${safeUrl(pr.url)}">PR #${number}</a>` : `PR #${number}`} ${pr?.title ?? ''}</h1>
   <p class="meta small">${pr?.headRef ? html`<span class="chip">${pr.headRef}</span> ` : ''}${builds.length} ${builds.length === 1 ? 'push' : 'pushes'}, each compared against main.</p>
 </header>
 <main><ol class="builds">${rows}</ol></main>`,

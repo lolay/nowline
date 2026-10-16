@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
     buildId,
     chooseBaseline,
+    linePrNumber,
     normalizeIndex,
     prNumberOf,
     resolveBaseId,
@@ -21,6 +22,18 @@ function byId(...manifests) {
 }
 
 const noAncestry = () => false;
+
+// Manifests for an index: PR-named lines' builds carry `pr`, the rest don't.
+function manifestsFor(lines) {
+    const manifests = [];
+    for (const [line, ids] of Object.entries(lines)) {
+        const number = prNumberOf(line);
+        for (const id of ids) {
+            manifests.push(build(id, { line, pr: number === null ? null : { number } }));
+        }
+    }
+    return byId(...manifests);
+}
 
 test('the m1 builds.json shape reads as the main line', () => {
     assert.deepEqual(normalizeIndex({ builds: ['b', 'a'] }), { lines: { main: ['b', 'a'] } });
@@ -189,7 +202,7 @@ test('retention keeps --keep per main and branch line and --keep-pr per PR line'
     };
     const { lines: kept, onDisk } = retainLines({
         lines,
-        manifests: new Map(),
+        manifests: manifestsFor(lines),
         keep: 3,
         keepPr: 2,
     });
@@ -206,14 +219,14 @@ test('retention drops PR lines that are not open, except the one just published'
     const lines = { main: ['m1'], 'pr-1': ['a1'], 'pr-2': ['b1'], 'pr-3': ['c1'], feat: ['f1'] };
     const { lines: kept } = retainLines({
         lines,
-        manifests: new Map(),
+        manifests: manifestsFor(lines),
         keep: 10,
         keepPr: 10,
         openPrs: [2],
         currentLine: 'pr-3',
     });
     assert.deepEqual(Object.keys(kept).sort(), ['feat', 'main', 'pr-2', 'pr-3']);
-    const all = retainLines({ lines, manifests: new Map(), keep: 10, keepPr: 10 });
+    const all = retainLines({ lines, manifests: manifestsFor(lines), keep: 10, keepPr: 10 });
     assert.equal(Object.keys(all.lines).length, 5, 'without --open-prs every line stays');
 });
 
@@ -222,8 +235,8 @@ test('a main build that a retained PR build compares against stays on disk', () 
         build('m3', { baseId: 'm2' }),
         build('m2', { baseId: 'm1' }),
         build('m1', { baseId: null }),
-        build('p1', { line: 'pr-4', baseId: 'm1' }),
-        build('q1', { line: 'pr-5', baseId: 'm1' }),
+        build('p1', { line: 'pr-4', pr: { number: 4 }, baseId: 'm1' }),
+        build('q1', { line: 'pr-5', pr: { number: 5 }, baseId: 'm1' }),
     );
     const lines = { main: ['m3', 'm2', 'm1'], 'pr-4': ['p1'], 'pr-5': ['q1'] };
     const kept = retainLines({ lines, manifests, keep: 1, keepPr: 10, openPrs: [4] });
@@ -245,4 +258,39 @@ test('render-time baseline: stored baseId, m1 fallback to the next older, pruned
     // m1 manifests have no baseId at all.
     assert.equal(resolveBaseId({ id: 'm3' }, ['m3', 'm2'], available), 'm2');
     assert.equal(resolveBaseId({ id: 'm2' }, ['m3', 'm2'], available), null);
+});
+
+test('a local branch named pr-12 is a branch line: --keep applies and --open-prs ignores it', () => {
+    const lines = { main: ['m2', 'm1'], 'pr-12': ['l3', 'l2', 'l1'], 'pr-13': ['p2', 'p1'] };
+    const manifests = byId(
+        build('m2'),
+        build('m1'),
+        build('l3', { line: 'pr-12' }),
+        build('l2', { line: 'pr-12' }),
+        build('l1', { line: 'pr-12' }),
+        build('p2', { line: 'pr-13', pr: { number: 13 } }),
+        build('p1', { line: 'pr-13', pr: { number: 13 } }),
+    );
+    assert.equal(linePrNumber('pr-12', lines['pr-12'], manifests), null);
+    assert.equal(linePrNumber('pr-13', lines['pr-13'], manifests), 13);
+    const { lines: kept } = retainLines({ lines, manifests, keep: 3, keepPr: 1, openPrs: [13] });
+    assert.deepEqual(kept, { main: ['m2', 'm1'], 'pr-12': ['l3', 'l2', 'l1'], 'pr-13': ['p2'] });
+    const closed = retainLines({ lines, manifests, keep: 3, keepPr: 1, openPrs: [] });
+    assert.deepEqual(Object.keys(closed.lines), ['main', 'pr-12'], 'only the real PR line closes');
+});
+
+test('pinned main baselines are ordered by instant, not by date string', async () => {
+    // 09:00-05:00 is 14:00Z, newer than 12:00Z though it sorts lower as text.
+    const manifests = byId(
+        build('utc', { sha: 'a'.repeat(40), date: '2026-03-01T12:00:00Z' }),
+        build('est', { sha: 'b'.repeat(40), date: '2026-03-01T09:00:00-05:00' }),
+        build('pr', { line: 'pr-1', pr: { number: 1, baseSha: 'c'.repeat(40) } }),
+    );
+    const baseId = await chooseBaseline({
+        manifest: manifests.get('pr'),
+        lines: { main: [] },
+        manifests,
+        isAncestor: () => true,
+    });
+    assert.equal(baseId, 'est');
 });

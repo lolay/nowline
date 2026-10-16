@@ -37,6 +37,16 @@
         return node;
     }
 
+    // An external link from build data: https only, else no link at all.
+    function safeUrl(value) {
+        if (typeof value !== 'string' || value === '') return '';
+        try {
+            return new URL(value).protocol === 'https:' ? value : '';
+        } catch {
+            return '';
+        }
+    }
+
     function localTime(iso) {
         const d = new Date(iso);
         if (Number.isNaN(d.getTime())) return iso;
@@ -148,7 +158,9 @@
         const sha = meta.sha.slice(0, 7);
         return el('figcaption', {}, [
             el('strong', { text: `${label} ` }),
-            meta.url ? el('a', { href: meta.url, text: sha }) : el('span', { text: sha }),
+            safeUrl(meta.url)
+                ? el('a', { href: safeUrl(meta.url), text: sha })
+                : el('span', { text: sha }),
             el('span', { className: 'subject', text: ` ${meta.subject}` }),
             el('span', {
                 className: 'byline',
@@ -604,8 +616,8 @@
         }
         const line = (label, b) => [
             el('strong', { text: `${label} ` }),
-            b.url
-                ? el('a', { href: b.url, text: b.sha.slice(0, 7) })
+            safeUrl(b.url)
+                ? el('a', { href: safeUrl(b.url), text: b.sha.slice(0, 7) })
                 : el('span', { text: b.sha.slice(0, 7) }),
             ` ${b.subject} · ${b.author} · ${localTime(b.date)}${b.line && b.line !== 'main' ? ` · ${b.line}` : ''}`,
         ];
