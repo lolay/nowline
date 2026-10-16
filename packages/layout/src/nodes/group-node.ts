@@ -114,7 +114,7 @@ export class GroupNode {
             ctx,
             helpers,
         );
-        const { children, timeCursorX, barRightX } = track;
+        const { children, timeCursorX } = track;
 
         const innerHeight = Math.max(step, track.packer.usedHeight());
         // The group's painted box hugs everything its children put on
@@ -123,7 +123,7 @@ export class GroupNode {
         // either a bar's logical right or a caption's reserved spill —
         // so the orange tint visually "owns" the spilled title/meta.
         //
-        // The cursor channel (`cursor.x` / `cursor.maxX`) stays on the
+        // The cursor channel (`cursor.x`) stays on the
         // COMPACT `timeCursorX` (bar logical ends only). Bubbling the
         // wide `visualRightX` upward would propagate through
         // `ParallelNode.maxRight → parallel.box.width → swimlane
@@ -147,11 +147,7 @@ export class GroupNode {
         };
         // No tail gutter: a parallel joins on its tracks' ends, as engine
         // C does (specs/scheduler-unification.md §8 decision 8).
-        // `cursor.x` is the time end; `cursor.maxX` the rightmost bar
-        // edge, so a parallel's bracket still encloses a bar drawn at its
-        // minimum width (specs/scheduler-unification.md §8 decision 6).
         cursor.x = timeCursorX;
-        cursor.maxX = Math.max(cursor.maxX, barRightX, timeCursorX);
         // The painted `box.height` is the group's tight visual
         // footprint (chiclet + content + bottomPad). The cursor
         // advance, however, must include one inter-row gap
@@ -165,9 +161,8 @@ export class GroupNode {
         cursor.height = Math.max(cursor.height, headerBand + box.height + interRowGap);
         const id = node.name;
         // `after:` the group is a time path: its last child's duration end,
-        // not its painted box, which a spilled caption or a bar drawn at its
-        // minimum width can widen (specs/scheduler-unification.md §8
-        // decisions 6, 7).
+        // not its painted box, which a spilled caption can widen
+        // (specs/scheduler-unification.md §8 decisions 6, 7).
         if (id) {
             ctx.entityLeftEdges.set(id, box.x);
             ctx.entityRightEdges.set(id, timeCursorX);

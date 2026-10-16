@@ -6,7 +6,7 @@
 /**
  * Lowest pixels-per-day a width cap may shrink the timeline to. Below one
  * pixel a working day stops being visible, and short bars collapse into
- * `MIN_ITEM_WIDTH` slivers that no longer read as durations.
+ * one-pixel slivers that no longer read as durations.
  */
 export const MIN_PIXELS_PER_DAY = 1;
 

@@ -40,8 +40,7 @@ export interface MilestonePredecessor {
     /**
      * Where the predecessor ends in time: an item's duration end, a
      * marker's x, a wave's `E_k`. The milestone sits on the latest one and
-     * overruns a date by it, so a bar drawn at its minimum width never
-     * moves a milestone (specs/scheduler-unification.md §8 decision 6).
+     * overruns a date by it (specs/scheduler-unification.md §8 decision 6).
      */
     endX: number;
     /** Where its slack or overrun arrow starts: the painted bar edge for an item. */

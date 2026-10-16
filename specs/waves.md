@@ -383,7 +383,7 @@ end(x)   = start(x) + dur(x)
 - It is the member with the latest end in the engine that computes it: engine A for the positioned model and the strip tooltip, engine C for the XLSX `Waves` sheet.
 - Ties go to the first member in placement order: main lanes in order, then isolated-region lanes in include order, and document order within a lane.
 - It is omitted when no member's end equals `E_k` with `E_k > S_k`: an empty wave, or a wave whose members all end at or before its start floor.
-- On day-level ties, engines A and C can name different members: engine A compares pixel duration ends (never the `MIN_ITEM_WIDTH` clamp, §8.6 divergence (b)), and engine C compares day ends.
+- On day-level ties, engines A and C can name different members: engine A compares pixel duration ends and engine C compares day ends.
 
 - Without floors, the columns tile `[S_1, E_n]` with no gaps and no overlap.
 - A wave opens at its barrier instant, not at its earliest member's start. A column may therefore begin with idle lanes. That idle time is the honest cost of the barrier.
@@ -739,12 +739,9 @@ It never goes through `forwardWithinDomain`, the seeded edge maps or `resolveAft
 5. **Invalid input.** Input that breaks the rules (for example, an LSP preview of a file with NL.E1103) hits the cap. The result is deterministic, and layout emits NL.W1002.
 6. **Cost.** `O((n+1)·(N + R))` for N main nodes and R region nodes. Example 1 converges in 4 passes, Example 19 in 3 and Example 16 in 2. These counts follow from running the §8.2 algorithm on each example from the cold start above, not from the bound in item 3.
 
-**Warm start (engine A).** Engine C runs first, so engine A starts from its result ([`scheduler-unification.md`](./scheduler-unification.md) §5, F4):
+**Warm start (engine A).** Engine C runs first, so engine A starts from its result ([`scheduler-unification.md`](./scheduler-unification.md) §5, F4): the driver's first pass starts each `S_k` (k > 1) and `E_k` at no less than C's, projected (`seed` of `solveWaveBarriers`). F4 also floored every item start by C's (`scheduleFloorX`); m4.15 removed that floor, since every bar now spans C's dates ([`true-width-layout.md`](./true-width-layout.md) §6).
 
-- every item start is floored by C's start, projected with `forwardWithinDomain` (`scheduleFloorX` in `start-rules.ts`; under `show` it compares the placed, snapped start, so an unsnapped `after:` date that NL.I1008 reads stays put);
-- the driver's first pass starts each `S_k` (k > 1) and `E_k` at no less than C's, projected (`seed` of `solveWaveBarriers`).
-
-C is a lower bound of A on every item and wave edge (`schedule-lower-bound.test.ts`), so the floors never move a settled bar, and for valid input the fixpoint is unique (item 2 makes each `E_k` a function of the `S` and `E` before it), so a pass can only confirm the right one. The positioned model is identical to a cold start's; only `waveSolve.passes` drops: Example 1 takes 2 passes, Examples 16 and 19 one each, and every wave sample and generated roadmap at least one fewer than cold, or one (`schedule-warm-start.test.ts`).
+C is a lower bound of A on every item and wave edge (`schedule-lower-bound.test.ts`), so the seed never moves a settled bar, and for valid input the fixpoint is unique (item 2 makes each `E_k` a function of the `S` and `E` before it), so a pass can only confirm the right one. The positioned model is identical to a cold start's; only `waveSolve.passes` drops: Example 1 takes 2 passes, Examples 16 and 19 one each, and every wave sample and generated roadmap at least one fewer than cold, or one (`schedule-warm-start.test.ts`).
 
 ### 8.4 Engine A hook points (pixels)
 
@@ -801,10 +798,10 @@ Effects:
 
 **Visual gutter.** Take `i ∈ M_j` and `l ∈ M_k` with `j < k`:
 
-- `visualRight(i) = box.x + box.width ≤ E_j − 6 ≤ S_k − 6`;
-- `visualLeft(l) = logicalLeft(l) + 6 ≥ S_k + 6`.
+- `visualRight(i) = box.x + box.width ≤ E_j − 1 ≤ S_k − 1`;
+- `visualLeft(l) = logicalLeft(l) + 1 ≥ S_k + 1`.
 
-So bars of different waves always have a gutter of at least 12 px between them (2 × `ITEM_INSET_PX`), including inside isolated regions. The boundary line sits in that gutter. The one exception is a bar drawn at its minimum width: its wave closes at its duration end, so the bar may paint past the boundary (presentation, as above).
+So bars of different waves always have a gutter of at least 2 px between them (2 × `ITEM_SEAM_PX`, [`true-width-layout.md`](./true-width-layout.md) §3.1), including inside isolated regions. The boundary line sits in that gutter. The one exception is a bar under 3 px, which shrinks its seams to keep the 1 px floor centred in its dates and may end within a pixel of the boundary.
 
 ### 8.5 Engine C (days)
 
@@ -825,14 +822,14 @@ Nested regions contribute nothing to the barrier, because engine A does not draw
 Engines A and C produce the same schedule unless one of the divergences of [`scheduler-unification.md`](./scheduler-unification.md) §1.2 triggers. The engine divergence register (`packages/layout/test/engine-divergences.json`, checked by `engine-divergence-register.test.ts` on every sample under `examples/` and `tests/`) lists each place they differ on the corpus: a new difference fails the test, and a fix has to delete its entry.
 
 - **(a)** settled by F1: an `after:` on a lane or group child starts at `max(previous item end, refs)` in both engines, so the register carries no entry for it;
-- **(b)** a short item: engine A draws the bar at least `MIN_ITEM_WIDTH` wide. Since F3 that is presentation only. Both engines take the duration end for the lane cursor, a parallel's join, an `after:` reference to the item, and the wave barrier. Engine A also starts an item `after:` a parallel at the parallel's latest track end, so a clamped bar does not push it either; engine C does not yet resolve `after:` on a parallel or a group (it starts the item as if the reference were absent), an open divergence that the register does not list because no sample has that shape. What is drawn keeps the painted bar: the row packer, so a following bar drops a row, and a parallel's bracket. The register keeps an entry for each clamped bar's own drawn width, and none for the items after it. No sample has a clamped bar before a parallel join or an `after:` reference, so `after-lane-cursor.test.ts` covers those two paths;
+- **(b)** settled by m4.15 m1 ([`true-width-layout.md`](./true-width-layout.md)): every bar spans its dates, so nothing is drawn wider than its duration and the register's last entries are gone. Before that, a short item: engine A drew the bar at least `MIN_ITEM_WIDTH` wide. Since F3 that was presentation only. Both engines take the duration end for the lane cursor, a parallel's join, an `after:` reference to the item, and the wave barrier. Engine A also starts an item `after:` a parallel at the parallel's latest track end, so a clamped bar does not push it either; engine C does not yet resolve `after:` on a parallel or a group (it starts the item as if the reference were absent), an open divergence that the register does not list because no sample has that shape. What is drawn keeps the painted bar: the row packer, so a following bar drops a row, and a parallel's bracket. The register keeps an entry for each clamped bar's own drawn width, and none for the items after it. No sample has a clamped bar before a parallel join or an `after:` reference, so `after-lane-cursor.test.ts` covers those two paths;
 - **(c)** settled by F3: a group's spilled caption used to move engine A's lane cursor; the cursor now takes the group's compact end in both engines, and the row packer keeps the painted box, so a following item drops a row instead of starting later;
 - **(d)** settled by F3: a group track that binds a parallel join used to add an 8 px tail gutter in engine A; the parallel now joins on its latest track end in both engines;
 - **(e)** settled by F2: an `after:` on a group that is a track of a parallel starts it at `max(the parallel's start, refs)` in both engines;
 - **(f)** settled by F8: engine A's lane cursor is monotone, and without item pins nothing moves a cursor back, so both engines agree by construction and the register carries no entry for it;
 - **(g)** item `date:` / `start:` pins: settled by removing them (F8 of [`scheduler-unification.md`](./scheduler-unification.md), [`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)). Both engines ignore the keys on an item, a group and a parallel, so the register carries no entry for it. (Engine A used to ignore a `start:` pin on a direct parallel track and let a lane item's `after:` push it; later both engines honoured the pin as `date:` > `start:` > `after:` > track cursor, with NL.W1001 when a wave floor moved it.)
 
-No divergence remains beyond the recorded (b) presentation entries: the register holds six, each a bar drawn at its minimum width (showcase `ship`, `brief` and `announce`, non-working-hide `qa`, non-working-show `qa`, size-and-capacity `f1`), and the open gaps that sit outside the register are listed in [`scheduler-unification.md`](./scheduler-unification.md) §9, "Known open gaps".
+No divergence remains: the register is empty since m4.15 m1 removed its six (b) entries, each a bar drawn at its minimum width (showcase `ship`, `brief` and `announce`, non-working-hide `qa`, non-working-show `qa`, size-and-capacity `f1`), and `date-truth.test.ts` checks every bar against engine C's dates. The open gaps that sit outside the register are listed in [`scheduler-unification.md`](./scheduler-unification.md) §9, "Known open gaps".
 
 The history of (a)–(g) is in [`handoffs/handoff-m2o-waves.md`](./handoffs/handoff-m2o-waves.md) §4.
 

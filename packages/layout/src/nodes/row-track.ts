@@ -10,17 +10,22 @@
 
 import type { GroupBlock, SwimlaneDeclaration } from '@nowline/core';
 import { isItemDeclaration } from '@nowline/core';
-import { trackChildren } from '@nowline/core/internal';
+import { type TrackNode, trackChildren } from '@nowline/core/internal';
 import { blockTitleRowSpillReservation } from '../container-header-geometry.js';
 import { type LayoutContext, type LayoutHelpers, newCursor } from '../layout-context.js';
 import { RowPacker } from '../row-packer.js';
 import { resolveChildStart } from '../start-rules.js';
-import { ITEM_INSET_PX } from '../themes/shared.js';
-import type { PositionedTrackChild } from '../types.js';
+import type { PositionedItem, PositionedTrackChild } from '../types.js';
 import { itemSpanPx } from '../working-span.js';
 import { trackChildPaintedRightX } from './content-extent.js';
 import { measureItem } from './item-measure.js';
 import { sequenceItem } from './sequence-item.js';
+
+/** Ids of every named item under `node`, `node` included. */
+function itemIdsUnder(node: TrackNode): string[] {
+    if (isItemDeclaration(node)) return node.name ? [node.name] : [];
+    return trackChildren(node).flatMap(itemIdsUnder);
+}
 
 export interface RowTrackOrigin {
     /** Left edge of the track: the lane's left x, or the group's content left x. */
@@ -33,15 +38,9 @@ export interface RowTrackResult {
     children: PositionedTrackChild[];
     /**
      * Compact cursor, in time: item duration ends and blocks' compact ends
-     * only, never the minimum bar width or a caption spill.
+     * only, never a caption spill.
      */
     timeCursorX: number;
-    /**
-     * Rightmost bar edge, in logical space: item painted footprints (the
-     * minimum bar width included) and blocks' `cursor.maxX`, never a
-     * caption spill. A group reports it as its `cursor.maxX`.
-     */
-    barRightX: number;
     /** The packer the children were fed to; read `usedHeight()` and `usedRightX()` from it. */
     packer: RowPacker;
 }
@@ -71,10 +70,14 @@ export function sequenceRowTrack(
         slackCorridors: ctx.slackCorridors,
     });
     let timeCursorX = leftX;
-    let barRightX = leftX;
+    // Items not yet placed in this track: an item never bumps for the slack
+    // arrow of one still to come, since rows never move up and that item
+    // would follow it down.
+    const pendingIds = new Set(trackChildren(container).flatMap(itemIdsUnder));
 
     const children: PositionedTrackChild[] = [];
     for (const child of trackChildren(container)) {
+        for (const id of itemIdsUnder(child)) pendingIds.delete(id);
         if (!isItemDeclaration(child)) {
             const blockStart = resolveChildStart(child, timeCursorX, ctx);
             const { rowIndex, y: blockY } = packer.placeBlock();
@@ -89,16 +92,24 @@ export function sequenceRowTrack(
             // (specs/scheduler-unification.md §8 decision 7).
             const blockEnd = positioned.box.x + positioned.box.width;
             const blockHeight = Math.max(step, cursor.height);
+            // A parallel's box spans only its dates, so a caption one of its
+            // tracks spills is outside it; the row reserves it, as it does an
+            // item's, so the next child drops a row rather than landing on it
+            // (specs/true-width-layout.md §3.2).
+            const contentRight = reservedRightX(positioned);
+            const reservations = [
+                blockTitleRowSpillReservation(positioned),
+                contentRight > blockEnd ? contentRight : null,
+            ].filter((x): x is number => x !== null);
             packer.commitBlock({
                 rowIndex,
                 placed: positioned,
                 blockHeight,
                 blockEnd,
-                spillReservation: blockTitleRowSpillReservation(positioned),
+                spillReservation: reservations.length > 0 ? Math.max(...reservations) : null,
                 paintedRight: trackChildPaintedRightX(positioned),
             });
             timeCursorX = Math.max(timeCursorX, cursor.x);
-            barRightX = Math.max(barRightX, cursor.maxX);
             continue;
         }
 
@@ -122,54 +133,63 @@ export function sequenceRowTrack(
             desiredStart: predictedStart,
             desiredEnd,
             predictedHeight: pitch,
+            pendingIds,
         });
 
         const cursor = newCursor(desiredStart, rowY);
         const positioned = sequenceItem(item, cursor, ctx, measure);
         children.push(positioned);
 
-        // The painted footprint in LOGICAL space (one ITEM_INSET_PX past
-        // the visual bar's right edge), the minimum bar width included:
-        // the row packer keeps it, so a following bar that would overlap
-        // a clamped bar drops a row.
-        const itemLogicalEnd = positioned.box.x + positioned.box.width + ITEM_INSET_PX;
-        // The time cursor advances by the duration only, never the
-        // minimum bar width, so the next chained item starts on its date,
-        // as in engine C (specs/scheduler-unification.md §8 decision 6).
-        // A bar wider than its duration is presentation.
+        // The painted footprint in LOGICAL space: the item's span, or the
+        // painted box when the 1 px floor makes it wider. The row packer
+        // keeps it, so a following bar never overlaps it.
+        const itemLogicalEnd = Math.max(
+            predictedStart + measure.naturalWidth,
+            positioned.box.x + positioned.box.width,
+        );
+        // The time cursor advances by the duration, so the next chained
+        // item starts on its date, as in engine C.
         const durationEnd = predictedStart + itemSpanPx(ctx, predictedStart, measure.durationDays);
         timeCursorX = Math.max(timeCursorX, durationEnd);
-        barRightX = Math.max(barRightX, itemLogicalEnd, durationEnd);
-
-        let spillReservation: number | null = null;
-        const hasAnySpill =
-            positioned.textSpills ||
-            positioned.chipsOutside ||
-            positioned.dotSpills ||
-            positioned.iconSpills ||
-            positioned.footnoteSpills;
-        if (hasAnySpill) {
-            // `decorationsRightX` already aggregates the spilled
-            // dot / icon / footnote / caption right edges from
-            // `sequenceItem`; the chip column tracks separately
-            // via `chipsRightX`. Add a 6-px buffer so the next
-            // chained item's bar leaves a visible gutter past
-            // the spilled cluster instead of butting against it.
-            const farRight = Math.max(
-                positioned.decorationsRightX,
-                positioned.chipsOutside ? positioned.chipsRightX : 0,
-            );
-            spillReservation = farRight + 6;
-        }
 
         packer.commitItem({
             rowIndex,
             placed: positioned,
             logicalEnd: itemLogicalEnd,
-            spillReservation,
+            spillReservation: itemSpillReservation(positioned),
             rowHeight: pitch,
         });
     }
 
-    return { children, timeCursorX, barRightX, packer };
+    return { children, timeCursorX, packer };
+}
+
+/**
+ * The row reservation an item's spill claims, or null when nothing spills.
+ * `decorationsRightX` already aggregates the spilled dot / icon / footnote /
+ * caption right edges from `sequenceItem`; the chip column tracks separately
+ * via `chipsRightX`. A 6 px buffer leaves the next chained item's bar a
+ * visible gutter past the spilled cluster instead of butting against it.
+ */
+function itemSpillReservation(item: PositionedItem): number | null {
+    const spills =
+        item.textSpills ||
+        item.chipsOutside ||
+        item.dotSpills ||
+        item.iconSpills ||
+        item.footnoteSpills;
+    if (!spills) return null;
+    return Math.max(item.decorationsRightX, item.chipsOutside ? item.chipsRightX : 0) + 6;
+}
+
+/**
+ * Rightmost x a placed child reserves on its row: an item's bar or spill
+ * reservation, a group's box (which already holds its children's), and for
+ * a parallel, whose box spans only its dates, the furthest of its tracks.
+ */
+function reservedRightX(child: PositionedTrackChild): number {
+    const boxRight = child.box.x + child.box.width;
+    if (child.kind === 'item') return Math.max(boxRight, itemSpillReservation(child) ?? boxRight);
+    if (child.kind === 'group') return boxRight;
+    return Math.max(boxRight, ...child.children.map(reservedRightX));
 }

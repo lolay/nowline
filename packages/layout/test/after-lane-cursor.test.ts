@@ -15,7 +15,7 @@ import {
     type PositionedTrackChild,
     scheduleRoadmap,
 } from '../src/index.js';
-import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../src/themes/shared.js';
+import { ITEM_SEAM_PX } from '../src/themes/shared.js';
 import { parseAndResolve } from './helpers.js';
 
 function collectItems(children: PositionedTrackChild[], out: PositionedItem[]): void {
@@ -35,8 +35,8 @@ function chartWeeks(model: PositionedRoadmap): Record<string, [number, number]> 
     for (const it of items) {
         if (!it.id) continue;
         out[it.id] = [
-            weeks(it.box.x - ITEM_INSET_PX),
-            weeks(it.box.x + it.box.width + ITEM_INSET_PX),
+            weeks(it.box.x - ITEM_SEAM_PX),
+            weeks(it.box.x + it.box.width + ITEM_SEAM_PX),
         ];
     }
     return out;
@@ -360,12 +360,10 @@ swimlane s "Subject"
     });
 });
 
-// Divergence (b) (specs/scheduler-unification.md §5 F3, §8 decision 6): the
-// minimum bar width stays out of the lane cursor. The cursor advances by the
-// duration, so the next item starts on its date, as in engine C; the clamped
-// bar keeps its width (presentation), and the row packer keeps that painted
-// footprint, so the next bar drops a row instead of overlapping it.
-describe('the minimum bar width stays out of the lane cursor', () => {
+// A short bar spans exactly its dates (specs/true-width-layout.md §3.1): a
+// one-day item is drawn one day wide, so the next item starts on its date,
+// as in engine C. Before m4.15 the bar was drawn wider than its day.
+describe('a one-day bar spans exactly its day', () => {
     const source = (waves: boolean): string => `nowline v1
 
 roadmap r "R" start:2026-01-05 calendar:full scale:1w
@@ -375,23 +373,23 @@ swimlane s "Subject"
   item b "B" duration:1w${waves ? ' wave:w2' : ''}
 `;
 
-    it('the next item starts at the clamped item’s duration end, a row lower', async () => {
+    it('the next item starts at its end, a row lower when its caption spills', async () => {
         const { model, chart, schedule } = await weeksOf(source(false));
-        // a is drawn wider than its one day: presentation.
-        expect(chart.a[1]).toBeGreaterThan(schedule.a[1]);
+        expect(chart.a).toEqual(schedule.a);
         expect(chart.b).toEqual(schedule.b);
-        expect(chart.b[0]).toBeLessThan(chart.a[1]);
+        expect(chart.b[0]).toEqual(chart.a[1]);
+        // "A 1d" does not fit a one-day bar, so it sits right of it and b drops.
+        expect(findItem(model, 'a').textSpills).toBe(true);
         expect(findItem(model, 'b').box.y).toBeGreaterThan(findItem(model, 'a').box.y);
     });
 
-    it('a clamped wave member closes its wave at its duration end', async () => {
+    it('a one-day wave member closes its wave at its end', async () => {
         const { model, chart, schedule } = await weeksOf(source(true));
+        expect(chart.a).toEqual(schedule.a);
         expect(chart.b).toEqual(schedule.b);
         const [w1, w2] = model.waves ?? [];
         expect(w2.startX).toBeCloseTo(w1.endX, 6);
-        expect(w2.startX).toBeLessThan(
-            findItem(model, 'a').box.x + findItem(model, 'a').box.width + ITEM_INSET_PX,
-        );
+        expect(w1.endX).toBeCloseTo(paintedEnd(model, 'a'), 6);
     });
 });
 
@@ -416,16 +414,13 @@ function findParallel(model: PositionedRoadmap, id: string): PositionedParallel 
 /** Right edge of `id`'s bar in logical space (its painted footprint). */
 const paintedEnd = (model: PositionedRoadmap, id: string): number => {
     const item = findItem(model, id);
-    return item.box.x + item.box.width + ITEM_INSET_PX;
+    return item.box.x + item.box.width + ITEM_SEAM_PX;
 };
 
-// Divergence (b) beyond the lane cursor (specs/scheduler-unification.md §8
-// decision 6): the time paths a clamped bar feeds, a parallel's join and an
-// `after:` reference, take its duration end, so what follows starts on its
-// date, as in engine C. What is drawn keeps the painted footprint: the
-// parallel's bracket still encloses the clamped bar.
-describe('the minimum bar width stays out of the parallel join and after:', () => {
-    it('parallel join: the item after a parallel starts at the clamped track’s duration end', async () => {
+// A short bar feeds a parallel's join, its bracket and an `after:` reference
+// at its end date, the one it is drawn to (specs/true-width-layout.md §3.1).
+describe('a one-day bar ends the parallel, its bracket and after: on its date', () => {
+    it('parallel join: the item after a parallel starts at the track’s end', async () => {
         const { model, chart, schedule } = await weeksOf(`nowline v1
 
 roadmap r "R" start:2026-01-05 calendar:full scale:1w
@@ -435,15 +430,13 @@ swimlane s "Subject"
     item t1 "T1" duration:1d
   item z "Z" duration:1w
 `);
-        expect(chart.t1[1]).toBeGreaterThan(schedule.t1[1]);
+        expect(chart.t1).toEqual(schedule.t1);
         expect(chart.z).toEqual(schedule.z);
-        // The bracket keeps t1's logical extent, the minimum width included.
         const pp = findParallel(model, 'pp') as PositionedParallel;
-        const t1 = findItem(model, 't1');
-        expect(pp.box.x + pp.box.width).toBeCloseTo(t1.box.x - ITEM_INSET_PX + MIN_ITEM_WIDTH, 6);
+        expect(pp.box.x + pp.box.width).toBeCloseTo(paintedEnd(model, 't1'), 6);
     });
 
-    it('a group track of a parallel: the bracket still encloses its clamped bar', async () => {
+    it('a group track of a parallel: the bracket ends at its last child’s end', async () => {
         const { model, chart, schedule } = await weeksOf(`nowline v1
 
 roadmap r "R" start:2026-01-05 calendar:full scale:1w
@@ -454,13 +447,13 @@ swimlane s "Subject"
       item g1 "G1" duration:1d
   item z "Z" duration:1w
 `);
-        expect(chart.g1[1]).toBeGreaterThan(schedule.g1[1]);
+        expect(chart.g1).toEqual(schedule.g1);
         expect(chart.z).toEqual(schedule.z);
         const pp = findParallel(model, 'pp') as PositionedParallel;
         expect(pp.box.x + pp.box.width).toBeCloseTo(paintedEnd(model, 'g1'), 6);
     });
 
-    it('after: an item starts at the clamped item’s duration end', async () => {
+    it('after: an item starts at its end', async () => {
         const { chart, schedule } = await weeksOf(`nowline v1
 
 roadmap r "R" start:2026-01-05 calendar:full scale:1w
@@ -469,11 +462,11 @@ swimlane s "Subject"
   item a "A" duration:1d
   item b "B" duration:1w after:a
 `);
-        expect(chart.a[1]).toBeGreaterThan(schedule.a[1]);
+        expect(chart.a).toEqual(schedule.a);
         expect(chart.b).toEqual(schedule.b);
     });
 
-    it('after: a parallel starts at its clamped track’s duration end', async () => {
+    it('after: a parallel starts at its track’s end', async () => {
         const { chart, schedule } = await weeksOf(`nowline v1
 
 roadmap r "R" start:2026-01-05 calendar:full scale:1w
@@ -485,13 +478,13 @@ swimlane r "Refs"
 swimlane s "Subject"
   item b "B" duration:1w after:pp
 `);
-        expect(chart.t1[1]).toBeGreaterThan(schedule.t1[1]);
+        expect(chart.t1).toEqual(schedule.t1);
         expect(chart.b[0]).toEqual(schedule.t1[1]);
         expect(chart.b).toEqual(schedule.b);
     });
 
-    it('after: a group starts at its clamped last child’s duration end', async () => {
-        const { model, chart, schedule } = await weeksOf(`nowline v1
+    it('after: a group starts at its last child’s end', async () => {
+        const { chart, schedule } = await weeksOf(`nowline v1
 
 roadmap r "R" start:2026-01-05 calendar:full scale:1w
 
@@ -502,9 +495,7 @@ swimlane r "Refs"
 swimlane s "Subject"
   item b "B" duration:1w after:gg
 `);
-        expect(chart.g1[1]).toBeGreaterThan(schedule.g1[1]);
-        const gg = findGroup(model, 'gg') as PositionedGroup;
-        expect(gg.box.x + gg.box.width).toBeGreaterThan(xOfWeeks(model, schedule.g1[1]));
+        expect(chart.g1).toEqual(schedule.g1);
         expect(chart.b[0]).toEqual(schedule.g1[1]);
         expect(chart.b).toEqual(schedule.b);
     });

@@ -1,8 +1,9 @@
 // A milestone's place and a `before:` cap are time paths
-// (specs/scheduler-unification.md §8 decision 6, §9): they read an item's
-// duration end, never its painted bar, which a bar clamped to
-// `MIN_ITEM_WIDTH` draws later than its date. The arrows keep leaving the
-// painted bar. At `scale:1w` a 1-day bar spans 5.71 px and is clamped.
+// (specs/scheduler-unification.md §8 decision 14, §9): they read an item's
+// duration end. Since m4.15 a bar spans exactly its dates
+// (specs/true-width-layout.md §3.1), so its painted edge is its end less a
+// 1 px seam, and the arrows leave it there. At `scale:1w` a 1-day bar spans
+// 5.71 px.
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -69,14 +70,14 @@ function item(model: PositionedRoadmap, id: string): PositionedItem {
 }
 
 describe('after-only milestone sits on the duration end', () => {
-    it('after a 1-day item clamped to its minimum width, on engine C’s day', async () => {
+    it('after a 1-day item, on engine C’s day', async () => {
         const { model, schedule } = await laidOut(`  item a "A" duration:1d
 
 milestone m "After A" after:a
 `);
         const a = item(model, 'a');
-        // The bar is painted past its duration end.
-        expect(dayAt(model, a.box.x + a.box.width)).toBeGreaterThan(2);
+        // The bar ends inside its day, a seam short of the end.
+        expect(dayAt(model, a.box.x + a.box.width)).toBeLessThan(1);
         expect(dayOf(schedule.milestones.get('m'))).toBe(1);
         expect(dayAt(model, milestone(model, 'm').center.x)).toBe(1);
     });
@@ -106,7 +107,7 @@ milestone m "Both" after:[a, b]
 });
 
 describe('a dated milestone overruns by duration end', () => {
-    it('is not overrun when a clamped bar’s duration ends on the date', async () => {
+    it('is not overrun when a 1-day bar’s duration ends on the date', async () => {
         const { model } = await laidOut(`  item a "A" duration:1d
 
 milestone m "Jan 6" date:2026-01-06 after:a
@@ -129,7 +130,7 @@ milestone m "Jan 6" date:2026-01-06 after:a
 });
 
 describe('before: overflow compares the duration end', () => {
-    it('does not flag a clamped bar whose duration meets the cap', async () => {
+    it('does not flag a 1-day bar whose duration meets the cap', async () => {
         const { model } = await laidOut(`  item a "A" duration:1d before:2026-01-06
 `);
         const a = item(model, 'a');

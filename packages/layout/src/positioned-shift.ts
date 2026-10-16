@@ -1,19 +1,16 @@
 // Vertical translation of already-positioned layout subtrees.
 //
-// Layout moves placed content down in two places:
+// Layout moves placed content down in finalize (`growHeaderRows`, f7):
+// when the final marker pack needs more rows than the marker band was
+// sized for, it pushes every swimlane and include region (with the
+// region's own markers) down by the extra band height. (`RowPacker` used
+// to shift later rows when an earlier row grew; since rows never move up
+// it only ever grows its last row, specs/true-width-layout.md §3.2.)
 //
-//   - `RowPacker`, when a row grows after the rows below it were placed
-//     (a taller item lands on an existing row), pushes every later row's
-//     children down by the growth.
-//   - Finalize (`growHeaderRows`, f7), when the final marker pack needs
-//     more rows than the marker band was sized for, pushes every swimlane
-//     and include region (with the region's own markers) down by the extra
-//     band height.
-//
-// Both paths go through `shiftTrackChildY`, so every absolute y the
+// The shift goes through `shiftTrackChildY`, so every absolute y the
 // positioned model carries is listed exactly once, here. A new y-bearing
 // field on `PositionedItem` / `PositionedGroup` / `PositionedParallel` has
-// to move here or it is left behind by both shifts.
+// to move here or it is left behind.
 //
 // Arrow attach ports are deliberately NOT stored anywhere that needs
 // shifting: they are derived from each item's final box when the arrows

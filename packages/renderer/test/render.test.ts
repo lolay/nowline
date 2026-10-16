@@ -953,8 +953,9 @@ describe('renderSvg — caption indent past an `after:` date glyph', () => {
     });
 
     it('indents every line of a wrapped caption and the meta line, keeping the left edge straight', async () => {
+        // 9.375 working days span 150 px, a 148 px bar: too narrow for the title on one line.
         const model = await parseToModel(
-            `${HEADER}swimlane s "S"\n  item ship "Ship the thing" duration:2w after:2026-04-20\n`,
+            `${HEADER}swimlane s "S"\n  item ship "Ship the thing" duration:9.375d after:2026-04-20\n`,
         );
         const fragment = itemFragment(await renderSvg(model), 'ship');
         const bar = barX(fragment);
@@ -1008,8 +1009,8 @@ describe('renderSvg — caption indent past an `after:` date glyph', () => {
         const fragment = itemFragment(await renderSvg(model), 'big');
         const bar = barX(fragment);
         const titles = textNodes(fragment).filter((t) => t.fontSize === 13);
-        // Spilled: starts past the bar's right edge (148px wide) plus the 6px gap.
-        expect(titles[0].x).toBe(bar + 148 + 6);
+        // Spilled: starts past the bar's right edge (158px wide) plus the 6px gap.
+        expect(titles[0].x).toBe(bar + 158 + 6);
     });
 });
 

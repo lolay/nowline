@@ -1,8 +1,10 @@
-// RowPacker — the topmost-fit row-pack engine shared by `SwimlaneNode`
-// and `GroupNode`. Tracks rows of variable height (each row's height is
-// the max of its placed children's heights, with a per-packer minimum)
-// and bumps a child to a new row when it would collide with a sibling's
-// `rightEdge`, caption `spillX`, or a slack-arrow corridor.
+// RowPacker — the row-pack engine shared by `SwimlaneNode` and
+// `GroupNode`. A child never lands above the one before it
+// (specs/true-width-layout.md §3.2), so it either joins the last row or
+// opens a new one below it: it drops a row when it would collide with the
+// last row's `rightEdge`, caption `spillX`, or a slack-arrow corridor.
+// Each row's height is the max of its placed children's heights, with a
+// per-packer minimum.
 //
 // Two-phase API per child:
 //   1) `placeItem(...)` / `placeBlock(...)` decides which row the child
@@ -12,15 +14,9 @@
 //      back into the packer so the row's `rightEdge` / `spillX` advance
 //      and the row's height grows to accommodate the new child.
 //
-// When a row's height grows after later rows already exist, the packer
-// shifts every subsequent row (and every positioned child placed in it)
-// downward by the delta, through the shared `shiftTrackChildY` (see
-// `positioned-shift.ts`). Items keep their row-anchored top edge; the
-// row simply gets taller. This keeps the contract "all children in a
-// row share that row's top y" intact while letting individual children
-// grow vertically (e.g. wrapped label-chiclet stacks in m3).
+// A child only ever commits to the last row, so a row that grows has no
+// rows below it to move.
 
-import { shiftTrackChildY } from './positioned-shift.js';
 import type { PositionedItem, PositionedTrackChild, SlackCorridor } from './types.js';
 
 export interface PackedRow {
@@ -33,10 +29,6 @@ export interface PackedRow {
     /** Reserved x for caption spill. Items whose `desiredStart < spillX`
      *  bump to a new row even if `rightEdge` would let them in. */
     spillX: number;
-    /** Children placed in this row. Used when the row's height grows
-     *  after later rows exist — every child in every later row shifts
-     *  down by the delta. */
-    placedChildren: PositionedTrackChild[];
 }
 
 export interface RowPackerOptions {
@@ -66,6 +58,10 @@ export interface ItemPlacementInput {
      *  initial height when this is the first item in a fresh row, or
      *  to grow the row when a taller item lands in an existing row. */
     predictedHeight: number;
+    /** Ids of the items still to come in this track. A slack corridor
+     *  whose arrow starts at one of them never bumps this item: rows
+     *  never move up, so that item would follow it down. */
+    pendingIds?: ReadonlySet<string>;
 }
 
 /** Result of a `placeItem` query. */
@@ -78,10 +74,9 @@ export interface ItemPlacement {
 export interface ItemCommitInput {
     rowIndex: number;
     placed: PositionedItem;
-    /** Logical right edge of the placed item. Includes the trailing
-     *  `ITEM_INSET_PX` so the next chained item butts edge-to-edge in
-     *  logical space (with a 2 × ITEM_INSET_PX visible gutter between
-     *  bars). */
+    /** Logical right edge of the placed item: its span in time, so the
+     *  next chained item butts edge-to-edge in logical space (each bar
+     *  keeps its seams inside its own dates). */
     logicalEnd: number;
     /** Reserved spill x for captions that overflow the bar's right
      *  edge. `null` resets the row's spill reservation to `laneLeftX`. */
@@ -119,9 +114,9 @@ export interface BlockCommitInput {
     spillReservation?: number | null;
     /** Rightmost x anything inside the block paints, when it can pass
      *  `blockEnd` (see `trackChildPaintedRightX`): a parallel's box is
-     *  compact, so a caption its tracks spill is not in it. It only
-     *  widens `usedRightX()` (the canvas and an enclosing group's box),
-     *  never the row's `rightEdge` or `spillX`, so packing is unchanged. */
+     *  compact, so a caption its tracks spill is not in it. It widens
+     *  `usedRightX()` (the canvas and an enclosing group's box); the
+     *  caller reserves it on the row through `spillReservation`. */
     paintedRight?: number;
 }
 
@@ -140,26 +135,26 @@ export class RowPacker {
                 height: opts.minRowHeight,
                 rightEdge: opts.laneLeftX,
                 spillX: opts.laneLeftX,
-                placedChildren: [],
             },
         ];
     }
 
     /**
-     * Find the topmost row where the item's natural extent fits without
-     * colliding with sibling content or a slack corridor; appending a
-     * fresh row at the bottom when none of the existing rows fit.
+     * Join the last row (the last committed child's) when the item's natural
+     * extent fits there without colliding with sibling content or a slack
+     * corridor; otherwise append a fresh row below it.
      */
     placeItem(input: ItemPlacementInput): ItemPlacement {
-        for (let i = 0; i < this.rows.length; i += 1) {
-            const r = this.rows[i];
-            if (input.desiredStart < r.rightEdge) continue;
-            if (input.desiredStart < r.spillX) continue;
-            if (this.rowIntersectsCorridor(r, input)) continue;
-            return { rowIndex: i, y: r.y };
-        }
-        const fresh = this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
-        return { rowIndex: this.rows.length - 1, y: fresh.y };
+        const last = this.rows[this.rows.length - 1];
+        const fits =
+            input.desiredStart >= last.rightEdge &&
+            input.desiredStart >= last.spillX &&
+            !this.rowIntersectsCorridor(last, input) &&
+            !this.rowCrossesOwnCorridor(last, input);
+        const row = fits
+            ? last
+            : this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
+        return { rowIndex: this.rows.length - 1, y: row.y };
     }
 
     /**
@@ -179,16 +174,13 @@ export class RowPacker {
 
     /**
      * Record a placed item back into its row. Grows the row's height to
-     * fit the item, advances `rightEdge`, sets the caption spill, and
-     * shifts later rows down if this row got taller.
+     * fit the item, advances `rightEdge` and sets the caption spill.
      */
     commitItem(input: ItemCommitInput): void {
         const row = this.rows[input.rowIndex];
-        const target = Math.max(input.placed.box.height, input.rowHeight ?? 0);
-        this.growRowHeight(input.rowIndex, target);
+        row.height = Math.max(row.height, input.placed.box.height, input.rowHeight ?? 0);
         row.rightEdge = input.logicalEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
-        row.placedChildren.push(input.placed);
     }
 
     /**
@@ -197,10 +189,9 @@ export class RowPacker {
      */
     commitBlock(input: BlockCommitInput): void {
         const row = this.rows[input.rowIndex];
-        this.growRowHeight(input.rowIndex, input.blockHeight);
+        row.height = Math.max(row.height, input.blockHeight);
         row.rightEdge = input.blockEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
-        row.placedChildren.push(input.placed);
         if (input.paintedRight !== undefined && input.paintedRight > this.paintedRightX) {
             this.paintedRightX = input.paintedRight;
         }
@@ -232,7 +223,23 @@ export class RowPacker {
                 c.y < r.y + r.height &&
                 p.desiredStart < c.xEnd &&
                 p.desiredEnd > c.xStart &&
-                c.slackPredId !== p.childId,
+                c.slackPredId !== p.childId &&
+                !p.pendingIds?.has(c.slackPredId),
+        );
+    }
+
+    /**
+     * An overrun slack arrow runs left, from its source back to a milestone
+     * dated before the source ends. Rows never move up, so the source cannot
+     * push the work before it out of that path; it drops to a row where the
+     * path is clear instead.
+     */
+    private rowCrossesOwnCorridor(r: PackedRow, p: ItemPlacementInput): boolean {
+        return this.opts.slackCorridors.some(
+            (c) =>
+                c.slackPredId === p.childId &&
+                c.xStart < p.desiredStart &&
+                r.rightEdge > Math.max(c.xStart, this.opts.laneLeftX),
         );
     }
 
@@ -243,23 +250,8 @@ export class RowPacker {
             height,
             rightEdge: this.opts.laneLeftX,
             spillX: this.opts.laneLeftX,
-            placedChildren: [],
         };
         this.rows.push(r);
         return r;
-    }
-
-    private growRowHeight(rowIndex: number, newHeight: number): void {
-        const row = this.rows[rowIndex];
-        const delta = newHeight - row.height;
-        if (delta <= 0) return;
-        row.height = newHeight;
-        for (let i = rowIndex + 1; i < this.rows.length; i += 1) {
-            const r = this.rows[i];
-            r.y += delta;
-            for (const child of r.placedChildren) {
-                shiftTrackChildY(child, delta);
-            }
-        }
     }
 }

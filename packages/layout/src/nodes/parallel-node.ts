@@ -56,11 +56,9 @@ export class ParallelNode {
         // raw start as its cursor seed and is snapped where it is placed.
         const boxLeftX = ctx.scale.showsNonWorking ? ctx.scale.startX(startX) : startX;
         const children: PositionedTrackChild[] = [];
-        // The latest track end in time (the join) and the rightmost bar
-        // edge (the bracket): a bar drawn at its minimum width paints past
-        // its duration end (specs/scheduler-unification.md §8 decision 6).
+        // The latest track end in time: the join, and the bracket's end
+        // (bars span exactly their dates, specs/true-width-layout.md §3.1).
         let maxTimeRight = boxLeftX;
-        let maxRight = boxLeftX;
         let accumulatedHeight = 0;
 
         // Each child of a parallel block lives on its own sub-track,
@@ -85,7 +83,6 @@ export class ParallelNode {
             children.push(positioned);
             accumulatedHeight += Math.max(ctx.bandScale.step(), subCursor.height);
             maxTimeRight = Math.max(maxTimeRight, subCursor.x);
-            maxRight = Math.max(maxRight, subCursor.maxX, subCursor.x);
             childIndex++;
         }
         ctx.currentFlowKey = previousFlowKey;
@@ -93,7 +90,7 @@ export class ParallelNode {
         const box: BoundingBox = {
             x: boxLeftX,
             y: startY,
-            width: maxRight - boxLeftX,
+            width: maxTimeRight - boxLeftX,
             height: accumulatedHeight,
         };
 
@@ -101,7 +98,6 @@ export class ParallelNode {
         // time, as engine C does (specs/scheduler-unification.md §8
         // decisions 6, 8).
         cursor.x = maxTimeRight;
-        cursor.maxX = Math.max(cursor.maxX, maxRight);
         cursor.height = Math.max(cursor.height, headerBand + accumulatedHeight);
 
         const id = node.name;

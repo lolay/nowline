@@ -495,7 +495,9 @@ function rectFrame(
     style: ResolvedStyle,
     extra: Record<string, string | number | undefined | null | boolean> = {},
 ): string {
-    const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, h / 2);
+    // The radius is a maximum: a frame narrower than two radii, such as a
+    // short bar drawn at its true width, rounds into a pill, then a line.
+    const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, h / 2, w / 2);
     return tag('rect', {
         x: num(x),
         y: num(y),

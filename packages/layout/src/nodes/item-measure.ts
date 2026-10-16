@@ -43,12 +43,7 @@ import { type LayoutContext, scheduledItemDays } from '../layout-context.js';
 import { resolveLabelChipStyle, resolveStyle, type StyleContext } from '../style-resolution.js';
 import { ellipsizeToWidth, estimateTextWidth } from '../text-measure.js';
 import type { Theme } from '../themes/index.js';
-import {
-    ITEM_INSET_PX,
-    MIN_ITEM_WIDTH,
-    PADDING_PX,
-    PROGRESS_STRIP_HEIGHT_PX,
-} from '../themes/shared.js';
+import { PADDING_PX, PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type {
     LinkIconKind,
     PositionedCapacity,
@@ -61,6 +56,7 @@ import { itemSpanPx } from '../working-span.js';
 import {
     type ItemCaptionMeasure,
     type ItemNodeGeometry,
+    itemBarInsetPx,
     itemVisualWidth,
     measureItemCaption,
     resolveCaptionTitleLines,
@@ -83,7 +79,7 @@ export interface ItemMeasure extends ItemNodeGeometry {
     /** The snapped start the bar is measured at (`ctx.scale.startX`). */
     startX: number;
     durationDays: number;
-    /** Logical width, `MIN_ITEM_WIDTH` clamp included. */
+    /** Logical width: the item's span in time. */
     naturalWidth: number;
     /**
      * The bar box width: the logical extent `(startX + naturalWidth) -
@@ -558,11 +554,11 @@ export function measureItem(
     const afterRaw = propValues(props, 'after');
     const beforeRaw = propValues(props, 'before');
 
-    const naturalWidth = Math.max(MIN_ITEM_WIDTH, itemSpanPx(ctx, startX, durationDays));
-    // The box width `ItemNode` paints, from the logical extent the bar owns
-    // (what `sequenceItem` registers as the entity's right edge).
-    const logicalRight = startX + naturalWidth;
-    const visualWidth = itemVisualWidth(Math.max(MIN_ITEM_WIDTH, logicalRight - startX));
+    // The bar spans exactly its dates (specs/true-width-layout.md §3.1):
+    // the logical width is the span, and the box `ItemNode` paints is that
+    // span less its seams, at least the 1 px floor.
+    const naturalWidth = itemSpanPx(ctx, startX, durationDays);
+    const visualWidth = itemVisualWidth(naturalWidth);
 
     const link = parseLinkIcon(propValue(props, 'link'));
     const hasLinkIcon = link.icon !== 'none';
@@ -644,7 +640,7 @@ export function measureItem(
         {
             textSpills,
             iconSpills,
-            barRightX: startX + ITEM_INSET_PX + visualWidth,
+            barRightX: startX + itemBarInsetPx(naturalWidth) + visualWidth,
             visualWidth,
             footnoteCount: footnoteIndicators.length,
             meta,

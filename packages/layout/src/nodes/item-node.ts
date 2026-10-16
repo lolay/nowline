@@ -50,7 +50,7 @@ import type {
     Renderable,
 } from '../renderable.js';
 import { estimateTextWidth, wrapText } from '../text-measure.js';
-import { ITEM_INSET_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
+import { ITEM_SEAM_PX, MIN_ITEM_WIDTH } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem } from '../types.js';
 
 /**
@@ -65,9 +65,7 @@ const TEXT_INSET_PX = 12;
 
 /**
  * Gap (px) between the bar's right edge and overflow text. Smaller
- * than `TEXT_INSET_PX` so the text reads as belonging to this bar —
- * adjacent bars are at least `2 * ITEM_INSET_PX = 12` away, so the
- * text still has a clear visual home.
+ * than `TEXT_INSET_PX` so the text reads as belonging to this bar.
  */
 const TEXT_OUTSIDE_GAP_PX = 4;
 
@@ -132,7 +130,7 @@ export interface ItemCaptionMeasure {
  */
 export interface ItemNodeGeometry {
     id: string;
-    /** Logical width, `MIN_ITEM_WIDTH` clamp included. */
+    /** Logical width: the item's span in time. */
     naturalWidth: number;
     /** Width of the visible bar box. */
     visualWidth: number;
@@ -175,9 +173,21 @@ export function estimateItemMetaWidth(metaText: string | undefined, trailingWidt
     return metaTextWidth + trailingWidth;
 }
 
-/** The visible bar width for a logical width: `ITEM_INSET_PX` off each side, `MIN_ITEM_WIDTH` floor. */
+/**
+ * The seam a bar gives up on each side, from inside its dates: `ITEM_SEAM_PX`,
+ * shrunk for a bar too short to keep both seams and the `MIN_ITEM_WIDTH`
+ * floor, so the floor stays centred in its dates.
+ */
+export function itemBarInsetPx(logicalWidth: number): number {
+    return Math.max(0, Math.min(ITEM_SEAM_PX, (logicalWidth - MIN_ITEM_WIDTH) / 2));
+}
+
+/**
+ * The visible bar width for a logical width: the span less a seam on each
+ * side, never under `MIN_ITEM_WIDTH` (specs/true-width-layout.md §3.1).
+ */
 export function itemVisualWidth(logicalWidth: number): number {
-    return Math.max(MIN_ITEM_WIDTH, logicalWidth - 2 * ITEM_INSET_PX);
+    return Math.max(MIN_ITEM_WIDTH, logicalWidth - 2 * itemBarInsetPx(logicalWidth));
 }
 
 export interface ItemCaptionFit {
@@ -395,9 +405,9 @@ export class ItemNode implements Renderable<PlacedItemGeometry> {
     }
 
     place(origin: Point, ctx: PlaceContext): PlacedItemGeometry {
-        const { visualWidth, caption, barExtra } = this.geometry;
+        const { naturalWidth, visualWidth, caption, barExtra } = this.geometry;
         const bandwidth = ctx.bands.bandwidth();
-        const boxX = origin.x + ITEM_INSET_PX;
+        const boxX = origin.x + itemBarInsetPx(naturalWidth);
         const box: BoundingBox = {
             x: boxX,
             y: origin.y,

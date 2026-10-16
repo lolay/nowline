@@ -113,11 +113,11 @@ swimlane a "A"
 `;
 
 describe('Example A under show', () => {
-    it('draws each week 56 px wide: boxes 6-34, 62-90, 118-146, 174-202', async () => {
+    it('draws each week 56 px wide: boxes 1-39, 57-95, 113-151, 169-207', async () => {
         const { model } = await lay(EXAMPLE_A, { nonWorking: 'show' });
-        expect(['w1', 'w2', 'w3', 'w4'].map((id) => boxLeft(model, id))).toEqual([6, 62, 118, 174]);
+        expect(['w1', 'w2', 'w3', 'w4'].map((id) => boxLeft(model, id))).toEqual([1, 57, 113, 169]);
         expect(['w1', 'w2', 'w3', 'w4'].map((id) => boxRight(model, id))).toEqual([
-            34, 90, 146, 202,
+            39, 95, 151, 207,
         ]);
     });
 
@@ -127,17 +127,20 @@ describe('Example A under show', () => {
         expect(model.milestones[0].center.x - model.timeline.originX).toBe(200);
     });
 
-    it('keeps the week ticks on Mondays, 56 px apart, and the window to Feb 2', async () => {
+    it('keeps the week ticks on Mondays, 56 px apart, and the window to Feb 9', async () => {
         const { model } = await lay(EXAMPLE_A, { nonWorking: 'show' });
+        // W4's caption spills past Feb 2, so the axis gains one column (the
+        // caption cap, specs/rendering.md).
         expect(ticksOf(model)).toEqual([
             [0, 'Jan 05'],
             [56, 'Jan 12'],
             [112, 'Jan 19'],
             [168, 'Jan 26'],
-            [224, undefined],
+            [224, 'Feb 02'],
+            [280, undefined],
         ]);
-        expect(model.timeline.box.width).toBe(224);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-02');
+        expect(model.timeline.box.width).toBe(280);
+        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
         expect(model.timeline.pixelsPerDay).toBe(8);
     });
 
@@ -151,6 +154,7 @@ describe('Example A under show', () => {
             [96, 16, '2026-01-17', '2026-01-18'],
             [152, 16, '2026-01-24', '2026-01-25'],
             [208, 16, '2026-01-31', '2026-02-01'],
+            [264, 16, '2026-02-07', '2026-02-08'],
         ]);
         for (const run of runs) {
             expect(run.band).toBe(true);
@@ -161,14 +165,14 @@ describe('Example A under show', () => {
 });
 
 describe('precedence: surface option, then the file key, then hide', () => {
-    // W4's box left edge: 174 under show (4 weeks of 56, less 3 + the 6 px
-    // inset), 126 under hide (3 weeks of 40, plus the inset).
+    // W4's box left edge: 169 under show (3 weeks of 56, plus the 1 px
+    // seam), 121 under hide (3 weeks of 40, plus the seam).
     const cases: Array<{ key?: Display; option?: Display; x: number }> = [
-        { x: 126 },
-        { option: 'show', x: 174 },
-        { key: 'show', x: 174 },
-        { key: 'show', option: 'hide', x: 126 },
-        { key: 'hide', option: 'show', x: 174 },
+        { x: 121 },
+        { option: 'show', x: 169 },
+        { key: 'show', x: 169 },
+        { key: 'show', option: 'hide', x: 121 },
+        { key: 'hide', option: 'show', x: 169 },
     ];
     for (const { key, option, x } of cases) {
         it(`file key ${key ?? 'none'}, option ${option ?? 'none'}: W4 at ${x}`, async () => {
@@ -202,14 +206,14 @@ swimlane a "A"
   item mid "Mid" duration:1w after:2026-01-07
 `;
 
-    it('Wednesday start under show: the bar crosses the weekend, 22-66', async () => {
+    it('Wednesday start under show: the bar crosses the weekend, 17-71', async () => {
         const { model } = await lay(source, { nonWorking: 'show' });
-        expect([boxLeft(model, 'mid'), boxRight(model, 'mid')]).toEqual([22, 66]);
+        expect([boxLeft(model, 'mid'), boxRight(model, 'mid')]).toEqual([17, 71]);
     });
 
-    it('Wednesday start under hide: 22-50', async () => {
+    it('Wednesday start under hide: 17-55', async () => {
         const { model } = await lay(source, { nonWorking: 'hide' });
-        expect([boxLeft(model, 'mid'), boxRight(model, 'mid')]).toEqual([22, 50]);
+        expect([boxLeft(model, 'mid'), boxRight(model, 'mid')]).toEqual([17, 55]);
     });
 });
 
@@ -225,28 +229,28 @@ ${container}
     const group = lane('  group g "G"\n    item x "X" duration:1w');
     const parallel = lane('  parallel p\n    item x "X" duration:1w\n    item y "Y" duration:1w');
 
-    it('a group after a 1w item is at 56 under show, its child at 62', async () => {
+    it('a group after a 1w item is at 56 under show, its child at 57', async () => {
         const { model } = await lay(group, { nonWorking: 'show' });
         expect(container(model, 'group').box.x - model.timeline.originX).toBe(56);
-        expect(boxLeft(model, 'x')).toBe(62);
+        expect(boxLeft(model, 'x')).toBe(57);
     });
 
-    it('a group after a 1w item is at 40 under hide, its child at 46', async () => {
+    it('a group after a 1w item is at 40 under hide, its child at 41', async () => {
         const { model } = await lay(group, { nonWorking: 'hide' });
         expect(container(model, 'group').box.x - model.timeline.originX).toBe(40);
-        expect(boxLeft(model, 'x')).toBe(46);
+        expect(boxLeft(model, 'x')).toBe(41);
     });
 
-    it('a parallel after a 1w item is at 56 under show, its tracks at 62', async () => {
+    it('a parallel after a 1w item is at 56 under show, its tracks at 57', async () => {
         const { model } = await lay(parallel, { nonWorking: 'show' });
         expect(container(model, 'parallel').box.x - model.timeline.originX).toBe(56);
-        expect([boxLeft(model, 'x'), boxLeft(model, 'y')]).toEqual([62, 62]);
+        expect([boxLeft(model, 'x'), boxLeft(model, 'y')]).toEqual([57, 57]);
     });
 
-    it('a parallel after a 1w item is at 40 under hide, its tracks at 46', async () => {
+    it('a parallel after a 1w item is at 40 under hide, its tracks at 41', async () => {
         const { model } = await lay(parallel, { nonWorking: 'hide' });
         expect(container(model, 'parallel').box.x - model.timeline.originX).toBe(40);
-        expect([boxLeft(model, 'x'), boxLeft(model, 'y')]).toEqual([46, 46]);
+        expect([boxLeft(model, 'x'), boxLeft(model, 'y')]).toEqual([41, 41]);
     });
 });
 
@@ -259,7 +263,7 @@ swimlane a "A"
   item a1 "A1" duration:2w
 `;
 
-    it('opens with a clamped band, the first box at 14, and a label-less first tick', async () => {
+    it('opens with a clamped band, the first box at 9, and a label-less first tick', async () => {
         const { model } = await lay(source, { nonWorking: 'show' });
         const t = model.timeline;
         const [first] = runsOf(model);
@@ -270,7 +274,7 @@ swimlane a "A"
             '2026-01-03',
             '2026-01-04',
         ]);
-        expect(boxLeft(model, 'a1')).toBe(14);
+        expect(boxLeft(model, 'a1')).toBe(9);
         expect(ticksOf(model).slice(0, 2)).toEqual([
             [0, undefined],
             [8, 'Jan 05'],
@@ -351,19 +355,19 @@ ${body}
 
     const dated = lane('  item d "D" duration:1w after:2026-01-10');
 
-    it('an after: date on a Saturday starts on Monday Jan 12, box at 62, under show', async () => {
+    it('an after: date on a Saturday starts on Monday Jan 12, box at 57, under show', async () => {
         const { model } = await lay(dated, { nonWorking: 'show' });
         expect(item(model, 'd').nonWorkingPin).toEqual(pin);
-        expect(boxLeft(model, 'd')).toBe(62);
+        expect(boxLeft(model, 'd')).toBe(57);
         expect(insightsOf(model, 'NL.I1008').map((i) => i.data.args)).toEqual([
             { name: 'd', ...pin },
         ]);
     });
 
-    it('an after: date on a Saturday starts on Monday Jan 12, box at 46, under hide', async () => {
+    it('an after: date on a Saturday starts on Monday Jan 12, box at 41, under hide', async () => {
         const { model } = await lay(dated, { nonWorking: 'hide' });
         expect(item(model, 'd').nonWorkingPin).toEqual(pin);
-        expect(boxLeft(model, 'd')).toBe(46);
+        expect(boxLeft(model, 'd')).toBe(41);
         expect(insightsOf(model, 'NL.I1008').map((i) => i.data.args)).toEqual([
             { name: 'd', ...pin },
         ]);
@@ -383,7 +387,7 @@ ${body}
             );
             expect(item(model, 'x').nonWorkingPin).toEqual(tie);
             expect(insightsOf(model, 'NL.I1008')).toHaveLength(1);
-            expect(boxLeft(model, 'x')).toBe(view === 'show' ? 62 : 46);
+            expect(boxLeft(model, 'x')).toBe(view === 'show' ? 57 : 41);
         });
 
         it(`an after:2026-01-10 tie inside a parallel reports under ${view}`, async () => {
@@ -395,7 +399,7 @@ ${body}
             );
             expect(item(model, 'x').nonWorkingPin).toEqual(tie);
             expect(insightsOf(model, 'NL.I1008')).toHaveLength(1);
-            expect(boxLeft(model, 'x')).toBe(view === 'show' ? 62 : 46);
+            expect(boxLeft(model, 'x')).toBe(view === 'show' ? 57 : 41);
         });
     }
 });

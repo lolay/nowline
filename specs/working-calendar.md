@@ -445,8 +445,8 @@ Schedule: W1 Jan 5–9, W2 Jan 12–16, W3 Jan 19–23, W4 Jan 26–30.
 |---|---|---|---|
 | W4 x (relative to origin) | 120–160, over Jan 20–25 | 120–160, Jan 26–30 | 168–208 |
 | Milestone x | 200 | 152 | 200 |
-| Week ticks | Jan 05, 10, 15, 20, 25, 30 | Jan 05, 12, 19, 26, Feb 02 (W4's spilled caption passes the end at 160, so the axis gains one column to 200; see [Caption cap at the chart's end](./rendering.md#caption-cap)) | Jan 05, 12, 19, 26 (at 0, 56, 112, 168; W4's caption ends inside the axis) |
-| Shading | none | none | 40–56, 96–112, 152–168, 208–224 |
+| Week ticks | Jan 05, 10, 15, 20, 25, 30 | Jan 05, 12, 19, 26, Feb 02 (W4's spilled caption passes the end at 160, so the axis gains one column to 200; see [Caption cap at the chart's end](./rendering.md#caption-cap)) | Jan 05, 12, 19, 26, Feb 02 (at 0, 56, 112, 168, 224; W4's spilled caption passes the end at 224, so the axis gains one column to 280) |
+| Shading | none | none | 40–56, 96–112, 152–168, 208–224, 264–280 |
 
 ### Example B: a holiday inside a bar
 
@@ -466,12 +466,12 @@ swimlane a "A"
   item qa "QA" duration:2d
 ```
 
-Schedule: Checkout uses Mon Nov 23, Tue 24, Wed 25, Mon 30 and Tue Dec 1. QA uses Wed Dec 2 and Thu Dec 3. Pixels are relative to the timeline origin. A box sits 6 px inside its logical extent, and QA's `hide` box is the 8 px minimum width.
+Schedule: Checkout uses Mon Nov 23, Tue 24, Wed 25, Mon 30 and Tue Dec 1. QA uses Wed Dec 2 and Thu Dec 3. Pixels are relative to the timeline origin. A box sits 1 px inside its logical extent on each side (the seam of [`true-width-layout.md`](./true-width-layout.md) §3.1).
 
 | | `hide` | `show` |
 |---|---|---|
-| Checkout box | 6–34 (logical 0–40) | 6–66 (logical 0–72) |
-| QA box | 46–54 (logical 40–56, minimum width) | 78–86 (logical 72–88) |
+| Checkout box | 1–39 (logical 0–40) | 1–71 (logical 0–72) |
+| QA box | 41–55 (logical 40–56) | 73–87 (logical 72–88) |
 | Milestone x | 24, `hiddenDate` `2026-11-28` | 40, no `hiddenDate` |
 | Ticks | `[0,undefined]`, `[24,'Nov 30']`, `[64,'Dec 07']`, `[104,undefined]` | `[0,'Nov 23']`, `[56,'Nov 30']`, `[112,'Dec 07']`, `[168,undefined]` |
 | Width, `endDate` | 104, 2026-12-14 (the content ends at 64; QA's spilled caption adds the `Dec 07` column) | 168, 2026-12-14 (likewise from 112) |
@@ -488,7 +488,7 @@ Runs read `[x, width, from, through, titles, band]`. The label, `labelBox`, `lab
 - **`show`:** Checkout is painted across the shaded Nov 26–29 band (24–56). QA follows at 72–88. The milestone sits at 40, on its Saturday. The band's label `Thanksgiving · 2d` sits at x = 30, on the second marker row, with no cut line.
 - **Engine C**, the same in both views: checkout `2026-11-23` to `2026-12-02` (exclusive, 5 days), qa `2026-12-02` to `2026-12-04` (2 days), launch `2026-11-28`.
 - **`date:[2026-11-26, 2026-11-27]`** in place of `start:` and `end:` gives the same model under `hide` and the same engine C.
-- Without the declaration the file lays out as it always did: Checkout 6–34, QA 46–54, the milestone at x = 40 with `hiddenDate`, and no titled run.
+- Without the declaration the file lays out as it always did: Checkout 1–39, QA 41–55, the milestone at x = 40 with `hiddenDate`, and no titled run.
 - **MS Project** writes the closure in the base calendar (UID 1), right after `</WeekDays>` and before `</Calendar>`. `<WeekDays>` still marks Saturday and Sunday non-working, and the resource calendar (UID 2) is unchanged:
 
   ```xml
@@ -530,8 +530,8 @@ swimlane a "A"
 
 The file's `weekend` replaces the preset's. `1w` is Sunday through Thursday, week ticks fall on Sundays, and `days-per-week: 5` agrees with the five working days, so NW4 stays quiet.
 
-- **`hide`:** boxes 6–34, 46–74 and 86–114. Ticks `[0,'Jan 04']`, `[40,'Jan 11']`, `[80,'Jan 18']`, `[120,'Jan 25']`, `[160,'Feb 01']`, `[200,'Feb 08']` and `[240,undefined]`. The first run is `[40,0,'2026-01-09','2026-01-10']`, and there is no Saturday–Sunday run.
-- **`show`:** boxes 6–34, 62–90 and 118–146, with ticks every 56 from `Jan 04`.
+- **`hide`:** boxes 1–39, 41–79 and 81–119. Ticks `[0,'Jan 04']`, `[40,'Jan 11']`, `[80,'Jan 18']`, `[120,'Jan 25']`, `[160,'Feb 01']`, `[200,'Feb 08']` and `[240,undefined]`. The first run is `[40,0,'2026-01-09','2026-01-10']`, and there is no Saturday–Sunday run.
+- **`show`:** boxes 1–39, 57–95 and 113–151, with ticks every 56 from `Jan 04`.
 - **Engine C:** w1 `2026-01-04` to `2026-01-09`, w2 `2026-01-11` to `2026-01-16`, w3 `2026-01-18` to `2026-01-23` (exclusive ends).
 - **Calendar:** `resolveWorkingCalendar(...).working.workingWeekdays` is `{0,1,2,3,4}` and `weekStart` is 0. Mermaid emits `excludes friday, saturday`, MS Project marks Friday and Saturday non-working, and the XLSX Calendar row reads `business (Friday and Saturday off; 5/22/65/260 days per week/month/quarter/year)`.
 
@@ -547,9 +547,9 @@ working crunch "Crunch Saturday" date:2026-01-10
 
 The crunch Saturday is a working day, so work that crosses it ends a day sooner.
 
-- **`hide`:** the item boxes keep their x (6–34, 46–74, 86–114, 126–154). The Friday milestone moves from 152 to 160. Ticks `[0,'Jan 05']`, `[48,'Jan 12']`, `[88,'Jan 19']`, `[128,'Jan 26']`, `[168,'Feb 02']` and `[208,undefined]`. The first run is `[48,0,'2026-01-11','2026-01-11']`.
+- **`hide`:** the item boxes keep their x (1–39, 41–79, 81–119, 121–159). The Friday milestone moves from 152 to 160. Ticks `[0,'Jan 05']`, `[48,'Jan 12']`, `[88,'Jan 19']`, `[128,'Jan 26']`, `[168,'Feb 02']` and `[208,undefined]`. The first run is `[48,0,'2026-01-11','2026-01-11']`.
 - **`hide` label:** the working exception `Crunch Saturday · +1d` sits at x 40 (the Saturday's column start), label box at 46, 121.8 wide, on the right, with no cut line. The Friday milestone's left-side label crosses it, so the label takes row 1 and the marker row grows to two rows (52).
-- **`show`:** W2 46–82, W3 94–138 and W4 150–194. W4 was 174–202, so its end comes in by one day. The first run is `[48,8,'2026-01-11','2026-01-11',band]`.
+- **`show`:** W2 41–87, W3 89–143 and W4 145–199. W4 was 169–207, so its end comes in by one day. The first run is `[48,8,'2026-01-11','2026-01-11',band]`.
 - **`show` label:** the same label at x 40, the unshaded Saturday's left edge, sharing row 0 with the Friday milestone (one row, 26).
 - **Engine C:** w2 `2026-01-10` to `2026-01-16`, w3 `2026-01-16` to `2026-01-23`, w4 `2026-01-23` to `2026-01-30` (it was `2026-01-26` to `2026-01-31`).
 

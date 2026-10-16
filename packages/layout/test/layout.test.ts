@@ -8,7 +8,7 @@ import {
 } from '../src/index.js';
 import { measureItem } from '../src/nodes/item-measure.js';
 import { SwimlaneNode } from '../src/nodes/swimlane-node.js';
-import { ITEM_INSET_PX } from '../src/themes/shared.js';
+import { ITEM_SEAM_PX } from '../src/themes/shared.js';
 import { parseAndResolve } from './helpers.js';
 
 describe('layoutRoadmap', () => {
@@ -463,7 +463,9 @@ swimlane a "A"
         const wp = edge!.waypoints;
         expect(wp.length).toBeGreaterThanOrEqual(2);
         const phaseLeft = phase2.box.x;
-        const phaseMidY = phase2.box.y + phase2.box.height / 2;
+        // The row's nominal midline, not a grown bar's middle: "Phase 2"
+        // wraps inside its bar (specs/rendering.md, "Row midline").
+        const phaseMidY = phase2.box.y + 28;
         // First waypoint sits on the anchor's vertical cut line
         // (centerX) at the target's row midY.
         expect(wp[0].x).toBeCloseTo(anchor!.center.x, 1);
@@ -1083,7 +1085,8 @@ swimlane b "B"
 });
 
 describe('layoutRoadmap title first-line clearance', () => {
-    // `scale:2w`: a `2w` item is a 148px bar with a 124px text area. The first
+    // `scale:2w` (16 px a day): a `9.375d` item spans 150 px, a 148px bar
+    // (less a 1 px seam on each side) with a 124px text area. The first
     // title line shares the bar's upper-right with the status dot, so it gets
     // 148 - 12 - 21 = 115px (dot only), 104.2px (dot + one footnote digit) or
     // 99px (dot + `before:` glyph). Later lines keep the full 124px.
@@ -1118,7 +1121,7 @@ ${body}`;
 
     it('wraps a title that fits the inner width but would run under the status dot', async () => {
         // "Plan the rollout" is 120.6px: one line at 124px, over the 115px first line.
-        const model = await layout(roadmap('  item "Plan the rollout" duration:2w\n'));
+        const model = await layout(roadmap('  item "Plan the rollout" duration:9.375d\n'));
         const item = only(model, 'Plan the rollout');
         expect(item.textSpills).toBe(false);
         expect(item.titleLines).toEqual(['Plan the', 'rollout']);
@@ -1127,7 +1130,7 @@ ${body}`;
 
     it('keeps a title that clears the dot on one line', async () => {
         // "Ship the thing" is 105.6px < 115px.
-        const model = await layout(roadmap('  item "Ship the thing" duration:2w\n'));
+        const model = await layout(roadmap('  item "Ship the thing" duration:9.375d\n'));
         const item = only(model, 'Ship the thing');
         expect(item.titleLines).toBeUndefined();
         expect(item.box.height).toBe(56);
@@ -1136,7 +1139,7 @@ ${body}`;
     it('widens the reserve for a footnote on the item', async () => {
         const model = await layout(
             roadmap(
-                '  item tech "Ship the thing" duration:2w\n',
+                '  item tech "Ship the thing" duration:9.375d\n',
                 '\nfootnote note "Note" on:tech\n',
             ),
         );
@@ -1149,7 +1152,7 @@ ${body}`;
 
     it('widens the reserve for a `before:` glyph', async () => {
         const model = await layout(
-            roadmap('  item "Ship the thing" duration:2w before:2026-06-29\n'),
+            roadmap('  item "Ship the thing" duration:9.375d before:2026-06-29\n'),
         );
         const item = only(model, 'Ship the thing');
         expect(item.inlineDatePins?.some((p) => p.side === 'before' && !p.spilled)).toBe(true);
@@ -1168,9 +1171,9 @@ footnote note "Note" on:tech
 
 swimlane "Platform"
   group "Squad"
-    item tech "Ship the thing" duration:2w
+    item tech "Ship the thing" duration:9.375d
     item spill "Spills past its one-day bar" duration:1d
-    item below "Below" duration:2w
+    item below "Below" duration:9.375d
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1191,9 +1194,9 @@ roadmap r "R" start:2026-04-06 scale:2w
 
 swimlane "Platform"
   group "Squad"
-    item tech "Ship the thing" duration:2w before:2026-06-29
+    item tech "Ship the thing" duration:9.375d before:2026-06-29
     item spill "Spills past its one-day bar" duration:1d
-    item below "Below" duration:2w
+    item below "Below" duration:9.375d
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1208,7 +1211,7 @@ swimlane "Platform"
 });
 
 describe('layoutRoadmap caption indent past an `after:` glyph', () => {
-    // `scale:2w`: a `2w` item is a 148px bar. An in-bar `after:DATE` glyph sits
+    // `scale:2w`: a `9.375d` item is a 148px bar. An in-bar `after:DATE` glyph sits
     // in the upper-left, so the caption starts at 22px (40px beside a link
     // tile) instead of 12 / 24: the first line gets 148 - 22 - 21 = 105px
     // (87px beside a link tile) instead of 115 / 103px, and the whole inner
@@ -1246,13 +1249,13 @@ ${body}`;
         // "Ship the thing" is 105.6px: inside the 115px dot-only first line,
         // outside the 105px first line the glyph leaves.
         const control = only(
-            await layout(roadmap('  item "Ship the thing" duration:2w\n')),
+            await layout(roadmap('  item "Ship the thing" duration:9.375d\n')),
             'Ship the thing',
         );
         expect(control.titleLines).toBeUndefined();
 
         const item = only(
-            await layout(roadmap('  item "Ship the thing" duration:2w after:2026-04-20\n')),
+            await layout(roadmap('  item "Ship the thing" duration:9.375d after:2026-04-20\n')),
             'Ship the thing',
         );
         const pin = item.inlineDatePins?.find((p) => p.side === 'after');
@@ -1270,7 +1273,7 @@ ${body}`;
         const linked = only(
             await layout(
                 roadmap(
-                    '  item "Ship it now!!" duration:2w link:https://github.com/acme/team/issues/1\n',
+                    '  item "Ship it now!!" duration:9.375d link:https://github.com/acme/team/issues/1\n',
                 ),
             ),
             'Ship it now!!',
@@ -1280,7 +1283,7 @@ ${body}`;
         const item = only(
             await layout(
                 roadmap(
-                    '  item "Ship it now!!" duration:2w link:https://github.com/acme/team/issues/1 after:2026-04-20\n',
+                    '  item "Ship it now!!" duration:9.375d link:https://github.com/acme/team/issues/1 after:2026-04-20\n',
                 ),
             ),
             'Ship it now!!',
@@ -1296,9 +1299,9 @@ ${body}`;
         // spills out to the left of the bar, so it reserves nothing at the
         // caption's left edge. The caption outcome matches the same bar without
         // `after:` (here both spill: 36px is far too narrow for any title).
-        const plain = only(await layout(roadmap('  item "Tiny" duration:3d\n')), 'Tiny');
+        const plain = only(await layout(roadmap('  item "Tiny" duration:2.375d\n')), 'Tiny');
         const dated = only(
-            await layout(roadmap('  item "Tiny" duration:3d after:2026-04-20\n')),
+            await layout(roadmap('  item "Tiny" duration:2.375d after:2026-04-20\n')),
             'Tiny',
         );
         expect(dated.box.width).toBeLessThan(40);
@@ -1314,9 +1317,9 @@ roadmap r "R" start:2026-04-06 scale:2w
 
 swimlane "Platform"
   group "Squad"
-    item tech "Ship the thing" duration:2w after:2026-04-06
+    item tech "Ship the thing" duration:9.375d after:2026-04-06
     item spill "Spills past its one-day bar" duration:1d
-    item below "Below" duration:2w
+    item below "Below" duration:9.375d
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1342,8 +1345,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 
 swimlane "Platform"
   group "Squad"
-    item tech "Go Internationalize" duration:2w after:2026-04-06
-    item below "Below" duration:2w
+    item tech "Go Internationalize" duration:9.375d after:2026-04-06
+    item below "Below" duration:9.375d
 `;
         const model = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1380,7 +1383,7 @@ swimlane "Platform"
 });
 
 describe('layoutRoadmap explicit title line breaks', () => {
-    // `scale:2w`: a `2w` item is a 148px bar with a 124px text area (115px for the first line).
+    // `scale:2w`: a `9.375d` item is a 148px bar with a 124px text area (115px for the first line).
     // In the DSL source a `\n` escape is two characters; Langium turns it into a real newline.
     function items(children: PositionedTrackChild[]): PositionedItem[] {
         const out: PositionedItem[] = [];
@@ -1427,7 +1430,7 @@ ${body}`;
 
     it('keeps the raw title and splits it into the author lines', async () => {
         const { model } = await layout(
-            roadmap('  item tech "Technology\\nSelection" duration:2w status:done\n'),
+            roadmap('  item tech "Technology\\nSelection" duration:9.375d status:done\n'),
         );
         const tech = find(items(model.swimlanes[0].children), 'tech');
         expect(tech.title).toBe('Technology\nSelection');
@@ -1437,7 +1440,7 @@ ${body}`;
     });
 
     it('breaks a title that would fit one line in a wide bar (explicit beats fit)', async () => {
-        // "Plan rollout" is 90px: one line in a 4w (308px) bar. The break still wins.
+        // "Plan rollout" is 90px: one line in a 4w (318px) bar. The break still wins.
         const { model } = await layout(roadmap('  item plan "Plan\\nrollout" duration:4w\n'));
         const plan = find(items(model.swimlanes[0].children), 'plan');
         expect(plan.title).toBe('Plan\nrollout');
@@ -1459,7 +1462,7 @@ ${body}`;
     });
 
     it('does not grow a one-line break-free title, and still wraps nothing without a break', async () => {
-        const { model } = await layout(roadmap('  item one "Design" duration:2w\n'));
+        const { model } = await layout(roadmap('  item one "Design" duration:9.375d\n'));
         const one = find(items(model.swimlanes[0].children), 'one');
         expect(one.titleLines).toBeUndefined();
         expect('titleLines' in one).toBe(false);
@@ -1471,7 +1474,7 @@ ${body}`;
             // The milestone keeps the axis end well past the caption, so the
             // caption cap at the chart's end leaves it whole.
             roadmap(
-                '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
+                '  item wide "Internationalization of\\nthe billing service" duration:9.375d\n',
                 CLEAR_OF_THE_END,
             ),
         );
@@ -1487,7 +1490,7 @@ ${body}`;
             // The milestone keeps the axis end well past the caption, so the
             // caption cap at the chart's end leaves it whole.
             roadmap(
-                '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
+                '  item wide "Internationalization of\\nthe billing service" duration:9.375d\n',
                 CLEAR_OF_THE_END,
             ),
         );
@@ -1504,7 +1507,7 @@ ${body}`;
     it('does not let a spilled explicit block overrun the next chained item', async () => {
         const { model } = await layout(
             roadmap(
-                '  item wide "Internationalization of\\nthe billing service" duration:2w\n  item after "Next" duration:2w\n',
+                '  item wide "Internationalization of\\nthe billing service" duration:9.375d\n  item after "Next" duration:9.375d\n',
             ),
         );
         const all = items(model.swimlanes[0].children);
@@ -1521,9 +1524,9 @@ roadmap r "R" start:2026-04-06 scale:2w
 
 swimlane "Platform"
   group "Squad"
-    item three "Design\\nBuild\\nShip" duration:2w
+    item three "Design\\nBuild\\nShip" duration:9.375d
     item spill "Spills past its one-day bar" duration:1d
-    item below "Below" duration:2w
+    item below "Below" duration:9.375d
 `;
         const { model } = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1542,8 +1545,8 @@ roadmap r "R" start:2026-04-06 scale:2w
 
 swimlane "Platform"
   group "Squad"
-    item wide "Internationalization of\\nthe billing service" duration:2w
-    item below "Below" duration:2w
+    item wide "Internationalization of\\nthe billing service" duration:9.375d
+    item below "Below" duration:9.375d
 `;
         const { model } = await layout(src);
         const group = model.swimlanes[0].children[0];
@@ -1565,7 +1568,7 @@ swimlane "Platform"
         try {
             const { file, model } = await layout(
                 roadmap(
-                    '  item wide "Internationalization of\\nthe billing service" duration:2w\n',
+                    '  item wide "Internationalization of\\nthe billing service" duration:9.375d\n',
                 ),
             );
             const ctx = place.mock.calls[0][1];
@@ -1621,7 +1624,7 @@ label a-fairly-long-label-id "A"
 label another-long-label-id "B"
 
 swimlane "Platform"
-  item wide "Internationalization of\\nthe billing service" duration:2w labels:[a-fairly-long-label-id, another-long-label-id]
+  item wide "Internationalization of\\nthe billing service" duration:9.375d labels:[a-fairly-long-label-id, another-long-label-id]
 `;
         const { model } = await layout(src);
         const wide = find(items(model.swimlanes[0].children), 'wide');
@@ -1895,10 +1898,10 @@ swimlane t "T"
 });
 
 describe('layoutRoadmap geometry after a late vertical shift', () => {
-    // Layout moves bars down AFTER placing them in two places: a row that
-    // grows retroactively (a taller item lands back on an earlier row)
-    // pushes every later row down, and a marker band that outgrows its
-    // sizing pushes the whole chart down. Everything attached to a bar has
+    // Layout moves bars down AFTER placing them when a marker band outgrows
+    // its sizing and pushes the whole chart down; a row that grew after
+    // later rows were placed did the same until rows stopped moving up
+    // (specs/true-width-layout.md §3.2). Everything attached to a bar has
     // to move with it: dependency-arrow ends, milestone slack arrows, and
     // inline-date glyphs. The attach rules are restated here (see
     // specs/rendering.md "Dependency Arrows" and "Inline-date glyph"), not
@@ -2030,37 +2033,35 @@ describe('layoutRoadmap geometry after a late vertical shift', () => {
         return layoutRoadmap(file, resolved, { theme: 'light' });
     }
 
-    it('ends every dependency arrow on its bars after a retroactive row growth', async () => {
-        // "Auth refactor" spills, so b and c drop to row 1. d fits back on
-        // row 0 and wraps ("Next" / "one"), growing row 0 by 16px after
-        // row 1 was placed, so row 1 moves down. The a -> b target and the
-        // c -> d source must move with it.
+    it('never places a later item above an earlier one, and ends every arrow on its bars', async () => {
+        // "Authentication refactor" spills, so b drops to row 1. d used to
+        // fit back on row 0 and grow it after row 1 was placed (a
+        // retroactive shift); a child now never lands above the one before
+        // it (specs/true-width-layout.md §3.2), so d stays at or below c.
         const model = await layout(`nowline v1
 
 roadmap repro "Retroactive shift" start:2026-01-05 scale:1w
 
 swimlane s "S"
-  item a "Auth refactor" duration:2w
+  item a "Authentication refactor" duration:2w
   item b "Next" duration:2w after:a
   item c "Plain thing" duration:2w
   item d "Next one" duration:2w after:c
 `);
         const [a, b, c, d] = ['a', 'b', 'c', 'd'].map((id) => find(model, id));
-        // The shift under test: d grew row 0 after b and c were placed.
-        expect(d.box.y).toBe(a.box.y);
-        expect(d.box.height).toBe(72);
-        expect(b.box.y).toBe(a.box.y + 64 + 16);
-        expect(c.box.y).toBe(b.box.y);
+        expect(b.box.y).toBeGreaterThanOrEqual(a.box.y);
+        expect(c.box.y).toBeGreaterThanOrEqual(b.box.y);
+        expect(d.box.y).toBeGreaterThanOrEqual(c.box.y);
 
         const ab = model.edges.find((e) => e.fromId === 'a' && e.toId === 'b')?.waypoints ?? [];
-        expect(ab.at(-1)?.y).toBe(b.box.y + NOMINAL_MID_PX);
-        const cd = model.edges.find((e) => e.fromId === 'c' && e.toId === 'd')?.waypoints ?? [];
-        expect(c.textSpills).toBe(true);
-        expect(cd[0]?.y).toBe(c.box.y + c.box.height - PROGRESS_STRIP_HALF_PX);
+        expect(ab.at(-1)?.y).toBe(targetY(b));
+        // d sits right after c on c's row, so position says it: no arrow.
+        expect(d.box.y).toBe(c.box.y);
+        expect(model.edges.find((e) => e.fromId === 'c' && e.toId === 'd')).toBeUndefined();
         expect(arrowMismatches(model)).toEqual([]);
     });
 
-    it('moves glyphs and slack arrows with the rows a retroactive growth pushed down', async () => {
+    it('keeps glyphs and slack arrows on their bars, rows in DSL order', async () => {
         // Same lane, plus a glyph on c (row 1), a filled group (row 2) and a
         // parallel (row 3), all placed before d grows row 0. g1 finishes
         // before d, so "Ship" draws a slack arrow from g1. c opens at b's end
@@ -2089,9 +2090,9 @@ swimlane s "S"
 milestone ship "Ship" after:[g1, d]
 `);
         const [a, c, d, g1] = ['a', 'c', 'd', 'g1'].map((id) => find(model, id));
-        expect(d.box.y).toBe(a.box.y);
-        expect(d.box.height).toBe(72);
-        expect(c.box.y).toBe(a.box.y + 64 + 16);
+        // d no longer lands back on row 0 (specs/true-width-layout.md §3.2).
+        expect(c.box.y).toBeGreaterThan(a.box.y);
+        expect(d.box.y).toBeGreaterThan(a.box.y);
         const group = allEntities(model).find((e) => e.kind === 'group');
         const parallel = allEntities(model).find((e) => e.kind === 'parallel');
         expect(group?.inlineDatePins).toHaveLength(1);
@@ -2191,7 +2192,7 @@ describe('layoutRoadmap no item start: pins', () => {
         const startOffset = (id: string): number => {
             const item = findItem(model.swimlanes[0].children, id);
             expect(item, id).toBeDefined();
-            return item!.box.x - ITEM_INSET_PX - model.timeline.originX;
+            return item!.box.x - ITEM_SEAM_PX - model.timeline.originX;
         };
         return { model, startOffset };
     }
@@ -2244,20 +2245,23 @@ swimlane "Platform"
     }
 
     it('spills the dot from a 23px bar', async () => {
-        const item = await only('1d', '7d');
+        // 5 days at 5 px a day, less a 1 px seam on each side.
+        const item = await only('1d', '5d');
         expect(item.box.width).toBe(23);
         expect(item.dotSpills).toBe(true);
         expect(item.dotSpillCx).not.toBeNull();
     });
 
-    it('spills the dot from a 20px bar, which the old 17px floor kept inside', async () => {
-        const item = await only('2w', '2d');
+    it('spills the dot from a 20px bar', async () => {
+        // 1.375 days at 16 px a day, less the seams.
+        const item = await only('2w', '1.375d');
         expect(item.box.width).toBe(20);
         expect(item.dotSpills).toBe(true);
     });
 
     it('keeps the dot inside a bar of 24px or more', async () => {
-        const item = await only('1m', '10d');
+        // 7.25 days at 80/22 px a day (about 26.4 px), less the seams.
+        const item = await only('1m', '7.25d');
         expect(item.box.width).toBeGreaterThanOrEqual(24);
         expect(item.box.width).toBeLessThan(25);
         expect(item.dotSpills).toBe(false);

@@ -35,7 +35,7 @@ import { daysBetween } from '../src/calendar.js';
 import { resolveWorkingCalendar } from '../src/calendar-resolver.js';
 import { layoutRoadmap } from '../src/layout.js';
 import { scheduleRoadmap } from '../src/schedule.js';
-import { ITEM_INSET_PX } from '../src/themes/shared.js';
+import { ITEM_SEAM_PX } from '../src/themes/shared.js';
 import { TimeScale } from '../src/time-scale.js';
 import type { PositionedItem, PositionedRoadmap, PositionedSwimlane } from '../src/types.js';
 import { parseAndResolve } from './helpers.js';
@@ -203,8 +203,8 @@ async function observe(rel: string): Promise<Map<string, Mismatch>> {
             const it = byId.get(node.name as string);
             const a = it
                 ? {
-                      start: xToDay(it.box.x - ITEM_INSET_PX),
-                      end: xToDay(it.box.x + it.box.width + ITEM_INSET_PX),
+                      start: xToDay(it.box.x - ITEM_SEAM_PX),
+                      end: xToDay(it.box.x + it.box.width + ITEM_SEAM_PX),
                   }
                 : undefined;
             const s = schedule.byNode.get(node);

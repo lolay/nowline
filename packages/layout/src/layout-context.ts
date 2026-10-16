@@ -36,24 +36,19 @@ import type { WorkingCalendar } from './working-calendar.js';
 export interface TrackCursor {
     /**
      * Where the next item begins, in time: the last child's duration end
-     * (a block's latest track end), never the minimum bar width or a
-     * caption spill (specs/scheduler-unification.md §8 decisions 6, 7).
+     * (a block's latest track end), never a caption spill. A bar spans
+     * exactly its dates, so this is also its painted end
+     * (specs/true-width-layout.md §3.1).
      */
     x: number;
     /** Top edge of the current row. */
     y: number;
     /** Accumulated height of the track. */
     height: number;
-    /**
-     * Rightmost bar edge reached, in logical space: the painted footprint,
-     * the minimum bar width included, never a caption spill. A parallel
-     * sizes its bracket on it.
-     */
-    maxX: number;
 }
 
 export function newCursor(x: number, y: number): TrackCursor {
-    return { x, y, height: 0, maxX: x };
+    return { x, y, height: 0 };
 }
 
 /**
