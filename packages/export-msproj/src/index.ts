@@ -93,6 +93,17 @@ interface ResourceRow {
     nowlineId?: string;
 }
 
+/**
+ * UID and ID counters for the task walk, plus each named parallel's track
+ * ends: the UID of every track's task (an item, or a group's summary task),
+ * which `after:<parallel>` links to.
+ */
+interface WalkCtx {
+    uid: number;
+    id: number;
+    parallelEnds: Map<string, number[]>;
+}
+
 const PROJECT_XMLNS = 'http://schemas.microsoft.com/project';
 
 export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {}): string {
@@ -120,7 +131,7 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
     const resources = collectResources(ast);
 
     // Tasks (walk roadmap entries in source order)
-    const tasks = collectTasks(ast, drops, schedule);
+    const { tasks, parallelEnds } = collectTasks(ast, drops, schedule);
 
     // Predecessor lookup uses Nowline ids → task UIDs.
     const idToUid = new Map<string, number>();
@@ -158,7 +169,7 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
     // Tasks block
     lines.push('  <Tasks>');
     for (const t of tasks) {
-        emitTask(t, idToUid, lines);
+        emitTask(t, idToUid, parallelEnds, lines);
     }
     lines.push('  </Tasks>');
 
@@ -195,9 +206,13 @@ export function exportMsProjXml(inputs: ExportInputs, options: MsProjOptions = {
 
 // ---------- Tasks ----------
 
-function collectTasks(ast: NowlineFile, drops: DropCounts, schedule: RoadmapSchedule): TaskRow[] {
+function collectTasks(
+    ast: NowlineFile,
+    drops: DropCounts,
+    schedule: RoadmapSchedule,
+): { tasks: TaskRow[]; parallelEnds: Map<string, number[]> } {
     const tasks: TaskRow[] = [];
-    const ctx = { uid: 1, id: 1 };
+    const ctx: WalkCtx = { uid: 1, id: 1, parallelEnds: new Map() };
 
     for (const entry of ast.roadmapEntries) {
         if (entry.$type === 'SwimlaneDeclaration') {
@@ -254,13 +269,13 @@ function collectTasks(ast: NowlineFile, drops: DropCounts, schedule: RoadmapSche
             });
         }
     }
-    return tasks;
+    return { tasks, parallelEnds: ctx.parallelEnds };
 }
 
 function walkSwimlaneChild(
-    child: SwimlaneContent,
+    child: SwimlaneContent | GroupContent,
     outline: number,
-    ctx: { uid: number; id: number },
+    ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
@@ -268,86 +283,72 @@ function walkSwimlaneChild(
     if (child.$type === 'ItemDeclaration') {
         emitTaskRow(child, outline, ctx, drops, tasks, schedule);
     } else if (child.$type === 'GroupBlock') {
-        const group = child as GroupBlock;
-        tasks.push({
-            uid: ctx.uid++,
-            id: ctx.id++,
-            name: displayLabel(group),
-            outlineLevel: outline,
-            isSummary: true,
-            isMilestone: false,
-            durationMinutes: 0,
-            predecessors: [],
-            nowlineId: group.name,
-            ownerRefs: [],
-        });
-        for (const grandchild of group.content as GroupContent[]) {
-            walkGroupChild(grandchild, outline + 1, ctx, drops, tasks, schedule);
-        }
+        emitGroup(child, outline, ctx, drops, tasks, schedule);
     } else if (child.$type === 'ParallelBlock') {
-        const parallel = child as ParallelBlock;
-        for (const grandchild of parallel.content) {
-            if (grandchild.$type === 'ItemDeclaration') {
-                emitTaskRow(grandchild, outline, ctx, drops, tasks, schedule);
-            } else if (grandchild.$type === 'GroupBlock') {
-                walkSwimlaneChild(
-                    grandchild as unknown as SwimlaneContent,
-                    outline,
-                    ctx,
-                    drops,
-                    tasks,
-                    schedule,
-                );
-            }
-        }
+        walkParallel(child, outline, ctx, drops, tasks, schedule);
     } else if (child.$type === 'DescriptionDirective') {
         drops.description += 1;
     }
 }
 
-function walkGroupChild(
-    child: GroupContent,
+/** A group is a summary task over its children, one outline level down. */
+function emitGroup(
+    group: GroupBlock,
     outline: number,
-    ctx: { uid: number; id: number },
+    ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
 ): void {
-    if (child.$type === 'ItemDeclaration') {
-        emitTaskRow(child, outline, ctx, drops, tasks, schedule);
-    } else if (child.$type === 'GroupBlock') {
-        const group = child as GroupBlock;
-        tasks.push({
-            uid: ctx.uid++,
-            id: ctx.id++,
-            name: displayLabel(group),
-            outlineLevel: outline,
-            isSummary: true,
-            isMilestone: false,
-            durationMinutes: 0,
-            predecessors: [],
-            nowlineId: group.name,
-            ownerRefs: [],
-        });
-        for (const grandchild of group.content as GroupContent[]) {
-            walkGroupChild(grandchild, outline + 1, ctx, drops, tasks, schedule);
-        }
-    } else if (child.$type === 'ParallelBlock') {
-        const parallel = child as ParallelBlock;
-        for (const grandchild of parallel.content) {
-            if (grandchild.$type === 'ItemDeclaration') {
-                emitTaskRow(grandchild, outline, ctx, drops, tasks, schedule);
-            }
-        }
-    } else if (child.$type === 'DescriptionDirective') {
-        drops.description += 1;
+    tasks.push({
+        uid: ctx.uid++,
+        id: ctx.id++,
+        name: displayLabel(group),
+        outlineLevel: outline,
+        isSummary: true,
+        isMilestone: false,
+        durationMinutes: 0,
+        predecessors: [],
+        nowlineId: group.name,
+        ownerRefs: [],
+    });
+    for (const grandchild of group.content) {
+        walkSwimlaneChild(grandchild, outline + 1, ctx, drops, tasks, schedule);
     }
+}
+
+/**
+ * A parallel has no task: its tracks sit at its own outline level. Engine C
+ * ends a named parallel at its latest track end, so `after:<parallel>` links
+ * to every track's task (an item, or a group's summary task, which MS Project
+ * finishes with its last child) and MS Project starts the successor at the
+ * latest of them.
+ */
+function walkParallel(
+    parallel: ParallelBlock,
+    outline: number,
+    ctx: WalkCtx,
+    drops: DropCounts,
+    tasks: TaskRow[],
+    schedule: RoadmapSchedule,
+): void {
+    const ends: number[] = [];
+    for (const track of parallel.content) {
+        if (track.$type === 'ItemDeclaration') {
+            ends.push(ctx.uid);
+            emitTaskRow(track, outline, ctx, drops, tasks, schedule);
+        } else if (track.$type === 'GroupBlock') {
+            ends.push(ctx.uid);
+            emitGroup(track, outline, ctx, drops, tasks, schedule);
+        }
+    }
+    if (parallel.name) ctx.parallelEnds.set(parallel.name, ends);
 }
 
 function emitTaskRow(
     item: ItemDeclaration,
     outline: number,
-    ctx: { uid: number; id: number },
+    ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
@@ -376,7 +377,12 @@ function countDrops(item: ItemDeclaration, drops: DropCounts): void {
     if (item.description) drops.description += 1;
 }
 
-function emitTask(t: TaskRow, idToUid: Map<string, number>, lines: string[]): void {
+function emitTask(
+    t: TaskRow,
+    idToUid: Map<string, number>,
+    parallelEnds: Map<string, number[]>,
+    lines: string[],
+): void {
     lines.push('    <Task>');
     lines.push(`      ${tag('UID', t.uid)}`);
     lines.push(`      ${tag('ID', t.id)}`);
@@ -395,9 +401,11 @@ function emitTask(t: TaskRow, idToUid: Map<string, number>, lines: string[]): vo
     const linked = new Set<number>();
     for (const pred of t.predecessors) {
         const uid = idToUid.get(pred);
-        if (uid !== undefined) {
-            emitPredecessorLink(uid, lines);
-            linked.add(uid);
+        // A parallel has no task of its own: link to each track's end.
+        for (const end of uid !== undefined ? [uid] : (parallelEnds.get(pred) ?? [])) {
+            if (linked.has(end)) continue;
+            emitPredecessorLink(end, lines);
+            linked.add(end);
         }
     }
     for (const uid of t.extraPredecessorUids ?? []) {

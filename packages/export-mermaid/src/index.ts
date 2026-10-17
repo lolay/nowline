@@ -41,7 +41,8 @@
 // start (`:done, my-id, 2w`) collapses to two fields after the status strip,
 // so Mermaid mis-reads the id as a start date and throws `Invalid date: my-id`
 // at render time. To keep an explicit id we therefore MUST emit a start token:
-//   - declared `after:` deps  -> `after <ids>`
+//   - declared `after:` deps  -> `after <ids>`, a group or parallel id
+//     expanded to the tasks that end it (neither is a Mermaid task)
 //   - otherwise a lane follower -> `after <previous item in the lane>`
 //   - otherwise a lane/track leader -> the roadmap start date
 //   - a member of wave k >= 2 also gets `after <wave k-1 id>`: appended to
@@ -61,7 +62,8 @@ import type {
     SwimlaneDeclaration,
     WavePlan,
 } from '@nowline/core';
-import { parseIsoDate } from '@nowline/core/internal';
+import { isGroupBlock, isParallelBlock } from '@nowline/core';
+import { parseIsoDate, type TrackNode, trackChildren, trackNodes } from '@nowline/core/internal';
 import type { ExportInputs } from '@nowline/export-core';
 import { displayLabel, getProp, getProps, hasProp, roadmapTitle } from '@nowline/export-core';
 import {
@@ -138,6 +140,8 @@ interface EmitCtx {
     startDate: string;
     schedule: RoadmapSchedule;
     waves: WaveCtx | undefined;
+    /** Each named group and parallel, which `after:` expands to its end tasks. */
+    containers: ReadonlyMap<string, GroupBlock | ParallelBlock>;
 }
 
 export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}): string {
@@ -185,12 +189,12 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
 
     // Waves → one end milestone per wave, dated from the day schedule.
     const waves = emitWaves(inputs, schedule, drops, out, startDate);
-    const ctx: EmitCtx = { startDate, schedule, waves };
 
     // Swimlanes → sections; their items become tasks.
     const swimlanes = ast.roadmapEntries.filter(
         (e): e is SwimlaneDeclaration => e.$type === 'SwimlaneDeclaration',
     );
+    const ctx: EmitCtx = { startDate, schedule, waves, containers: namedContainers(swimlanes) };
     for (const lane of swimlanes) {
         emitSwimlane(lane, [lane.name ?? slugify(displayLabel(lane))], drops, out, ctx);
     }
@@ -202,7 +206,7 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     if (milestones.length > 0) {
         out.push('    section Milestones');
         for (const m of milestones) {
-            emitMilestone(m, drops, out, startDate);
+            emitMilestone(m, drops, out, ctx);
         }
     }
 
@@ -365,9 +369,9 @@ function emitItem(
     ctx: EmitCtx,
 ): void {
     countDrops(item, drops);
-    const id = item.name ?? slugify(displayLabel(item));
+    const id = taskIdOf(item);
     const status = mapStatus(getProp(item, 'status'));
-    const after = getProps(item, 'after');
+    const after = expandAfter(getProps(item, 'after'), ctx.containers);
     const duration = daysToMermaid(ctx.schedule.byNode.get(item)?.days) ?? '1d';
     const start = startTokenFor(after, chain, ctx.startDate, previousWaveOf(item, ctx.waves));
 
@@ -381,11 +385,11 @@ function emitMilestone(
     milestone: MilestoneDeclaration,
     drops: DropCounts,
     out: string[],
-    startDate: string,
+    ctx: EmitCtx,
 ): void {
     const id = milestone.name ?? slugify(displayLabel(milestone));
     const date = getProp(milestone, 'date');
-    const after = getProps(milestone, 'after');
+    const after = expandAfter(getProps(milestone, 'after'), ctx.containers);
     let start: string;
     if (date) {
         start = date;
@@ -394,7 +398,7 @@ function emitMilestone(
     } else {
         // A milestone with neither a date nor predecessors still needs a start
         // token; anchor it at the roadmap start so Mermaid renders it.
-        start = startDate;
+        start = ctx.startDate;
     }
     out.push(`    ${escapeTaskName(displayLabel(milestone))} :milestone, ${id}, ${start}, 0d`);
     if (hasProp(milestone, 'style')) drops.style += 1;
@@ -422,6 +426,54 @@ function startTokenFor(
     else return startDate;
     if (barrier && !deps.includes(barrier)) deps.push(barrier);
     return `after ${deps.join(' ')}`;
+}
+
+/** An item's Mermaid task id: its own id, else a slug of its title. */
+function taskIdOf(item: ItemDeclaration): string {
+    return item.name ?? slugify(displayLabel(item));
+}
+
+/** Every named group and parallel under `lanes`, by id. */
+function namedContainers(
+    lanes: readonly SwimlaneDeclaration[],
+): Map<string, GroupBlock | ParallelBlock> {
+    const out = new Map<string, GroupBlock | ParallelBlock>();
+    for (const node of trackNodes(lanes)) {
+        if ((isGroupBlock(node) || isParallelBlock(node)) && node.name) out.set(node.name, node);
+    }
+    return out;
+}
+
+/**
+ * `after:` ids with each group and parallel replaced by the tasks that end it,
+ * without duplicates. Neither container is a Mermaid task, and Mermaid starts
+ * a task with an unknown `after` id on the day it renders. Engine C ends a
+ * group at its last child's end and a parallel at its latest track end;
+ * Mermaid's `after a b` starts at the latest end of the tasks it names, so the
+ * expansion lands on the same day.
+ */
+function expandAfter(
+    after: readonly string[],
+    containers: ReadonlyMap<string, GroupBlock | ParallelBlock>,
+): string[] {
+    const out: string[] = [];
+    for (const ref of after) {
+        const container = containers.get(ref);
+        for (const id of container ? endTaskIds(container) : [ref]) {
+            if (!out.includes(id)) out.push(id);
+        }
+    }
+    return out;
+}
+
+/** The task ids that end a track node: an item, a group's last child, or every parallel track. */
+function endTaskIds(node: TrackNode): string[] {
+    if (isGroupBlock(node)) {
+        const last = trackChildren(node).at(-1);
+        return last ? endTaskIds(last) : [];
+    }
+    if (isParallelBlock(node)) return trackChildren(node).flatMap(endTaskIds);
+    return [taskIdOf(node)];
 }
 
 /** The previous wave's id for a member of wave k >= 2; undefined otherwise. */
