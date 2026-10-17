@@ -171,6 +171,7 @@ Logo resolution is a render-time concern. Each failure is a warning, and the cha
 A single-row header displays the scale units (days, weeks, months, quarters, years) as defined in `config`. Height controlled by `default roadmap header-height:` (`md` = 24 px; see the style-key list above for every bucket). `header-height:none` hides the date labels entirely.
 
 - **Grid lines**: light, dotted vertical lines drop from each labeled tick mark down through all swimlanes for visual tracking
+- **Column width**: one `scale:` unit is 32 px at days, 40 px at weeks, 80 px at months, 160 px at quarters and 320 px at years (`unitPx` in [`view-preset.ts`](../packages/layout/src/view-preset.ts)); a literal's count multiplies it, so `scale:2w` is 80 px a week. Pixels per day is that width over the calendar's days per unit, so a day inside a default week column is 8 px under `calendar:business` and about 5.7 px under `calendar:full`. A day at `scale:1d` is never narrower than either: a day literal labels every column, and 32 px holds the widest `M/D` label (`12/31`, about 29 px at the 10 px tick font) the way a 40 px week holds `Sep 28`. A `calendar:custom` with fewer than two days per week makes a week's day wider than 32 px; that is the author's own unit, not the default.
 - **Label thinning**: when too many tick marks exist, show every Nth label to reduce density. Default thinning thresholds:
   - Days: show every 7th (weekly markers)
   - Weeks: show every 4th (monthly markers)
