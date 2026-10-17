@@ -62,6 +62,14 @@ describe('@nowline/mcp: default now', () => {
         expect(text(east)).not.toBe(text(west));
     });
 
+    it('draws a different picture for each weekend date', async () => {
+        const saturday = await call('render', { now: '2026-10-17' });
+        const sunday = await call('render', { now: '2026-10-18' });
+        const monday = await call('render', { now: '2026-10-19' });
+        expect(text(saturday)).not.toBe(text(sunday));
+        expect(text(sunday)).not.toBe(text(monday));
+    });
+
     it('lets an explicit now win over the timezone', async () => {
         const east = await call('render', { now: '2025-01-08', timezone: '+14:00' });
         const west = await call('render', { now: '2025-01-08', timezone: '-12:00' });
