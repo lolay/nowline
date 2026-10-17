@@ -1,0 +1,3 @@
+```release-note:changed
+`scale:1d` draws a day 32 px wide instead of 5 px, so every day label fits its column and a day is never narrower than a day inside a default weekly column (8 px under `calendar:business`). Day-scale charts get wider; a `--width` cap still shrinks them.
+```

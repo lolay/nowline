@@ -400,22 +400,22 @@ swimlane a "A"
     it('drops the weekends and majors on every second kept column', async () => {
         const { model } = await lay(source());
         const ticks = model.timeline.ticks;
-        // 15 working days, 5 px each, plus the closing tick.
-        expect(model.timeline.pixelsPerDay).toBe(5);
+        // 15 working days, 32 px each, plus the closing tick.
+        expect(model.timeline.pixelsPerDay).toBe(32);
         expect(ticks.map((t) => t.x - model.timeline.originX)).toEqual(
-            Array.from({ length: 16 }, (_, i) => i * 5),
+            Array.from({ length: 16 }, (_, i) => i * 32),
         );
         expect(
             ticks.filter((t) => t.major).map((t) => [t.x - model.timeline.originX, t.label]),
         ).toEqual([
             [0, '1/5'],
-            [10, '1/7'],
-            [20, '1/9'],
-            [30, '1/13'],
-            [40, '1/15'],
-            [50, '1/19'],
-            [60, '1/21'],
-            [70, '1/23'],
+            [64, '1/7'],
+            [128, '1/9'],
+            [192, '1/13'],
+            [256, '1/15'],
+            [320, '1/19'],
+            [384, '1/21'],
+            [448, '1/23'],
         ]);
         expect(ticks[15].label).toBeUndefined();
         expect(iso(model.timeline.endDate)).toBe('2026-01-26');
@@ -426,9 +426,9 @@ swimlane a "A"
         const o = model.timeline.originX;
         const runs = model.timeline.nonWorking ?? [];
         expect(runs.map((r) => [r.x - o, iso(r.from), iso(r.through)])).toEqual([
-            [25, '2026-01-10', '2026-01-11'],
-            [50, '2026-01-17', '2026-01-18'],
-            [75, '2026-01-24', '2026-01-25'],
+            [160, '2026-01-10', '2026-01-11'],
+            [320, '2026-01-17', '2026-01-18'],
+            [480, '2026-01-24', '2026-01-25'],
         ]);
         // Seam only where the run is strictly inside the chart and no grid
         // line falls at its x: column 5 (Jan 12) is minor, column 10 is
@@ -451,8 +451,8 @@ swimlane a "A"
         const columns = model.timeline.ticks.slice(0, -1);
         expect(columns.filter((t) => t.major).map((t) => [t.x - o, t.label])).toEqual([
             [0, '1/5'],
-            [25, '1/12'],
-            [50, '1/19'],
+            [160, '1/12'],
+            [320, '1/19'],
         ]);
         const runs = model.timeline.nonWorking ?? [];
         expect(runs).toHaveLength(3);
