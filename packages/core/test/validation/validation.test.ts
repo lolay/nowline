@@ -720,6 +720,15 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /label-every|integer/i)).toBe(true);
     });
 
+    it('Scale: pixels-per-unit is an unknown scale property', async () => {
+        const r = await parse(
+            `config\nscale\n  pixels-per-unit: 200\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(
+            hasError(errorMessages(r.diagnostics), /Unknown scale property "pixels-per-unit"/),
+        ).toBe(true);
+    });
+
     it('Scale: unit is an unknown scale property', async () => {
         const r = await parse(
             `config\nscale\n  unit: days\nroadmap r\nswimlane s\n  item x duration:1w\n`,

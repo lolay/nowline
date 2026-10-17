@@ -190,6 +190,6 @@ Each began as an open question with a recommendation; m2 and m3 settled them (th
 Separate from this milestone, each its own change:
 
 - `scale:1d` defaults to 5 px a day, narrower than a day inside a weekly column (8 px).
-- The `scale` block's `pixels-per-unit` is read by the layout (`view-preset.ts`) but rejected by the validator.
+- ~~The `scale` block's `pixels-per-unit` is read by the layout (`view-preset.ts`) but rejected by the validator.~~ Fixed: the layout no longer reads it. `dsl.md` never documented the key, and a width knob in the block would be the auto-zoom §2 rules out, so the column width comes from `scale:` alone.
 - ~~The `scale` block's `unit` is read by the layout (`view-preset.ts`) but rejected by the validator, the same gap as `pixels-per-unit` was.~~ Fixed: the layout no longer reads it. `dsl.md` never documented the key, and `scale:<duration>` on the roadmap already picks the unit, so the unit comes from `scale:` alone.
 - The MS Project export writes no link for `after:` a parallel, and the Mermaid export names group and parallel ids it never declares ([`scheduler-unification.md`](./scheduler-unification.md) §9).
