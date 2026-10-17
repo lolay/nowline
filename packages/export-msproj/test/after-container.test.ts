@@ -1,13 +1,13 @@
 import { scheduleRoadmap } from '@nowline/layout';
 import { describe, expect, it } from 'vitest';
 import { exportMsProjXml } from '../src/index.js';
+import { msProjectStarts, parseTasks, startMismatches } from './forward-pass.js';
 import { buildExportInputs } from './helpers.js';
 
 // `after:` a parallel or a group (specs/scheduler-unification.md, Known open
 // gaps). A group is a summary task, which MS Project finishes with its last
 // child; a parallel has no task, so `after:<parallel>` links to every track's
-// task. Each track chains with explicit `after:` because the exporter writes
-// no implicit lane sequencing, and the lanes keep the dependents leaders.
+// task. Each track's own order comes from the export's lane sequencing links.
 
 const FIXTURE = `nowline v1
 
@@ -18,13 +18,13 @@ swimlane build "Build"
     item fast "Fast" duration:1w
     group slow "Slow"
       item s1 "S1" duration:1w
-      item s2 "S2" duration:3w after:s1
+      item s2 "S2" duration:3w
     item mid "Mid" duration:2w
 
 swimlane polish "Polish"
   group g "G"
     item g1 "G1" duration:1w
-    item g2 "G2" duration:1w after:g1
+    item g2 "G2" duration:1w
 
 swimlane follow "Follow"
   item wait-p "Wait P" duration:1w after:p
@@ -34,53 +34,6 @@ swimlane later "Later"
 
 milestone mp "MP" after:p
 `;
-
-interface ParsedTask {
-    uid: number;
-    name: string;
-    outlineLevel: number;
-    summary: boolean;
-    workingDays: number;
-    preds: number[];
-}
-
-function parseTasks(xml: string): ParsedTask[] {
-    const block = xml.slice(xml.indexOf('<Tasks>'), xml.indexOf('</Tasks>'));
-    return [...block.matchAll(/<Task>([\s\S]*?)<\/Task>/g)].map(([, body]) => ({
-        uid: Number(/<UID>(\d+)<\/UID>/.exec(body)?.[1]),
-        name: /<Name>([^<]*)<\/Name>/.exec(body)?.[1] ?? '',
-        outlineLevel: Number(/<OutlineLevel>(\d+)<\/OutlineLevel>/.exec(body)?.[1]),
-        summary: body.includes('<Summary>1</Summary>'),
-        workingDays: Number(/<Duration>PT(?:0H)?(\d+)M/.exec(body)?.[1] ?? 0) / 480,
-        preds: [...body.matchAll(/<PredecessorUID>(\d+)<\/PredecessorUID>/g)].map((m) =>
-            Number(m[1]),
-        ),
-    }));
-}
-
-/**
- * MS Project's forward pass, in working days from the project start: a task
- * starts at the latest finish of its finish-to-start predecessors, and a
- * summary task finishes with the latest of the tasks under it.
- */
-function msProjectStarts(tasks: readonly ParsedTask[]): Map<string, number> {
-    const byUid = new Map(tasks.map((t) => [t.uid, t]));
-    const children = new Map<number, ParsedTask[]>();
-    tasks.forEach((t, i) => {
-        if (!t.summary) return;
-        const under: ParsedTask[] = [];
-        for (const next of tasks.slice(i + 1)) {
-            if (next.outlineLevel <= t.outlineLevel) break;
-            under.push(next);
-        }
-        children.set(t.uid, under);
-    });
-    const finish = (t: ParsedTask): number =>
-        t.summary ? Math.max(0, ...children.get(t.uid)!.map(finish)) : start(t) + t.workingDays;
-    const start = (t: ParsedTask): number =>
-        Math.max(0, ...t.preds.map((uid) => finish(byUid.get(uid)!)));
-    return new Map(tasks.map((t) => [t.name, start(t)]));
-}
 
 async function exportFixture(source: string) {
     const inputs = await buildExportInputs(source);
@@ -105,12 +58,18 @@ describe('exportMsProjXml — after: a parallel or a group', () => {
         expect(tasks.find((t) => t.name === 'Wait G')!.preds).toEqual([g.uid]);
     });
 
-    it("lands the dependents on engine C's start, the date the xlsx export writes", async () => {
-        const { tasks, schedule } = await exportFixture(FIXTURE);
+    it("lands every task on engine C's start, the date the xlsx export writes", async () => {
+        const { inputs, xml, tasks, schedule } = await exportFixture(FIXTURE);
+        expect(startMismatches(xml, inputs.ast, schedule)).toEqual([]);
         const starts = msProjectStarts(tasks);
         const { working } = schedule.calendar;
         const msDate = (name: string) =>
-            working.dateAtWorkingIndex(schedule.startDate, starts.get(name)!).toISOString();
+            working
+                .dateAtWorkingIndex(
+                    schedule.startDate,
+                    starts.get(tasks.find((t) => t.name === name)!.uid)!,
+                )
+                .toISOString();
         expect(msDate('Wait P')).toBe(schedule.items.get('wait-p')!.start.toISOString());
         expect(msDate('Wait G')).toBe(schedule.items.get('wait-g')!.start.toISOString());
         expect(msDate('MP')).toBe(schedule.milestones.get('mp')!.toISOString());

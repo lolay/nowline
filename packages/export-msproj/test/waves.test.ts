@@ -90,8 +90,11 @@ describe('exportMsProjXml — waves (checkout-relaunch sample)', () => {
 
     it('links members of wave k >= 2 to wave k-1 end; wave 1 and background get none', async () => {
         const { byName, uid } = await exportTasks(SAMPLE);
+        // The other links are lane sequencing (lane-links.test.ts).
+        const ends = ['Foundations (wave end)', 'Build (wave end)', 'Launch (wave end)'].map(uid);
+        const waveLinks = (name: string) => byName(name).preds.filter((p) => ends.includes(p));
         for (const name of ['Auth service split', 'Checkout UX research', 'Wallet SDK spike']) {
-            expect(byName(name).preds).toEqual([]);
+            expect(waveLinks(name)).toEqual([]);
         }
         for (const name of [
             'Payments API v2',
@@ -99,12 +102,12 @@ describe('exportMsProjXml — waves (checkout-relaunch sample)', () => {
             'Accessibility pass',
             'Wallet integration',
         ]) {
-            expect(byName(name).preds).toEqual([uid('Foundations (wave end)')]);
+            expect(waveLinks(name)).toEqual([uid('Foundations (wave end)')]);
         }
         for (const name of ['Rate limits', 'Launch page', 'App store release']) {
-            expect(byName(name).preds).toEqual([uid('Build (wave end)')]);
+            expect(waveLinks(name)).toEqual([uid('Build (wave end)')]);
         }
-        expect(byName('On-call and KTLO').preds).toEqual([]);
+        expect(waveLinks('On-call and KTLO')).toEqual([]);
     });
 
     it('resolves after:<wave> on milestones to the wave-end task', async () => {
@@ -156,8 +159,8 @@ swimlane a
 `;
         const sink = vi.fn();
         const { byName, uid } = await exportTasks(src, sink);
-        // The anonymous member still waits for the barrier ...
-        expect(byName('Untitled work').preds).toEqual([uid('One (wave end)')]);
+        // The anonymous member still waits for the barrier, after its lane link ...
+        expect(byName('Untitled work').preds).toEqual([uid('a1'), uid('One (wave end)')]);
         // ... but cannot be linked into its own wave's end.
         expect(byName('Two (wave end)').preds).toEqual([uid('One (wave end)')]);
         expect(sink).toHaveBeenCalledTimes(1);
@@ -199,8 +202,9 @@ describe('exportMsProjXml — wave floors (Example 11)', () => {
         const { byName, uid } = await exportTasks(EXAMPLE_11, sink);
         const planEnd = uid('Plan (wave end)');
         const floor = uid('FY budget release');
-        expect(byName('a2').preds).toEqual([planEnd, floor]);
-        expect(byName('b2').preds).toEqual([planEnd, floor]);
+        // The lane link to the previous item comes first.
+        expect(byName('a2').preds).toEqual([uid('a1'), planEnd, floor]);
+        expect(byName('b2').preds).toEqual([uid('b1'), planEnd, floor]);
         expect(byName('a1').preds).toEqual([]);
         expect(byName('Execute (wave end)').preds).toEqual([uid('a2'), uid('b2'), floor, planEnd]);
         expect(byName('Execute complete').preds).toEqual([uid('Execute (wave end)')]);
@@ -211,7 +215,7 @@ describe('exportMsProjXml — wave floors (Example 11)', () => {
         const src = EXAMPLE_11.replace('after:fy-budget', 'after:2026-02-02');
         const sink = vi.fn();
         const { byName, uid } = await exportTasks(src, sink);
-        expect(byName('a2').preds).toEqual([uid('Plan (wave end)')]);
+        expect(byName('a2').preds).toEqual([uid('a1'), uid('Plan (wave end)')]);
         expect(byName('Execute (wave end)').preds).toEqual([
             uid('a2'),
             uid('b2'),
@@ -227,7 +231,11 @@ describe('exportMsProjXml — wave floors (Example 11)', () => {
             'milestone fy-budget "FY budget release" date:2026-02-02',
         );
         const { byName, uid } = await exportTasks(src);
-        expect(byName('b2').preds).toEqual([uid('Plan (wave end)'), uid('FY budget release')]);
+        expect(byName('b2').preds).toEqual([
+            uid('b1'),
+            uid('Plan (wave end)'),
+            uid('FY budget release'),
+        ]);
     });
 });
 
@@ -251,11 +259,12 @@ swimlane eng "Eng"
 `;
         const { byName, uid } = await exportTasks(src);
         const planEnd = uid('Plan (wave end)');
-        for (const name of ['api', 'ui', 'polish']) {
-            expect(byName(name).preds).toEqual([planEnd]);
-        }
-        expect(byName('ship').preds).toEqual([]);
-        expect(byName('UI track').preds).toEqual([]);
+        // Lane links: each track after spec, polish after ui, ship after both tracks.
+        expect(byName('api').preds).toEqual([uid('spec'), planEnd]);
+        expect(byName('UI track').preds).toEqual([uid('spec')]);
+        expect(byName('ui').preds).toEqual([planEnd]);
+        expect(byName('polish').preds).toEqual([uid('ui'), planEnd]);
+        expect(byName('ship').preds).toEqual([uid('api'), uid('UI track')]);
         expect(byName('Build (wave end)').preds).toEqual([
             uid('api'),
             uid('ui'),
