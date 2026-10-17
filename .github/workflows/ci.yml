@@ -173,7 +173,12 @@ jobs:
         include:
           - { os: ubuntu-latest, node-version: '22' }
     steps:
+      # Depth 2: a PR is checked out as its merge commit, and the review
+      # gallery collect step below reads the PR head (the merge's second
+      # parent) for the build's subject, author and date.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
       - uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ matrix.node-version }}
@@ -188,6 +193,38 @@ jobs:
       # Only {ubuntu-latest, node 26} runs the full `ci`; see the matrix comment.
       - name: Gate (make ${{ matrix.os == 'ubuntu-latest' && matrix.node-version == '26' && 'ci' || 'ci-platform' }} on a clean checkout)
         run: make ${{ matrix.os == 'ubuntu-latest' && matrix.node-version == '26' && 'ci' || 'ci-platform' }}
+
+      # Review gallery snapshot (specs/ci.md § Review gallery): the canonical
+      # cell's `make ci` rendered every example and test, so collect them
+      # for gallery.yml to publish to review.nowline.dev. Push to main and
+      # same-repo PRs only: never merge_group, never forks. `!cancelled()`
+      # so a red build still shows what it rendered. The PR facts come from
+      # the event, because the checkout is the PR's merge commit; they reach
+      # collect.mjs through env, never through the shell.
+      - name: Collect review gallery renders
+        id: gallery
+        if: >-
+          ${{ !cancelled() && matrix.os == 'ubuntu-latest' && matrix.node-version == '26' &&
+          (github.event_name == 'push' ||
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) }}
+        env:
+          GALLERY_DIR: ${{ runner.temp }}/gallery
+          GALLERY_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GALLERY_PR_TITLE: ${{ github.event.pull_request.title }}
+          GALLERY_PR_URL: ${{ github.event.pull_request.html_url }}
+          GALLERY_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GALLERY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GALLERY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: make gallery-collect GALLERY_DIR="$GALLERY_DIR"
+
+      - name: Upload review gallery renders
+        if: ${{ !cancelled() && steps.gallery.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: gallery-raw
+          path: ${{ runner.temp }}/gallery/raw
+          if-no-files-found: error
+          retention-days: 7
 
   bundle-size:
     name: Embed bundle size gate
@@ -266,6 +303,12 @@ jobs:
         run: |
           pnpm --filter @nowline/integration-tests exec playwright install-deps chromium
           make mcp-app-e2e
+
+      # Review gallery browser leg (scripts/gallery over a fixture site).
+      # It rides here because this job already provisions Chromium; it
+      # needs no package build.
+      - name: Review gallery e2e
+        run: make gallery-e2e
 
   release-build-smoke:
     name: Release build smoke (no upload)
