@@ -96,6 +96,14 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 - **Changelog**: user-observable changes (DSL syntax, CLI flag, AST JSON shape, exporter output, extension UX, embed/CDN surface) get a fragment file, never an edit to `CHANGELOG.md`: add `.changelog/<branch-slug>.txt` holding a ` ```release-note:<kind> ` block, where `<kind>` is `added` / `changed` / `deprecated` / `removed` / `fixed` / `security`. VS Code extension UX goes in `packages/vscode-extension/.changelog/` instead (or as well). Format: [`.changelog/README.md`](./.changelog/README.md). Internal-only changes (build scripts, CI, dep bumps with no behavior change) get no fragment and the `no-changelog` PR label; the `Changelog` check fails a PR with neither, or one that adds entries to `CHANGELOG.md`. The release cut folds fragments into the new version section and deletes them; full contract in [`specs/releasing.md`](./specs/releasing.md#changelog-workflow).
 - **Round-trips**: changes to the AST, grammar, or printer must keep [`packages/cli/test/convert/roundtrip.test.ts`](./packages/cli/test/convert/roundtrip.test.ts) green — every `examples/` file must round-trip text → JSON → text and JSON → text → JSON without drift (modulo comment loss).
 
+## Visual changes
+
+A change is visual if it changes the rendered SVG of any file under `examples/` or `tests/`, or any snapshot under `packages/integration-tests/test/__snapshots__/`. Theme, spacing, and DSL-default changes count, whichever package you touch.
+
+Before implementing a visual change, show the maintainer what it will do to the diagrams and stop until they agree. Use whatever is least effort and still makes the change clear: render 1 to 3 affected fixtures on the base commit (`node packages/cli/dist/index.js <file> -o .scratch/<name>-before.svg`) and pair each with an "after" (a hand-edited copy of the SVG, a mockup, or a quick hack rendered the same way). Add a sentence or two on what changes and which other diagrams it will touch. Revert any hack before implementing.
+
+When the change is done, show before and after again from the real implementation: the same fixtures, plus any other diagram whose render changed. This is a report, not a gate; don't wait for sign-off.
+
 ## Where new files go
 
 | Kind | Location |

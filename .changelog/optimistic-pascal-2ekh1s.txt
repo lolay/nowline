@@ -1,0 +1,3 @@
+```release-note:fixed
+**MS Project export: tasks follow their lane's order.** The export linked only `after:` and waves, so MS Project started every later item in a lane on the project start. Each item, group or parallel now links finish-to-start to the one before it in its lane or group (to every track of a parallel, so the next item waits for the latest), and MS Project's own scheduling puts each task on the start date the chart and the XLSX export give. A group's links sit on its summary task. The export writes links, not dates, so changing a duration in MS Project still moves what follows it. Task UIDs and IDs are unchanged.
+```
