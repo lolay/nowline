@@ -356,8 +356,8 @@ function emitParallel(
             drops.description += 1;
         }
     }
-    // After the block, the lane continues from the last track (lossy — Mermaid
-    // can't express "after the latest of N tracks").
+    // After the block, the lane continues from the last track, not the latest
+    // one as engine C does (a known gap, specs/scheduler-unification.md).
     chain.prevId = lastTrackEnd;
 }
 
