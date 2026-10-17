@@ -11,6 +11,9 @@
 //   - Lossy export policy: `--strict` does not escalate.
 //   - Waves (specs/waves.md §10): one wave-end milestone task per wave,
 //     appended after every other task so existing UIDs never renumber.
+//   - Lane sequencing: each node links finish-to-start to the node before
+//     it in its lane or group, so MS Project's forward pass starts every
+//     task on engine C's day (specs/rendering.md § MS Project XML Export).
 //
 // Determinism: no `new Date()`. Anchoring date comes from `options.startDate`
 // or the schedule's start (the roadmap's `start:`, else `inputs.today`);
@@ -82,7 +85,9 @@ interface TaskRow {
     startsAt?: string;
     /** The source item, for wave membership. */
     node?: ItemDeclaration;
-    /** Links by UID, added after `predecessors`, skipping UIDs already linked. */
+    /** The previous node in the lane or group: its task, or every track end of a parallel. */
+    chainUids: number[];
+    /** Links by UID, added after `chainUids`, skipping UIDs already linked. */
     extraPredecessorUids?: number[];
 }
 
@@ -227,12 +232,12 @@ function collectTasks(
                 isMilestone: false,
                 durationMinutes: 0,
                 predecessors: [],
+                chainUids: [],
                 nowlineId: lane.name,
                 ownerRefs: getProps(lane, 'owner') as string[],
             });
-            for (const child of lane.content) {
-                walkSwimlaneChild(child, 2, ctx, drops, tasks, schedule);
-            }
+            // A lane's first node links to nothing: it starts on the project start.
+            walkSequence(lane.content, [], 2, ctx, drops, tasks, schedule);
             // Summary spans all child rows — implicit in MSProject by id ranges,
             // but we don't bother computing FinishDate / actuals.
             void summaryUid;
@@ -247,6 +252,7 @@ function collectTasks(
                 isMilestone: true,
                 durationMinutes: 0,
                 predecessors: getProps(m, 'after') as string[],
+                chainUids: [],
                 nowlineId: m.name,
                 ownerRefs: [],
                 startsAt: getProp(m, 'date'),
@@ -263,6 +269,7 @@ function collectTasks(
                 isMilestone: true, // Anchors → milestones in MS Project
                 durationMinutes: 0,
                 predecessors: [],
+                chainUids: [],
                 nowlineId: a.name,
                 ownerRefs: [],
                 startsAt: getProp(a, 'date'),
@@ -272,101 +279,147 @@ function collectTasks(
     return { tasks, parallelEnds: ctx.parallelEnds };
 }
 
-function walkSwimlaneChild(
-    child: SwimlaneContent | GroupContent,
+/**
+ * Engine C's sequential rule (`walkLane` in schedule.ts): each node starts
+ * after the one before it. `entry` is what the first node links to; each
+ * node's ends become the next node's entry. Returns the last node's ends.
+ */
+function walkSequence(
+    children: readonly (SwimlaneContent | GroupContent)[],
+    entry: number[],
     outline: number,
     ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
-): void {
-    if (child.$type === 'ItemDeclaration') {
-        emitTaskRow(child, outline, ctx, drops, tasks, schedule);
-    } else if (child.$type === 'GroupBlock') {
-        emitGroup(child, outline, ctx, drops, tasks, schedule);
-    } else if (child.$type === 'ParallelBlock') {
-        walkParallel(child, outline, ctx, drops, tasks, schedule);
-    } else if (child.$type === 'DescriptionDirective') {
-        drops.description += 1;
+): number[] {
+    let prev = entry;
+    for (const child of children) {
+        prev = walkNode(child, prev, [], outline, ctx, drops, tasks, schedule);
     }
+    return prev;
 }
 
-/** A group is a summary task over its children, one outline level down. */
-function emitGroup(
-    group: GroupBlock,
+/**
+ * Writes one lane or group child and returns the UIDs that end it. `entry`
+ * links to the previous node; `inheritedAfter` is a parallel's own `after:`,
+ * which each of its tracks carries since the parallel has no task.
+ */
+function walkNode(
+    child: SwimlaneContent | GroupContent,
+    entry: number[],
+    inheritedAfter: string[],
     outline: number,
     ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
-): void {
+): number[] {
+    if (child.$type === 'ItemDeclaration') {
+        return [emitTaskRow(child, entry, inheritedAfter, outline, ctx, drops, tasks, schedule)];
+    }
+    if (child.$type === 'GroupBlock') {
+        return [emitGroup(child, entry, inheritedAfter, outline, ctx, drops, tasks, schedule)];
+    }
+    if (child.$type === 'ParallelBlock') {
+        return walkParallel(child, entry, outline, ctx, drops, tasks, schedule);
+    }
+    if (child.$type === 'DescriptionDirective') {
+        drops.description += 1;
+    }
+    return entry;
+}
+
+/**
+ * A group is a summary task over its children, one outline level down. Its
+ * entry link and its `after:` go on the summary task: MS Project starts no
+ * subtask before its summary task's predecessors finish, so the first child
+ * needs no link of its own. Returns the summary task's UID, which MS Project
+ * finishes with the group's last child.
+ */
+function emitGroup(
+    group: GroupBlock,
+    entry: number[],
+    inheritedAfter: string[],
+    outline: number,
+    ctx: WalkCtx,
+    drops: DropCounts,
+    tasks: TaskRow[],
+    schedule: RoadmapSchedule,
+): number {
+    const uid = ctx.uid++;
     tasks.push({
-        uid: ctx.uid++,
+        uid,
         id: ctx.id++,
         name: displayLabel(group),
         outlineLevel: outline,
         isSummary: true,
         isMilestone: false,
         durationMinutes: 0,
-        predecessors: [],
+        predecessors: [...(getProps(group, 'after') as string[]), ...inheritedAfter],
+        chainUids: entry,
         nowlineId: group.name,
         ownerRefs: [],
     });
-    for (const grandchild of group.content) {
-        walkSwimlaneChild(grandchild, outline + 1, ctx, drops, tasks, schedule);
-    }
+    walkSequence(group.content, [], outline + 1, ctx, drops, tasks, schedule);
+    return uid;
 }
 
 /**
- * A parallel has no task: its tracks sit at its own outline level. Engine C
- * ends a named parallel at its latest track end, so `after:<parallel>` links
- * to every track's task (an item, or a group's summary task, which MS Project
- * finishes with its last child) and MS Project starts the successor at the
- * latest of them.
+ * A parallel has no task: its tracks sit at its own outline level, and each
+ * track's task (an item, or a group's summary task) takes the links the
+ * parallel would have had, its entry and its `after:`. Engine C ends a
+ * parallel at its latest track end, so the next node in the lane and
+ * `after:<parallel>` link to every track's task and MS Project starts the
+ * successor at the latest of them. Returns those track ends.
  */
 function walkParallel(
     parallel: ParallelBlock,
+    entry: number[],
     outline: number,
     ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
-): void {
+): number[] {
+    const after = getProps(parallel, 'after') as string[];
     const ends: number[] = [];
     for (const track of parallel.content) {
-        if (track.$type === 'ItemDeclaration') {
-            ends.push(ctx.uid);
-            emitTaskRow(track, outline, ctx, drops, tasks, schedule);
-        } else if (track.$type === 'GroupBlock') {
-            ends.push(ctx.uid);
-            emitGroup(track, outline, ctx, drops, tasks, schedule);
+        if (track.$type === 'ItemDeclaration' || track.$type === 'GroupBlock') {
+            ends.push(...walkNode(track, entry, after, outline, ctx, drops, tasks, schedule));
         }
     }
     if (parallel.name) ctx.parallelEnds.set(parallel.name, ends);
+    return ends.length > 0 ? ends : entry;
 }
 
 function emitTaskRow(
     item: ItemDeclaration,
+    entry: number[],
+    inheritedAfter: string[],
     outline: number,
     ctx: WalkCtx,
     drops: DropCounts,
     tasks: TaskRow[],
     schedule: RoadmapSchedule,
-): void {
+): number {
     countDrops(item, drops);
+    const uid = ctx.uid++;
     tasks.push({
-        uid: ctx.uid++,
+        uid,
         id: ctx.id++,
         name: displayLabel(item),
         outlineLevel: outline,
         isSummary: false,
         isMilestone: false,
         durationMinutes: workingDaysToMinutes(schedule.byNode.get(item)?.days),
-        predecessors: getProps(item, 'after') as string[],
+        predecessors: [...(getProps(item, 'after') as string[]), ...inheritedAfter],
+        chainUids: entry,
         nowlineId: item.name,
         ownerRefs: getProps(item, 'owner') as string[],
         node: item,
     });
+    return uid;
 }
 
 function countDrops(item: ItemDeclaration, drops: DropCounts): void {
@@ -408,7 +461,7 @@ function emitTask(
             linked.add(end);
         }
     }
-    for (const uid of t.extraPredecessorUids ?? []) {
+    for (const uid of [...t.chainUids, ...(t.extraPredecessorUids ?? [])]) {
         if (linked.has(uid)) continue;
         emitPredecessorLink(uid, lines);
         linked.add(uid);
@@ -496,6 +549,7 @@ function addWaveTasks(
             isMilestone: true,
             durationMinutes: 0,
             predecessors: [],
+            chainUids: [],
             ownerRefs: [],
             extraPredecessorUids: preds,
         });
