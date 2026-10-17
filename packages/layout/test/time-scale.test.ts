@@ -642,6 +642,19 @@ describe('resolveScale', () => {
         expect(preset.pixelsPerUnit).toBe(40);
     });
 
+    it('ignores a pixels-per-unit key in the scale block', () => {
+        // The validator rejects the key (specs/dsl.md lists no such property),
+        // so the column width comes from `scale:` alone.
+        const file = {
+            roadmapDecl: { properties: [{ key: 'scale:', value: '2w' }] },
+        } as unknown as Parameters<typeof resolveScale>[0];
+        const block = {
+            properties: [{ key: 'pixels-per-unit', value: '200' }],
+        } as unknown as Parameters<typeof resolveScale>[1];
+        expect(resolveScale(file, block).pixelsPerUnit).toBe(80);
+        expect(resolveScale(file, block)).toEqual(resolveScale(file, undefined));
+    });
+
     describe('labelEveryDefault', () => {
         type File = Parameters<typeof resolveScale>[0];
         type Block = Parameters<typeof resolveScale>[1];
