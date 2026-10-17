@@ -190,5 +190,6 @@ Each began as an open question with a recommendation; m2 and m3 settled them (th
 Separate from this milestone, each its own change:
 
 - `scale:1d` defaults to 5 px a day, narrower than a day inside a weekly column (8 px).
-- The `scale` block's `pixels-per-unit` is read by the layout (`view-preset.ts`) but rejected by the validator.
-- The MS Project export writes no link for `after:` a parallel, and the Mermaid export names group and parallel ids it never declares. Resolved after m4.15: MS Project links `after:` a parallel to each track's task, and Mermaid expands a group or a parallel to the tasks that end it ([`scheduler-unification.md`](./scheduler-unification.md) §9, Known open gaps).
+- ~~The `scale` block's `pixels-per-unit` is read by the layout (`view-preset.ts`) but rejected by the validator.~~ Fixed: the layout no longer reads it. `dsl.md` never documented the key, and a width knob in the block would be the auto-zoom §2 rules out, so the column width comes from `scale:` alone.
+- The `scale` block's `unit` is read by the layout (`view-preset.ts`) but rejected by the validator, the same gap as `pixels-per-unit` was.
+- ~~The MS Project export writes no link for `after:` a parallel, and the Mermaid export names group and parallel ids it never declares.~~ Fixed: MS Project links `after:` a parallel to each track's task, and Mermaid expands a group or a parallel to the tasks that end it ([`scheduler-unification.md`](./scheduler-unification.md) §9, Known open gaps).
