@@ -114,17 +114,14 @@ export function resolveScale(file: NowlineFile, scaleBlock: ScaleBlock | undefin
         const unitProp = findProp(scaleBlock.properties, 'unit');
         const resolvedUnit: ScaleUnit = (unitProp?.value as ScaleUnit) ?? unit;
         const labelProp = findProp(scaleBlock.properties, 'label-every');
-        const pxProp = findProp(scaleBlock.properties, 'pixels-per-unit');
         const explicitLabelEvery = labelProp ? parseInt(labelProp.value, 10) || 0 : 0;
         const labelEvery =
             explicitLabelEvery !== 0 ? Math.max(1, explicitLabelEvery) : defaultLabelEvery;
-        const pixelsPerUnit = pxProp
-            ? Math.max(1, parseInt(pxProp.value, 10) || unitPx(resolvedUnit))
-            : (pixelsPerUnitOverride ?? unitPx(resolvedUnit));
+        // Column width comes from `scale:` alone; the block only sets display.
         return {
             unit: resolvedUnit,
             labelEvery,
-            pixelsPerUnit,
+            pixelsPerUnit: pixelsPerUnitOverride ?? unitPx(resolvedUnit),
             ...defaultFlag(explicitLabelEvery !== 0),
         };
     }
