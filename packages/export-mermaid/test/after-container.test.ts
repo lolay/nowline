@@ -11,6 +11,10 @@ import { buildExportInputs } from './helpers.js';
 //
 // A lane item that follows a parallel chains the same way: after every
 // track's end, not just the last track's, so a long first track holds it.
+//
+// Declared `after:` joins the lane chain instead of replacing it: engine C
+// starts an item at `max(prevEnd, ...after)`, and so does a group's or a
+// parallel's own `after:` for its first children.
 
 const FIXTURE = `nowline v1
 
@@ -64,6 +68,35 @@ swimlane outer "Outer"
       item o-long "O Long" duration:3w
       item o-short "O Short" duration:1w
   item o-after "O After" duration:1w
+
+swimlane source "Source"
+  item k "K" duration:1w
+
+swimlane own "Own"
+  item own-long "Own Long" duration:4w
+  item own-x "Own X" duration:1w after:k
+
+swimlane post "Post"
+  parallel pp "PP"
+    item pp-long "PP Long" duration:3w
+    item pp-short "PP Short" duration:1w
+  item pp-x "PP X" duration:1w after:k
+
+swimlane boxed "Boxed"
+  item b0 "B0" duration:1w
+  group bg "BG" after:pp
+    item bg1 "BG1" duration:1w
+    item bg2 "BG2" duration:1w
+
+swimlane boxed-par "Boxed Par"
+  item b1 "B1" duration:1w
+  parallel bp "BP" after:own-long
+    item bp1 "BP1" duration:1w
+    item bp2 "BP2" duration:2w
+
+swimlane dated "Dated"
+  group dg "DG" after:[2026-04-06, k]
+    item dg1 "DG1" duration:1w
 
 milestone mp "MP" after:p
 milestone mg "MG" after:g
@@ -128,6 +161,28 @@ describe('exportMermaid — after: a group or a parallel', () => {
         expect(startOf('o-after')).toBe('after o-long o-short');
     });
 
+    it('keeps the lane chain when an item declares its own after:', async () => {
+        const tasks = parseTasks(exportMermaid(await buildExportInputs(FIXTURE)));
+        const startOf = (id: string) => tasks.find((t) => t.id === id)!.start;
+        expect(startOf('own-x')).toBe('after k own-long');
+        // Right after a parallel: every track's end, not only the declared id.
+        expect(startOf('pp-x')).toBe('after k pp-long pp-short');
+        // A lane leader has no chain, so its `after:` stands alone.
+        expect(startOf('wait-p')).toBe('after fast s2 mid');
+    });
+
+    it("joins a group's or a parallel's own after: to its first children", async () => {
+        const tasks = parseTasks(exportMermaid(await buildExportInputs(FIXTURE)));
+        const startOf = (id: string) => tasks.find((t) => t.id === id)!.start;
+        expect(startOf('bg1')).toBe('after b0 pp-long pp-short');
+        expect(startOf('bg2')).toBe('after bg1');
+        // Every track of the parallel starts from the joined entry.
+        expect(startOf('bp1')).toBe('after b1 own-long');
+        expect(startOf('bp2')).toBe('after b1 own-long');
+        // An inline date names no task, so only the id joins.
+        expect(startOf('dg1')).toBe('after k');
+    });
+
     it("starts the dependents on engine C's day, the date the xlsx export writes", async () => {
         const inputs = await buildExportInputs(FIXTURE);
         const tasks = parseTasks(exportMermaid(inputs));
@@ -143,7 +198,20 @@ describe('exportMermaid — after: a group or a parallel', () => {
                 : working.workingIndexOf(schedule.startDate, new Date(`${t.start}T00:00:00Z`));
         const mermaidDate = (id: string) =>
             working.dateAtWorkingIndex(schedule.startDate, start(byId.get(id)!)).toISOString();
-        for (const id of ['wait-p', 'wait-g', 'wait-both', 'after-cp', 'i-next', 'o-after']) {
+        for (const id of [
+            'wait-p',
+            'wait-g',
+            'wait-both',
+            'after-cp',
+            'i-next',
+            'o-after',
+            'own-x',
+            'pp-x',
+            'bg1',
+            'bg2',
+            'bp1',
+            'bp2',
+        ]) {
             expect(mermaidDate(id)).toBe(schedule.items.get(id)!.start.toISOString());
         }
         for (const id of ['mp', 'mg']) {
@@ -152,5 +220,12 @@ describe('exportMermaid — after: a group or a parallel', () => {
         expect(mermaidDate('wait-p')).toBe('2026-03-30T00:00:00.000Z');
         // c0's week plus the four-week first track, not the one-week last one.
         expect(mermaidDate('after-cp')).toBe('2026-04-06T00:00:00.000Z');
+        // The four-week item before it, not k's one week.
+        expect(mermaidDate('own-x')).toBe('2026-03-30T00:00:00.000Z');
+        expect(mermaidDate('pp-x')).toBe('2026-03-23T00:00:00.000Z');
+        // The group waits for pp's three weeks, past b0's one.
+        expect(mermaidDate('bg1')).toBe('2026-03-23T00:00:00.000Z');
+        // The parallel waits for own-long's four weeks, past b1's one.
+        expect(mermaidDate('bp1')).toBe('2026-03-30T00:00:00.000Z');
     });
 });
