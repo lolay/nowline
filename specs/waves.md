@@ -762,7 +762,7 @@ C is a lower bound of A on every item and wave edge (`schedule-lower-bound.test.
 
 **Accumulation.** For each member, `sequenceItem` sets `memberEnd[k] = max(memberEnd[k], start + span(days))`, its duration end (`itemSpanPx` from the placed start).
 
-- This is how far the lane cursor advances past an item (`sequenceRowTrack`). The minimum bar width never enters it: a bar drawn wider than its duration is presentation ([`scheduler-unification.md`](./scheduler-unification.md) §8 decision 6).
+- This is how far the lane cursor advances past an item (`sequenceRowTrack`). It is also where the bar ends, less its seam: every bar spans its dates ([`true-width-layout.md`](./true-width-layout.md) §3.1).
 - Group boxes and caption spill never enter it.
 
 **Seeds.** Each pass resets the entity edge maps to the anchor and dated-milestone baseline, resets `placedItems` and `itemFlowKey`, then seeds:
@@ -978,7 +978,7 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
   - an empty wave adds no line of its own.
 - **Which style.** A wave's opening line uses its own style. In a gap, the closing line at `E_k` uses wave k's style.
 - **Span.** From the top of the strip down to `swimlaneBottomY`, so the cell edge, the marker rows and the column below read as one continuous line.
-- **Gutter.** The line sits in the logical gutter of at least 12 px (§8.4).
+- **Gutter.** The line sits in the gap of at least 2 px between bars of different waves (§8.4, "Visual gutter").
 - **Milestone on a boundary.** A milestone whose diamond falls on a boundary (`|center.x − boundary.x| < 0.5 px`, recorded as `onWaveBoundary`) keeps its diamond and label but **does not draw its cut line**. The boundary already marks that instant, and two vertical lines in the same place would read as a rendering bug.
   - This is the common `milestone … after:<wave>` case (the Beta and GA milestones in the mockup).
   - A dated milestone that a wave overruns is never on a boundary, so it keeps its red cut line.

@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.5 sha256:de109c3debafc6741369d566b29bb423313947ee7edb7331052bf4858f2beec0
+.\" translated-from: nowline.5 sha256:a09a86faed775a5d103a5758ccdaa55085238852506ec4c61af0b8a8f991132e
 .\"
 .\" Les mots-clés du DSL (nowline, config, roadmap, swimlane, item, parallel,
 .\" group, person, team, anchor, label, size, status, wave, milestone, footnote,
@@ -946,15 +946,25 @@ swimlane platform
 .Pp
 Un
 .Sy group
-avec
-.Sy style: ,
-.Sy labels:
-ou d'autres propriétés visuelles est rendu avec une boîte
-englobante visible et une petite pastille de titre.
+est dessiné au-dessus et autour de ses éléments, jamais à côté\ :
+un en-tête (son titre au-dessus d'un crochet qui couvre exactement
+ses dates) sur un corps teinté de son
+.Sy bg ,
+avec une marge au-dessus et au-dessous.
+.Sy style:
+ne change que les couleurs.
 Un
+.Sy parallel
+est dessiné de la même façon, ses pistes empilées dans son corps.
+Dans une roadmap avec vagues, un
 .Sy group
-sans style est purement structurel \(em il ne régit que le
-séquencement et la croissance interne, sans artefact visible.
+sans titre, sans
+.Sy style:
+et sans
+.Sy labels:
+qui porte
+.Sy wave:
+ne dessine rien\ ; il ne fait qu'attribuer l'appartenance.
 .Ss anchor \(em date nommée sur la chronologie
 .Bd -literal -offset indent
 anchor kickoff date:2026-01-06
@@ -1665,9 +1675,16 @@ cela déclenche l'avertissement
 .It Sy corner-radius
 .Sy none | xs | sm | md | lg | xl | full .
 .It Sy bracket
-.Sy none Pq par défaut | solid | dashed .
-Réservée à
-.Sy parallel .
+.Sy none | solid | dashed .
+Le crochet d'en-tête au-dessus des dates d'un groupe ou d'un
+parallèle\ :
+.Sy solid
+par défaut sur un groupe,
+.Sy dashed
+sur un parallèle\ ;
+.Sy none
+le masque.
+Réservée aux conteneurs.
 .It Sy capacity-icon
 Glyphe utilisé comme suffixe des nombres de capacité.
 Identifiants intégrés\ :

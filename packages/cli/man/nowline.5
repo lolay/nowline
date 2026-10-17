@@ -887,15 +887,25 @@ swimlane platform
 .Pp
 A
 .Sy group
-with
-.Sy style: ,
-.Sy labels: ,
-or other visual properties renders with a visible bounding box
-plus a small title chiclet.
+is drawn above and around its items, never beside them: a header
+(its title over a bracket spanning exactly its dates) over a body
+shaded with its
+.Sy bg ,
+padded above and below.
+.Sy style:
+changes only the colours.
 A
+.Sy parallel
+is drawn the same way, its tracks stacked in its body.
+In a roadmap with waves, a
 .Sy group
-with no styling is purely structural \(em it only governs
-sequencing and inner row growth, with no visible artifact.
+with no title, no
+.Sy style: ,
+and no
+.Sy labels:
+that carries
+.Sy wave:
+draws nothing; it only assigns membership.
 .Ss anchor \(em named date on the timeline
 .Bd -literal -offset indent
 anchor kickoff date:2026-01-06
@@ -1573,8 +1583,15 @@ that draws the warning
 .It Sy corner-radius
 .Sy none | xs | sm | md | lg | xl | full .
 .It Sy bracket
-.Sy none Pq default | solid | dashed .
-Parallel-only.
+.Sy none | solid | dashed .
+The header bracket over a group's or parallel's dates:
+.Sy solid
+by default on a group,
+.Sy dashed
+on a parallel;
+.Sy none
+hides it.
+Containers only.
 .It Sy capacity-icon
 Glyph used as the suffix to capacity numbers.
 Built-in identifiers:

@@ -12,8 +12,8 @@
 // Checked on every arrow of every sample under `examples/` and `tests/`
 // (main lanes and isolated regions, each among its own lanes), laid out as
 // `nowline <file> --now 2026-02-09` lays them out, on the 60 generated
-// roadmaps with waves, and on focused cases from the prototype's stress files
-// (`specs/handoffs/true-width-prototype/samples/`).
+// roadmaps with waves, and on focused cases from the design's stress files
+// (`specs/true-width-layout.md` §6).
 
 import { readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
