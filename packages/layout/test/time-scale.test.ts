@@ -642,6 +642,19 @@ describe('resolveScale', () => {
         expect(preset.pixelsPerUnit).toBe(40);
     });
 
+    it('ignores a unit key in the scale block', () => {
+        // The validator rejects the key (specs/dsl.md lists no such property),
+        // so the unit comes from `scale:` alone.
+        const file = {
+            roadmapDecl: { properties: [{ key: 'scale:', value: '2w' }] },
+        } as unknown as Parameters<typeof resolveScale>[0];
+        const block = {
+            properties: [{ key: 'unit', value: 'days' }],
+        } as unknown as Parameters<typeof resolveScale>[1];
+        expect(resolveScale(file, block).unit).toBe('weeks');
+        expect(resolveScale(file, block)).toEqual(resolveScale(file, undefined));
+    });
+
     describe('labelEveryDefault', () => {
         type File = Parameters<typeof resolveScale>[0];
         type Block = Parameters<typeof resolveScale>[1];
@@ -674,24 +687,15 @@ describe('resolveScale', () => {
             expect('labelEveryDefault' in preset).toBe(false);
         });
 
-        it('is set when a scale block switches unit and inherits the default', () => {
-            const preset = resolveScale(fileWith(), blockWith({ unit: 'days' }));
-            expect(preset.unit).toBe('days');
+        it('is set when a scale block sets only display keys', () => {
+            const preset = resolveScale(fileWith(), blockWith({ name: 'sprint' }));
+            expect(preset.labelEvery).toBe(4);
             expect(preset.labelEveryDefault).toBe(true);
         });
 
-        it('is absent when a block switches unit but the literal fixed labelEvery', () => {
-            const preset = resolveScale(fileWith('1w'), blockWith({ unit: 'days' }));
-            expect(preset.unit).toBe('days');
-            expect('labelEveryDefault' in preset).toBe(false);
-        });
-
-        it('is absent when the block sets label-every along with a unit', () => {
-            const preset = resolveScale(
-                fileWith(),
-                blockWith({ unit: 'days', 'label-every': '2' }),
-            );
-            expect(preset.labelEvery).toBe(2);
+        it('is absent when a block omits label-every but the literal fixed labelEvery', () => {
+            const preset = resolveScale(fileWith('1w'), blockWith({ name: 'sprint' }));
+            expect(preset.labelEvery).toBe(1);
             expect('labelEveryDefault' in preset).toBe(false);
         });
     });

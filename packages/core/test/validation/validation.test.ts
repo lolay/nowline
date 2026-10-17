@@ -720,6 +720,13 @@ swimlane s
         expect(hasError(errorMessages(r.diagnostics), /label-every|integer/i)).toBe(true);
     });
 
+    it('Scale: unit is an unknown scale property', async () => {
+        const r = await parse(
+            `config\nscale\n  unit: days\nroadmap r\nswimlane s\n  item x duration:1w\n`,
+        );
+        expect(hasError(errorMessages(r.diagnostics), /Unknown scale property "unit"/)).toBe(true);
+    });
+
     // --- Milestone: date: OR after: required ---
 
     it('Milestone: date: alone is accepted', async () => {

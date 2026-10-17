@@ -111,18 +111,17 @@ export function resolveScale(file: NowlineFile, scaleBlock: ScaleBlock | undefin
         labelEveryOverride === undefined && !hasLabelEvery ? { labelEveryDefault: true } : {};
 
     if (scaleBlock) {
-        const unitProp = findProp(scaleBlock.properties, 'unit');
-        const resolvedUnit: ScaleUnit = (unitProp?.value as ScaleUnit) ?? unit;
+        // The unit comes from `scale:` alone; the block only sets display.
         const labelProp = findProp(scaleBlock.properties, 'label-every');
         const pxProp = findProp(scaleBlock.properties, 'pixels-per-unit');
         const explicitLabelEvery = labelProp ? parseInt(labelProp.value, 10) || 0 : 0;
         const labelEvery =
             explicitLabelEvery !== 0 ? Math.max(1, explicitLabelEvery) : defaultLabelEvery;
         const pixelsPerUnit = pxProp
-            ? Math.max(1, parseInt(pxProp.value, 10) || unitPx(resolvedUnit))
-            : (pixelsPerUnitOverride ?? unitPx(resolvedUnit));
+            ? Math.max(1, parseInt(pxProp.value, 10) || unitPx(unit))
+            : (pixelsPerUnitOverride ?? unitPx(unit));
         return {
-            unit: resolvedUnit,
+            unit,
             labelEvery,
             pixelsPerUnit,
             ...defaultFlag(explicitLabelEvery !== 0),
