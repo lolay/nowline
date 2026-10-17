@@ -3030,21 +3030,17 @@ export async function renderSvg(
     const fonts: FontFamilies = options.fontFamilies ?? FONT_STACK;
     const parts: string[] = [];
 
-    // <defs> — shadows + arrowhead markers (palette-driven fills baked in).
-    // Marker ids carry the per-render prefix: several SVGs inlined in one
-    // HTML page share an id namespace and `url(#id)` resolves to the first
-    // match, so a global id would paint one diagram's arrowheads (and theme)
-    // onto another.
-    const arrowFillNeutral = palette.arrowhead.neutral;
-    const arrowFillLight = palette.arrowhead.light;
-    const arrowFillDark = palette.arrowhead.dark;
+    // <defs> — shadows + the slack-arrow marker (palette-driven fill baked
+    // in). Dependency arrows draw their own heads (`renderEdge`), so the
+    // milestone slack line's dark marker is the only one. Its id carries the
+    // per-render prefix: several SVGs inlined in one HTML page share an id
+    // namespace and `url(#id)` resolves to the first match, so a global id
+    // would paint one diagram's arrowheads (and theme) onto another.
     const arrowDef = (id: string, fill: string): string =>
         `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}"/></marker>`;
     const defs =
         `<defs>${allShadowDefs(idPrefix)}` +
-        arrowDef(`${idPrefix}-arrow`, arrowFillNeutral) +
-        arrowDef(`${idPrefix}-arrow-light`, arrowFillLight) +
-        arrowDef(`${idPrefix}-arrow-dark`, arrowFillDark) +
+        arrowDef(`${idPrefix}-arrow-dark`, palette.arrowhead.dark) +
         // Wave hatch patterns, only those a bar or the legend uses.
         usedWaveHatchKinds(model)
             .map((k) => waveHatchPatternDef(idPrefix, k, palette))
