@@ -43,7 +43,8 @@
 // at render time. To keep an explicit id we therefore MUST emit a start token:
 //   - declared `after:` deps  -> `after <ids>`, a group or parallel id
 //     expanded to the tasks that end it (neither is a Mermaid task)
-//   - otherwise a lane follower -> `after <previous item in the lane>`
+//   - otherwise a lane follower -> `after <previous item in the lane>`, or
+//     after every track end when it follows a parallel
 //   - otherwise a lane/track leader -> the roadmap start date
 //   - a member of wave k >= 2 also gets `after <wave k-1 id>`: appended to
 //     its `after` token, or replacing a lane/track leader's start date
@@ -116,12 +117,12 @@ function emptyCounts(): DropCounts {
 }
 
 /**
- * Mutable per-lane chaining cursor. `prevId` is the id the NEXT sequential
- * task should start after; `null` means "anchor at the roadmap start date"
- * (lane / parallel-track leader).
+ * Mutable per-lane chaining cursor. `prevIds` are the ids the NEXT sequential
+ * task should start after: one item, or every track end after a parallel.
+ * Empty means "anchor at the roadmap start date" (lane / parallel-track leader).
  */
 interface Chain {
-    prevId: string | null;
+    prevIds: string[];
 }
 
 /**
@@ -267,7 +268,7 @@ function emitSwimlane(
     out.push(`    section ${escapeMermaidText(sectionLabel)}`);
     // Each lane starts its own sequential chain; the first non-`after` item
     // anchors at the roadmap start date.
-    const chain: Chain = { prevId: null };
+    const chain: Chain = { prevIds: [] };
     for (const child of lane.content) {
         emitSwimlaneChild(child, breadcrumb, drops, out, chain, ctx);
     }
@@ -340,25 +341,20 @@ function emitParallel(
 ): void {
     // Tracks run concurrently: each starts from the parallel's entry point
     // (the lane cursor as it was on entry), not after the previous track.
-    const entryId = chain.prevId;
-    let lastTrackEnd = entryId;
+    const entryIds = chain.prevIds;
     for (const child of parallel.content) {
         if (child.$type === 'ItemDeclaration') {
-            const trackChain: Chain = { prevId: entryId };
-            emitItem(child, drops, out, trackChain, ctx);
-            lastTrackEnd = trackChain.prevId;
+            emitItem(child, drops, out, { prevIds: entryIds }, ctx);
         } else if (child.$type === 'GroupBlock') {
             drops.group += 1;
-            const trackChain: Chain = { prevId: entryId };
-            emitGroup(child, breadcrumb, drops, out, trackChain, ctx);
-            lastTrackEnd = trackChain.prevId;
+            emitGroup(child, breadcrumb, drops, out, { prevIds: entryIds }, ctx);
         } else if (child.$type === 'DescriptionDirective') {
             drops.description += 1;
         }
     }
-    // After the block, the lane continues from the last track, not the latest
-    // one as engine C does (a known gap, specs/scheduler-unification.md).
-    chain.prevId = lastTrackEnd;
+    // After the block, the lane continues after every track's end: Mermaid's
+    // `after a b` starts at the latest of them, where engine C ends a parallel.
+    chain.prevIds = endTaskIds(parallel);
 }
 
 function emitItem(
@@ -378,7 +374,7 @@ function emitItem(
     const meta = [status, id, start, duration].filter((s) => s !== '').join(', ');
     out.push(`    ${escapeTaskName(displayLabel(item))} :${meta}`);
     // Advance the lane cursor so the next sequential item chains after this one.
-    chain.prevId = id;
+    chain.prevIds = [id];
 }
 
 function emitMilestone(
@@ -406,8 +402,8 @@ function emitMilestone(
 
 /**
  * Start token for a task: declared `after:` deps win, otherwise chain after the
- * previous item in the lane, otherwise anchor the lane/track leader at the
- * roadmap start date. Always non-empty so Mermaid never mis-reads the task id
+ * previous item in the lane (every track end after a parallel), otherwise
+ * anchor the lane/track leader at the roadmap start date. Always non-empty so Mermaid never mis-reads the task id
  * as a start date. A member of wave k >= 2 also waits for wave k-1's end
  * milestone (`barrier`): Mermaid's `after a b` starts at the latest of them,
  * and a lane leader's start date gives way to the barrier, which is never
@@ -421,7 +417,7 @@ function startTokenFor(
 ): string {
     let deps: string[];
     if (after.length > 0) deps = [...after];
-    else if (chain.prevId) deps = [chain.prevId];
+    else if (chain.prevIds.length > 0) deps = [...chain.prevIds];
     else if (barrier) deps = [];
     else return startDate;
     if (barrier && !deps.includes(barrier)) deps.push(barrier);

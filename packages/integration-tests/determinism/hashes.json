@@ -81,7 +81,7 @@
             "icu": false
         },
         "dependencies:mermaid": {
-            "node": "61be302e0c3a21c111f496f2bb2078ed71ae1cb33a7130c56ecfa50eb7ab6b65",
+            "node": "be1e5dd5c1a9603be8324be454ca9b9ac5290b026c05cd0c339caa8eeb5d983b",
             "icu": false
         },
         "dependencies:msproj": {
@@ -246,7 +246,7 @@
             "icu": false
         },
         "platform-2026-dark:mermaid": {
-            "node": "36497d291261dfd6462d75eb170f0efc1e741b8158a660248acce22020c96bdc",
+            "node": "b30cd9a441fbd969a9f6710adb3999aa8e2e1028b0857f756f18555e9a5e74f4",
             "icu": false
         },
         "platform-2026-dark:msproj": {
@@ -279,7 +279,7 @@
             "icu": false
         },
         "platform-2026:mermaid": {
-            "node": "36497d291261dfd6462d75eb170f0efc1e741b8158a660248acce22020c96bdc",
+            "node": "b30cd9a441fbd969a9f6710adb3999aa8e2e1028b0857f756f18555e9a5e74f4",
             "icu": false
         },
         "platform-2026:msproj": {
