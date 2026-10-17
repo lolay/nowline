@@ -1,9 +1,9 @@
 // An omitted `now` is today's civil date in the `timezone` argument's zone, or
 // the local zone, not UTC (specs/surface-options.md §7, decision 2). The
 // roadmap has no `start:`, so its axis starts on the now-line date and the
-// picture shows which date was chosen. `calendar:full` keeps every day a
-// working day: under `calendar:business` a Saturday and a Sunday both start
-// the axis on Monday, and the two zones below rendered alike every weekend.
+// picture shows which date was chosen. `calendar:full` keeps weekends on the
+// axis: under business a weekend date sits at Monday's seam, so a Saturday and
+// a Sunday (or a Sunday and a Monday) drew the same picture.
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import * as os from 'node:os';
@@ -60,6 +60,14 @@ describe('@nowline/mcp: default now', () => {
         expect(east.isError).toBeFalsy();
         expect(west.isError).toBeFalsy();
         expect(text(east)).not.toBe(text(west));
+    });
+
+    it('draws a different picture for each weekend date', async () => {
+        const saturday = await call('render', { now: '2026-10-17' });
+        const sunday = await call('render', { now: '2026-10-18' });
+        const monday = await call('render', { now: '2026-10-19' });
+        expect(text(saturday)).not.toBe(text(sunday));
+        expect(text(sunday)).not.toBe(text(monday));
     });
 
     it('lets an explicit now win over the timezone', async () => {

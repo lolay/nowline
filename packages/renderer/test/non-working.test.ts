@@ -31,7 +31,7 @@ function entityMarkup(svg: string, layer: string, id: string): string {
     return match![1];
 }
 
-// Days scale over 15 working days (5 px each), Jan 5 - Jan 26 2026. With
+// Days scale over 15 working days (32 px each), Jan 5 - Jan 26 2026. With
 // `label-every: 2` the Monday Jan 12 column (index 5) is minor and carries
 // the seam for the hidden Jan 10-11; the Monday Jan 19 column (index 10) is
 // major and draws a grid line, so Jan 17-18 gets no seam. `scale:1d` sits
@@ -89,8 +89,8 @@ describe('non-working seam', () => {
             const seam = seams[0];
             expect(seam['stroke-width']).toBe('1');
             expect(seam['stroke-dasharray']).toBe('1 3');
-            // The run at Jan 10-11 is at working-day index 5: 25 px from the origin.
-            expect(Number(seam.x1) - model.timeline.originX).toBe(25);
+            // The run at Jan 10-11 is at working-day index 5: 160 px from the origin.
+            expect(Number(seam.x1) - model.timeline.originX).toBe(160);
             expect(seam.x2).toBe(seam.x1);
         });
     }
@@ -121,7 +121,7 @@ describe('non-working seam', () => {
         const xs = gridLines(await renderSvg(model))
             .filter((l) => l.stroke === lightTheme.timeline.nonWorkingSeam)
             .map((l) => Number(l.x1) - model.timeline.originX);
-        expect(xs).toEqual([25]);
+        expect(xs).toEqual([160]);
     });
 
     it('draws no seam with minor-grid:true', async () => {
