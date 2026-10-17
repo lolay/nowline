@@ -26,7 +26,7 @@ SHELL := bash
 .DEFAULT_GOAL := help
 
 .PHONY: help init build build-fast test lint format typecheck ci ci-platform pre-commit doctor clean \
-        gallery gallery-collect gallery-serve gallery-e2e \
+        gallery gallery-collect gallery-publish gallery-serve gallery-e2e \
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
@@ -48,6 +48,15 @@ GALLERY_DIR ?= .gallery
 GALLERY_KEEP ?= 100
 GALLERY_KEEP_PR ?= 10
 GALLERY_PORT ?= 8080
+# gallery-publish only (the review gallery workflow passes these):
+#   GALLERY_TRUST     --pr <n> or --trusted-main, from the triggering run
+#   GALLERY_REPO      owner/name the build must come from
+#   GALLERY_SHA       the commit the triggering run built (a PR's head sha)
+#   GALLERY_OPEN_PRS  comma-separated open PR numbers; other PR lines are dropped
+GALLERY_TRUST ?=
+GALLERY_REPO ?=
+GALLERY_SHA ?=
+GALLERY_OPEN_PRS ?=
 
 # The review gallery's scripts are plain Node, outside the pnpm workspace,
 # so their node:test specs run beside the Vitest suites.
@@ -128,6 +137,10 @@ gallery: build ## Add this tree's renders to the local review gallery (.gallery/
 
 gallery-collect: ## Snapshot the already-rendered examples and tests into .gallery/raw (no build first; reads GALLERY_* PR facts in CI)
 	node scripts/gallery/collect.mjs $(GALLERY_DIR)/raw
+
+gallery-publish: ## CI: add $(GALLERY_DIR)/raw to the history in $(GALLERY_DIR)/data and regenerate $(GALLERY_DIR)/site (GALLERY_TRUST, GALLERY_REPO, GALLERY_SHA, GALLERY_OPEN_PRS)
+	@[ -n "$(GALLERY_TRUST)" ] || { echo 'gallery-publish: set GALLERY_TRUST to --pr <n> or --trusted-main' >&2; exit 2; }
+	node scripts/gallery/publish.mjs $(GALLERY_TRUST) $(if $(GALLERY_REPO),--repo "$(GALLERY_REPO)") $(if $(GALLERY_SHA),--sha "$(GALLERY_SHA)") --open-prs "$(GALLERY_OPEN_PRS)" --data $(GALLERY_DIR)/data --raw $(GALLERY_DIR)/raw --site $(GALLERY_DIR)/site --keep $(GALLERY_KEEP) --keep-pr $(GALLERY_KEEP_PR)
 
 gallery-serve: ## Serve the local review gallery over http on every interface (phone/iPad on the same network)
 	node scripts/gallery/serve.mjs $(GALLERY_DIR)/site $(GALLERY_PORT)

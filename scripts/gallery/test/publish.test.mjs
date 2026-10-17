@@ -823,6 +823,24 @@ test('a PR build must be on its own pr-<n> line, and the one the workflow expect
     await rejects(/expected a build of PR #12, got PR #13/, { trust: { pr: 12 } });
 });
 
+test('--repo and --sha pin the build to the repository and commit the run built', async () => {
+    const { data, site, raw, rejects } = await untrusted('expect');
+    await rejects(/expected repoUrl https:\/\/github.com\/lolay\/other/, {
+        expect: { repoUrl: 'https://github.com/lolay/other' },
+    });
+    await rejects(/expected a build of 7{40}, got 6{40}/, { expect: { sha: '7'.repeat(40) } });
+    await rejects(/expected sha must be 7-40 lowercase hex/, { expect: { sha: 'HEAD' } });
+    const result = await publish({
+        dataDir: data,
+        siteDir: site,
+        rawDir: raw,
+        isAncestor: () => false,
+        trust: 'main',
+        expect: { repoUrl: 'https://github.com/lolay/nowline', sha: '6'.repeat(40) },
+    });
+    assert.equal(result.id, '6'.repeat(12));
+});
+
 test('shas must be hex: option-shaped shas never reach git', async () => {
     const { tamper, rejects } = await untrusted('sha');
     for (const sha of ['--output=/tmp/pwned', 'HEAD', 'A'.repeat(40), '123456']) {

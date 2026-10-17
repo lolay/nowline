@@ -4,6 +4,7 @@
 //
 // Usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir>
 //          (--pr <n> | --trusted-main | --trusted-local)
+//          [--repo <owner>/<name>] [--sha <sha>]
 //          [--keep 100] [--keep-pr 10] [--open-prs 12,34]
 //
 // `--data` holds raw builds only (SVGs, sources, manifests) and builds.json,
@@ -26,8 +27,10 @@
 // `--pr <n>` for a pull request run (the build must be PR n's),
 // `--trusted-main` for a push to main (the build must be a main build), and
 // `--trusted-local` for `make gallery` on a developer's own tree (any line;
-// refused under GitHub Actions). A build id already on another line is
-// refused, and only the files the manifest names are copied in.
+// refused under GitHub Actions). `--repo` and `--sha` pin the build to the
+// repository and commit the triggering run built. A build id already on
+// another line is refused, and only the files the manifest names are copied
+// in.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -136,7 +139,8 @@ async function loadAllManifests(dataDir) {
 
 // Adds the raw build to the data dir with its baseline, applies retention
 // and deletes raw builds nothing keeps. Returns the new index's lines and
-// the build's id. `trust` is required (see assertTrust in lib/validate.mjs).
+// the build's id. `trust` is required (see assertTrust in lib/validate.mjs);
+// `expect` is optional (see validateManifest).
 // The raw build is validated first; an invalid one throws with the data dir
 // untouched.
 export async function addBuild({
@@ -146,12 +150,13 @@ export async function addBuild({
     keepPr = 10,
     openPrs = null,
     trust,
+    expect = {},
     isAncestor = gitIsAncestor(),
 }) {
     assertTrust(trust);
     const manifest = await readJson(resolve(rawDir, 'manifest.json'), null);
     if (!manifest) throw new Error(`no manifest.json in ${rawDir}`);
-    validateManifest(manifest, { trust });
+    validateManifest(manifest, { trust, expect });
     await checkRawTree(rawDir, manifest);
     const target = inside(dataDir, 'b', manifest.id);
     const { lines } = normalizeIndex(await readJson(resolve(dataDir, 'builds.json'), null));
@@ -408,6 +413,7 @@ export async function publish({
     keepPr = 10,
     openPrs = null,
     trust,
+    expect = {},
     isAncestor = gitIsAncestor(),
 }) {
     const { id, lines } = await addBuild({
@@ -417,13 +423,14 @@ export async function publish({
         keepPr,
         openPrs,
         trust,
+        expect,
         isAncestor,
     });
     return renderSite({ dataDir, siteDir, lines, focusId: id });
 }
 
 const USAGE =
-    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> (--pr <n> | --trusted-main | --trusted-local) [--keep 100] [--keep-pr 10] [--open-prs 12,34]';
+    'usage: node scripts/gallery/publish.mjs --data <dir> --raw <dir> --site <dir> (--pr <n> | --trusted-main | --trusted-local) [--repo <owner>/<name>] [--sha <sha>] [--keep 100] [--keep-pr 10] [--open-prs 12,34]';
 
 function positiveInt(name, text) {
     const value = Number(text);
@@ -446,6 +453,8 @@ async function main() {
             pr: { type: 'string' },
             'trusted-main': { type: 'boolean' },
             'trusted-local': { type: 'boolean' },
+            repo: { type: 'string' },
+            sha: { type: 'string' },
         },
     });
     if (!values.data || !values.raw || !values.site) {
@@ -488,10 +497,14 @@ async function main() {
         keepPr: positiveInt('--keep-pr', values['keep-pr']),
         openPrs,
         trust,
+        expect: {
+            repoUrl: values.repo ? `https://github.com/${values.repo}` : undefined,
+            sha: values.sha,
+        },
     });
     console.log(`published ${result.id} -> ${resolve(values.site, result.path)}`);
     if (process.env.GITHUB_OUTPUT) {
-        await appendFile(process.env.GITHUB_OUTPUT, `path=${result.path}\n`);
+        await appendFile(process.env.GITHUB_OUTPUT, `id=${result.id}\npath=${result.path}\n`);
     }
 }
 

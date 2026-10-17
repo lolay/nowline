@@ -158,10 +158,23 @@ function checkId(manifest, line, pr) {
     fail(`build id ${JSON.stringify(id)} must be ${expected} for line ${line}`);
 }
 
+// Facts the publishing workflow takes from its own event rather than from
+// the build: `repoUrl` (the repository it runs in) and `sha` (the commit
+// the triggering run built, the head sha for a PR). Each is checked when set.
+function checkExpected(manifest, expect) {
+    if (expect.repoUrl && manifest.repoUrl !== expect.repoUrl) {
+        fail(`expected repoUrl ${expect.repoUrl}, got ${JSON.stringify(manifest.repoUrl)}`);
+    }
+    if (expect.sha && manifest.sha !== assertSha('expected sha', expect.sha)) {
+        fail(`expected a build of ${expect.sha}, got ${manifest.sha}`);
+    }
+}
+
 // Validates a build manifest's shape and every field that becomes a path,
 // a git argument or a link, and binds its id to its line. With `trust` (see
-// assertTrust), the build must also be one the publishing workflow expects.
-export function validateManifest(manifest, { trust = null } = {}) {
+// assertTrust), the build must also be one the publishing workflow expects,
+// and with `expect` (see checkExpected), of its repository and commit.
+export function validateManifest(manifest, { trust = null, expect = {} } = {}) {
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
         fail('manifest is not an object');
     }
@@ -184,6 +197,7 @@ export function validateManifest(manifest, { trust = null } = {}) {
         optionalSha('pr.baseSha', pr.baseSha);
     }
     if (trust !== null) checkTrust(assertTrust(trust), line, pr);
+    checkExpected(manifest, expect);
     // A build without `pr` on a line named like `pr-12` is a local branch of
     // that name; lib/lines.mjs classifies lines by `pr`, not by name.
     checkLinks(manifest, pr);
