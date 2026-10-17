@@ -1220,7 +1220,7 @@ describe('renderSvg — waves', () => {
         const defs = svg.match(/<defs>.*?<\/defs>/)?.[0] ?? '';
         expect(defs).not.toContain('<pattern');
         expect(defs.match(/<filter /g)).toHaveLength(3);
-        expect(defs.match(/<marker /g)).toHaveLength(3);
+        expect(defs.match(/<marker /g)).toHaveLength(1);
     });
 
     it('strip cells alternate by visible ordinal; an empty wave does not break it', async () => {
@@ -1913,9 +1913,9 @@ footnote vendor "Vendor dependency" on:api
 });
 
 describe('renderSvg — arrowhead marker ids', () => {
-    // A cross-lane `after:` draws a dependency edge (`marker-end` on the
-    // neutral marker); the after-only milestone over two parallels draws a
-    // slack arrow (`marker-end` on the dark marker).
+    // A cross-lane `after:` draws a dependency edge (its head is a path,
+    // no marker); the after-only milestone over two parallels draws a
+    // slack arrow (`marker-end` on the dark marker, the only one defined).
     const ARROWS_DSL = `nowline v1
 
 roadmap r "R" start:2026-01-05
@@ -1949,8 +1949,8 @@ swimlane web "Web"
         const svgB = await renderSvg(dark, { idPrefix: 'doc-b' });
         const idsA = markerIds(svgA);
         const idsB = markerIds(svgB);
-        expect(idsA).toHaveLength(3);
-        expect(idsB).toHaveLength(3);
+        expect(idsA).toEqual(['doc-a-0-root-arrow-dark']);
+        expect(idsB).toEqual(['doc-b-0-root-arrow-dark']);
         for (const id of [...idsA, ...idsB]) expect(id).not.toMatch(/^nl-arrow/);
         expect(idsA.filter((id) => idsB.includes(id))).toEqual([]);
 
