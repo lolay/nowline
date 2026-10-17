@@ -200,9 +200,12 @@ export const ITEM_SEAM_PX = 1;
 // constant as the rest-state baseline.
 export const GUTTER_PX = 12;
 
-// Default pixel-per-day when no explicit scale is set. Calibrated so a
-// 26-week (180 day) roadmap fits a 1200 px content area.
-export const DEFAULT_PIXELS_PER_DAY = 5;
+// Pixels per day at the days scale (`scale:1d`). A day literal labels
+// every column, so a day must hold its widest `M/D` label (`12/31`, about
+// 29 px at the 10 px tick font), as a 40 px week holds `Sep 28`. That
+// also keeps a day here wider than a day inside a default week column
+// (8 px under business, about 5.7 px under full).
+export const DEFAULT_PIXELS_PER_DAY = 32;
 
 // Header box defaults per position. The beside-mode card width is dynamic
 // (sized to the title + author text, clamped to MIN..MAX with text wrap),

@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { layoutRoadmap, type PositionedItem, type PositionedTrackChild } from '../src/index.js';
 import { measureItem } from '../src/nodes/item-measure.js';
 import { SwimlaneNode } from '../src/nodes/swimlane-node.js';
-import { ITEM_SEAM_PX } from '../src/themes/shared.js';
+import { estimateTextWidth } from '../src/text-measure.js';
+import { ITEM_SEAM_PX, TIMELINE_TICK_LABEL_FONT_SIZE_PX } from '../src/themes/shared.js';
 import { parseAndResolve } from './helpers.js';
 
 describe('layoutRoadmap', () => {
@@ -2268,8 +2269,8 @@ swimlane "Platform"
     }
 
     it('spills the dot from a 23px bar', async () => {
-        // 5 days at 5 px a day, less a 1 px seam on each side.
-        const item = await only('1d', '5d');
+        // 25/32 of a day at 32 px a day, less a 1 px seam on each side.
+        const item = await only('1d', '0.78125d');
         expect(item.box.width).toBe(23);
         expect(item.dotSpills).toBe(true);
         expect(item.dotSpillCx).not.toBeNull();
@@ -2290,4 +2291,41 @@ swimlane "Platform"
         expect(item.dotSpills).toBe(false);
         expect(item.dotSpillCx).toBeNull();
     });
+});
+
+describe('layoutRoadmap day width at the days scale', () => {
+    // A day at `scale:1d` is never narrower than a day inside a `scale:1w`
+    // column: 8 px under business (40 px / 5 working days), 40/7 px under
+    // full. Both calendars, since a week column holds 5 or 7 days. The
+    // window opens in late December, where the `M/D` labels are widest.
+    async function timeline(scale: string, calendar: string) {
+        const src = `nowline v1
+
+roadmap r "R" start:2026-12-21 scale:${scale} calendar:${calendar}
+
+swimlane "Platform"
+  item a "A" duration:3w
+`;
+        const { file, resolved } = await parseAndResolve(src);
+        return layoutRoadmap(file, resolved, { theme: 'light' }).timeline;
+    }
+
+    for (const calendar of ['business', 'full']) {
+        it(`is at least a day of a weekly column under calendar:${calendar}`, async () => {
+            const day = (await timeline('1d', calendar)).pixelsPerDay;
+            expect(day).toBeGreaterThanOrEqual((await timeline('1w', calendar)).pixelsPerDay);
+        });
+
+        it(`fits every day label in its own column under calendar:${calendar}`, async () => {
+            // A day literal labels every column.
+            const { ticks } = await timeline('1d', calendar);
+            expect(ticks.filter((t) => t.label !== undefined).length).toBeGreaterThan(10);
+            for (let i = 0; i < ticks.length - 1; i++) {
+                const label = ticks[i].label;
+                if (label === undefined) continue;
+                const width = estimateTextWidth(label, TIMELINE_TICK_LABEL_FONT_SIZE_PX);
+                expect(width).toBeLessThan(ticks[i + 1].x - ticks[i].x);
+            }
+        });
+    }
 });

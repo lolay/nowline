@@ -77,7 +77,7 @@ swimlane a "A"
 roadmap r "R" start:2026-01-05 scale:1d
 
 swimlane eng "Engineering"
-  item x "X" duration:1d
+  item x "X" duration:0.5d
 `;
         const { file, resolved } = await parseAndResolve(src);
         const layout = layoutRoadmap(file, resolved, { theme: 'light', width: 1280 });
