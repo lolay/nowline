@@ -1,0 +1,3 @@
+```release-note:fixed
+**Mermaid export: an item that follows a `parallel` waits for every track.** It used to chain `after` the parallel's last track only, so when an earlier track ran longer Mermaid started it too soon. It now starts after every track's end (`after audit-ui sso`), at the latest one, the date the chart and the XLSX export give. The bundled `platform-2026` and `product` samples' Mermaid exports start `Platform QA` later; four others name the extra track with no date change.
+```

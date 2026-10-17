@@ -379,8 +379,8 @@ swimlane web "Web"
         // Leaders of a lane-opening parallel replace the start date.
         expect(lineFor(md, 'web-a')).toContain(':web-a, after plan, 5d');
         expect(lineFor(md, 'web-b')).toContain(':web-b, after plan, 5d');
-        // Background work after the block gets no barrier.
-        expect(lineFor(md, 'ship')).toContain(':ship, after polish, 5d');
+        // Background work after the block waits for every track, with no barrier.
+        expect(lineFor(md, 'ship')).toContain(':ship, after api polish, 5d');
     });
 
     it('dates the wave-end milestones on the first working day at or after E_k', async () => {
