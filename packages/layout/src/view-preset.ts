@@ -111,17 +111,15 @@ export function resolveScale(file: NowlineFile, scaleBlock: ScaleBlock | undefin
         labelEveryOverride === undefined && !hasLabelEvery ? { labelEveryDefault: true } : {};
 
     if (scaleBlock) {
-        const unitProp = findProp(scaleBlock.properties, 'unit');
-        const resolvedUnit: ScaleUnit = (unitProp?.value as ScaleUnit) ?? unit;
+        // Unit and column width come from `scale:` alone; the block only sets display.
         const labelProp = findProp(scaleBlock.properties, 'label-every');
         const explicitLabelEvery = labelProp ? parseInt(labelProp.value, 10) || 0 : 0;
         const labelEvery =
             explicitLabelEvery !== 0 ? Math.max(1, explicitLabelEvery) : defaultLabelEvery;
-        // Column width comes from `scale:` alone; the block only sets display.
         return {
-            unit: resolvedUnit,
+            unit,
             labelEvery,
-            pixelsPerUnit: pixelsPerUnitOverride ?? unitPx(resolvedUnit),
+            pixelsPerUnit: pixelsPerUnitOverride ?? unitPx(unit),
             ...defaultFlag(explicitLabelEvery !== 0),
         };
     }
