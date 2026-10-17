@@ -1,7 +1,9 @@
 // An omitted `now` is today's civil date in the `timezone` argument's zone, or
 // the local zone, not UTC (specs/surface-options.md §7, decision 2). The
 // roadmap has no `start:`, so its axis starts on the now-line date and the
-// picture shows which date was chosen.
+// picture shows which date was chosen. `calendar:full` keeps every day a
+// working day: under `calendar:business` a Saturday and a Sunday both start
+// the axis on Monday, and the two zones below rendered alike every weekend.
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import * as os from 'node:os';
@@ -13,7 +15,7 @@ import { createMcpServer } from '../src/server.js';
 const SOURCE = [
     'nowline v1',
     '',
-    'roadmap nows "Nows" scale:1w',
+    'roadmap nows "Nows" scale:1w calendar:full',
     '',
     'swimlane lane "Lane"',
     '  item foo "Foo Item" duration:1w',
