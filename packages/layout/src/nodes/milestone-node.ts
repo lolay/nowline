@@ -15,7 +15,7 @@
 import type { MilestoneDeclaration } from '@nowline/core';
 import { formatIsoDate, parseIsoDate, propValue, propValues } from '../dsl-utils.js';
 import { itemSlackAttachY } from '../item-port-geometry.js';
-import type { LayoutContext } from '../layout-context.js';
+import { chartFrameY, type LayoutContext } from '../layout-context.js';
 import { resolveStyle } from '../style-resolution.js';
 import type {
     MarkerRowPlacement,
@@ -31,7 +31,8 @@ import { MARKER_DIAMOND_RADIUS_PX } from './marker-geometry.js';
  * One predecessor of a milestone with everything placement and the
  * slack-arrow pipeline need: its end in time (`endX`, also where its slack
  * or overrun line starts, specs/true-width-layout.md §3.5), its attach y
- * (bar bottom strip when text spills, nominal row midline otherwise), and
+ * in the chart's local frame (bar bottom strip when text spills, nominal
+ * row midline otherwise; a marker's estimated row centre), and
  * its flow key (used to dedupe so a chained-flow's siblings collapse to
  * the last entry).
  */
@@ -44,7 +45,11 @@ export interface MilestonePredecessor {
      * its slack or overrun line starts here.
      */
     endX: number;
-    y: number;
+    /**
+     * Undefined when the reference has no y: a wave, or a marker whose
+     * midpoint is not written yet.
+     */
+    y: number | undefined;
     flowKey: string;
     /**
      * Set when `ref` names a wave: `endX` is the seeded wave end `E_k`.
@@ -72,9 +77,13 @@ export function collectMilestonePredecessors(
         const item = ctx.placedItems.get(ref);
         const endX = ctx.entityRightEdges.get(ref);
         if (endX === undefined) continue;
+        // A marker's midpoint is a canvas y in the header's marker band.
+        const markerY = item ? undefined : ctx.entityMidpoints.get(ref)?.y;
         const y = item
             ? itemSlackAttachY(item, ctx.bandScale.bandwidth())
-            : (ctx.entityMidpoints.get(ref)?.y ?? 0);
+            : markerY === undefined
+              ? undefined
+              : chartFrameY(markerY, ctx);
         // A wave reads its seeded end `E_k` (logical, not inset), so a
         // milestone bound by it sits exactly on the boundary.
         if (!item && ctx.waves?.plan.index.has(ref)) {
@@ -111,8 +120,11 @@ export function lastPredecessorPerFlow(preds: MilestonePredecessor[]): Milestone
  * Whether a non-binding predecessor of an after-only milestone at `maxEnd`
  * draws a slack arrow: it ends before the milestone. A wave draws none.
  */
-function hasSlackArrow(p: MilestonePredecessor, maxEnd: number): boolean {
-    return p.endX < maxEnd && p.y > 0 && p.wave === undefined;
+function hasSlackArrow(
+    p: MilestonePredecessor,
+    maxEnd: number,
+): p is MilestonePredecessor & { y: number } {
+    return p.endX < maxEnd && p.y !== undefined && p.wave === undefined;
 }
 
 /**
@@ -224,7 +236,7 @@ export class MilestoneNode {
                 slackArrows = [
                     {
                         x: maxPred.endX,
-                        y: maxPred.y > 0 ? maxPred.y : estimatedCenterY,
+                        y: maxPred.y ?? chartFrameY(estimatedCenterY, ctx),
                     },
                 ];
             }
@@ -351,7 +363,7 @@ export function positionMilestones(
  * `MilestoneNode.place` would emit on `slackArrows`, so the row-packer
  * and the renderer agree on every arrow's geometry.
  *
- * Each non-binding predecessor (`x < maxEnd`, `y > 0`) becomes one
+ * Each non-binding predecessor (`x < maxEnd`, with a y) becomes one
  * corridor; date-pinned milestones whose latest predecessor overruns
  * the date contribute a single back-pointing corridor between the
  * pinned column and the predecessor's right edge. Wave predecessors draw
@@ -380,7 +392,7 @@ export function collectSlackCorridors(
             if (milestoneX === null) continue;
             // Wave references draw no arrow, so they own no corridor.
             const maxPred = latestArrowPredecessor(dedupedPreds);
-            if (maxPred && maxPred.endX > milestoneX && maxPred.y > 0) {
+            if (maxPred && maxPred.endX > milestoneX && maxPred.y !== undefined) {
                 out.push({
                     xStart: Math.min(maxPred.endX, milestoneX),
                     xEnd: Math.max(maxPred.endX, milestoneX),

@@ -7,6 +7,11 @@
 // regions are fitted only there, and milestones get their marker row and
 // label box from the final pack. It places on the natural scale, which
 // finalize may extend but never re-places on.
+//
+// Placement lays the chart out in local coordinates, with its top at y 0:
+// lanes, regions, milestone cut lines and slack arrows. The chart's top on
+// the canvas is known only once the header rows above it stop growing, so
+// finalize translates the whole chart there, once (f7).
 
 import type { ResolveResult, SwimlaneDeclaration } from '@nowline/core';
 import { AxisColumns } from '../axis-columns.js';
@@ -41,6 +46,7 @@ import type { MeasuredRoadmap } from './measure.js';
 /** Gap (px) between the last lane and the first isolated region's tab. */
 const LANES_TO_REGIONS_GAP_PX = 8;
 
+/** A placed chart, every y in the chart's local frame (top at 0) until f7 translates it. */
 export interface PlacedChart {
     /** Entity maps and placed items of the kept pass; finalize reads them, never writes placements. */
     ctx: LayoutContext;
@@ -97,7 +103,8 @@ export function placeChart(
                 : undefined,
         },
         {
-            chartTopY: bands.chartTopY,
+            chartTopY: 0,
+            estimatedChartTopY: bands.chartTopY,
             chartBottomY: 0,
             swimlaneBottomY: 0,
         },
@@ -273,7 +280,6 @@ export function placeChart(
 
     ctx.chartBottomY = y;
     ctx.swimlaneBottomY = y;
-    timeline.box.height = ctx.chartBottomY - timeline.box.y;
 
     // Milestones first so anchors know which xs are occupied (for
     // collision bumps). Placement gives each its x, slack arrows and

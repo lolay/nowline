@@ -169,7 +169,22 @@ export interface LayoutContext {
      * runs, before milestones are positioned (f6) and anchors built (f10).
      */
     markerRowPlacements: Map<string, MarkerRowPlacement>;
+    /**
+     * The chart's top. Placement lays the chart out in local coordinates,
+     * with the top at 0; finalize translates every placed y once, by the
+     * final top, when the header rows above it stop growing (f7), and
+     * sets this to that top. A region's context keeps its local value.
+     */
     chartTopY: number;
+    /**
+     * The chart top the measure phase estimated, in canvas coordinates.
+     * Placement reads it only to bring a canvas y into the chart's local
+     * frame: a marker's estimated row centre, which a slack arrow from a
+     * marker predecessor starts on (`chartFrameY`). f7 translates by the
+     * final top, so such a y moves by the header rows' growth, the one
+     * shift it always took.
+     */
+    estimatedChartTopY: number;
     chartBottomY: number;
     /**
      * Y coordinate at the bottom of the last swimlane / include region.
@@ -205,8 +220,9 @@ export interface ContextSource {
 /**
  * Build a `LayoutContext` for the root file or for an isolated region.
  * `chart` passes the chart extents through unchanged: the root sets
- * `chartTopY` from the timeline with both bottoms at 0, a region sets all
- * three y fields to its inner start. The canvas width is not part of a
+ * `chartTopY` to the local top 0 with both bottoms at 0, a region sets all
+ * three y fields to its inner start; both pass the measure phase's
+ * estimate of the chart top. The canvas width is not part of a
  * context: placement never reads it (finalize owns the `CanvasExtent`).
  * A region passes its own footnote index, numbered on after the host's,
  * and no marker placements. The caller seeds
@@ -225,7 +241,10 @@ export function createLayoutContext(
         bandScale: BandScale;
         waves?: WaveLayoutState;
     },
-    chart: Pick<LayoutContext, 'chartTopY' | 'chartBottomY' | 'swimlaneBottomY'>,
+    chart: Pick<
+        LayoutContext,
+        'chartTopY' | 'estimatedChartTopY' | 'chartBottomY' | 'swimlaneBottomY'
+    >,
     init: {
         footnotes?: FootnoteIndex;
         markerRowPlacements?: Map<string, MarkerRowPlacement>;
@@ -264,6 +283,7 @@ export function createLayoutContext(
         slackCorridors: [],
         markerRowPlacements: init.markerRowPlacements ?? new Map(),
         chartTopY: chart.chartTopY,
+        estimatedChartTopY: chart.estimatedChartTopY,
         chartBottomY: chart.chartBottomY,
         swimlaneBottomY: chart.swimlaneBottomY,
         nextParallelId: 0,
@@ -288,4 +308,13 @@ export interface LayoutHelpers {
         cursor: TrackCursor,
         ctx: LayoutContext,
     ) => PositionedTrackChild;
+}
+
+/**
+ * A canvas y (a marker row in the header) in the chart's local frame:
+ * relative to the estimated chart top, so f7's translation by the final
+ * top moves it by exactly the header rows' growth.
+ */
+export function chartFrameY(canvasY: number, ctx: LayoutContext): number {
+    return canvasY - ctx.estimatedChartTopY;
 }

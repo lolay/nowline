@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { translateIncludeY, translateSwimlaneY } from '../src/chart-translation.js';
 import { layoutRoadmap, type PositionedTrackChild } from '../src/index.js';
-import { shiftIncludeY, shiftSwimlaneY } from '../src/positioned-shift.js';
 import { parseAndResolve } from './helpers.js';
 
-// The late vertical shift (a grown marker band in finalize step f7) moves
-// placed content through `shiftTrackChildY`. This pins its contract generically: after a shift,
-// EVERY property named `y` anywhere in the subtree moved by exactly `dy`
-// and every other number stayed put. A new y-bearing field on the
-// positioned model that the shift forgets fails here, as long as the
-// fixture below produces it; extend the fixture with the new field.
+// Finalize translates the chart, placed with its top at 0, to its top on
+// the canvas (step f7) through `translateTrackChildY`. This pins its
+// contract generically: after a translation, EVERY property named `y`
+// anywhere in the subtree moved by exactly `dy` and every other number
+// stayed put. A new y-bearing field on the positioned model that the
+// translation forgets fails here, as long as the fixture below produces
+// it; extend the fixture with the new field. (It would also sit a chart
+// top too high on every render, which the attach-geometry sweep sees.)
 
 const SRC = `nowline v1
 
@@ -79,7 +81,7 @@ function numericDrift(
     return out;
 }
 
-describe('shiftSwimlaneY / shiftTrackChildY', () => {
+describe('translateSwimlaneY / translateTrackChildY', () => {
     it('moves every y in a positioned lane by dy and nothing else', async () => {
         const { file, resolved } = await parseAndResolve(SRC);
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
@@ -105,12 +107,12 @@ describe('shiftSwimlaneY / shiftTrackChildY', () => {
         ]);
 
         const before = structuredClone(lane);
-        shiftSwimlaneY(lane, 17);
+        translateSwimlaneY(lane, 17);
         expect(numericDrift(before, lane, 17)).toEqual([]);
     });
 });
 
-describe('shiftIncludeY', () => {
+describe('translateIncludeY', () => {
     it("moves a region's lanes and its own markers, cut lines included, by dy", async () => {
         const host = `nowline v1
 
@@ -144,7 +146,7 @@ milestone beta "Beta" after:[alpha, bravo]
         expect(region.milestones?.[0].slackArrows).toHaveLength(1);
 
         const before = structuredClone(region);
-        shiftIncludeY(region, 17);
+        translateIncludeY(region, 17);
         expect(numericDrift(before, region, 17, '', ['y', 'cutTopY', 'cutBottomY'])).toEqual([]);
     });
 });

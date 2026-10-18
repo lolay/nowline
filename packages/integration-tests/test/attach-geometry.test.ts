@@ -1,13 +1,16 @@
 // Gate-level regression check for geometry attached to an item bar:
 // dependency-arrow ends, milestone slack arrows, and inline-date glyphs.
 //
-// Layout moves bars down AFTER placing them when a marker band outgrows
-// its sizing and pushes the whole chart down (a row that grew after later
-// rows were placed did the same until rows stopped moving up,
+// Layout places the chart with its top at 0 and translates every bar to
+// its top on the canvas AFTER placing it, once the header rows above stop
+// growing (specs/layout-phases.md F2; a row that grew after later rows
+// were placed moved bars too until rows stopped moving up,
 // specs/true-width-layout.md §3.2). Anything captured from a bar while it
-// was placed and not moved with it is left behind: an arrow attaching 16px
-// above its bar, a calendar glyph floating above the bar it belongs to.
-// `tests/late-row-shifts.nowline` exercises the shift.
+// was placed and not translated with it is left behind: an arrow attaching
+// a chart top above its bar, a calendar glyph floating above the bar it
+// belongs to. Every sample exercises the translation;
+// `tests/late-row-shifts.nowline` also grows the marker band, so its chart
+// top is not the measure phase's estimate.
 //
 // Every attachment is checked against its bar's FINAL box. The attach
 // rules are deliberately restated here rather than imported from

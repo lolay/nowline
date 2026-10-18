@@ -6,9 +6,9 @@
 // separated by GAP_BETWEEN_REGIONS px.
 
 import type { IsolatedRegion } from '@nowline/core';
+import { translateSwimlaneY } from '../chart-translation.js';
 import { includeChromeGeometry } from '../include-chrome-geometry.js';
 import { createLayoutContext, type LayoutContext, type LayoutHelpers } from '../layout-context.js';
-import { shiftSwimlaneY } from '../positioned-shift.js';
 import { resolveStyle } from '../style-resolution.js';
 import type { BoundingBox, PositionedIncludeRegion, PositionedSwimlane } from '../types.js';
 import { seedWaveEdges } from '../wave-layout.js';
@@ -65,6 +65,7 @@ export function buildIncludeRegions(
             },
             {
                 chartTopY: innerStartY,
+                estimatedChartTopY: ctx.estimatedChartTopY,
                 chartBottomY: innerStartY,
                 swimlaneBottomY: innerStartY,
             },
@@ -100,7 +101,7 @@ export function buildIncludeRegions(
         // its label tab, and the lanes move down below it.
         const markers = placeRegionMarkers(region, childCtx, y, innerStartY, cursorY, chartRightX);
         if (markers.laneShift !== 0) {
-            for (const lane of nestedSwimlanes) shiftSwimlaneY(lane, markers.laneShift);
+            for (const lane of nestedSwimlanes) translateSwimlaneY(lane, markers.laneShift);
             cursorY += markers.laneShift;
         }
         const innerEndY = cursorY;
