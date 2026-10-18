@@ -150,8 +150,21 @@ export interface HeaderRowsTop {
     shift: number;
 }
 
-/** Reports whether a finalize step changed something; see `setFinalizeTrace`. */
-export type FinalizeTrace = (step: string, changed: boolean) => void;
+/**
+ * Reports whether a finalize step changed something and, for a step that
+ * says (`FinalizeContext.explain`), why; see `setFinalizeTrace`.
+ */
+export type FinalizeTrace = (step: string, changed: boolean, why?: readonly string[]) => void;
+
+/**
+ * What passed the natural window when f2 grew the axis (specs/layout-phases.md
+ * §9, F3): a leaf item bar (a bug: the schedule's extent and the placement
+ * disagree), a spilled caption (its one capped column), a date-pinned marker
+ * (a dated anchor or milestone on the last day), or an after-only milestone
+ * on the window end (decision 14). A diamond sits on its day, so its right
+ * half passes a window that ends on that day.
+ */
+export type TimelineExtensionCause = 'bar' | 'caption' | 'datedMarker' | 'afterMilestone';
 
 let finalizeTrace: FinalizeTrace | undefined;
 
@@ -175,6 +188,7 @@ export class FinalizeContext {
     private band: MarkerBand | undefined;
     private rowsTop: HeaderRowsTop | undefined;
     private rowsBottom: number | undefined;
+    private why: readonly string[] | undefined;
 
     constructor(
         readonly file: NowlineFile,
@@ -291,9 +305,15 @@ export class FinalizeContext {
         this.rowsBottom = y;
     }
 
+    /** Say why the running step changed something; its report carries it. */
+    explain(why: readonly string[]): void {
+        this.why = why;
+    }
+
     /** Report a step's effect to the trace, when one is installed. */
     report(step: string, changed: boolean): void {
-        finalizeTrace?.(step, changed);
+        finalizeTrace?.(step, changed, this.why);
+        this.why = undefined;
     }
 }
 
@@ -523,12 +543,12 @@ function growCanvasForSpill(fx: FinalizeContext): boolean {
 
 /**
  * f2 (was P7): extend the axis when content passes the natural window.
- * The window only knows logical bar durations; caption spill, dependency
- * slack and floating (`after:`) markers can push real content further
- * right once the lanes and regions are placed. Measure the rightmost
- * CONTENT BOX edge — leaf item bars (never a spilled caption, see
- * `maxLeafItemRightX`) and marker diamonds — and grow the window to the
- * next tick boundary when content overflows it. A spilled caption past
+ * The window is engine C's extent, which every bar's dates fall inside;
+ * what passes it is a spilled caption and the right half of a diamond on
+ * the window's last day (specs/layout-phases.md §9, F3). Measure the
+ * rightmost CONTENT BOX edge — leaf item bars (never a spilled caption,
+ * see `maxLeafItemRightX`) and marker diamonds — and grow the window to
+ * the next tick boundary when content overflows it. A spilled caption past
  * that end grows it by one more full column at most, labelled by the
  * same rules as any other column: the item measure capped the caption to
  * end inside it (`AxisColumns.captionCapX`). This is driven
@@ -541,16 +561,20 @@ function extendTimeline(fx: FinalizeContext): boolean {
     const { calendar, preset: scale, startDate, spanDays, nonWorking } = fx.window;
     const { originX, ppd } = fx.measured.axis;
     const timeline = fx.measured.timeline;
-    let maxContentRightX = maxLeafItemRightX(swimlanes);
+    let barRightX = maxLeafItemRightX(swimlanes);
     for (const inc of includes) {
-        maxContentRightX = Math.max(maxContentRightX, maxLeafItemRightX(inc.nestedSwimlanes));
+        barRightX = Math.max(barRightX, maxLeafItemRightX(inc.nestedSwimlanes));
     }
+    let datedRightX = 0;
     for (const e of fx.measured.markers.datePinned) {
-        maxContentRightX = Math.max(maxContentRightX, e.centerX + e.radius);
+        datedRightX = Math.max(datedRightX, e.centerX + e.radius);
     }
+    let afterRightX = 0;
     for (const m of milestones) {
-        maxContentRightX = Math.max(maxContentRightX, m.x + m.radius);
+        if (m.fixed) datedRightX = Math.max(datedRightX, m.x + m.radius);
+        else afterRightX = Math.max(afterRightX, m.x + m.radius);
     }
+    const maxContentRightX = Math.max(barRightX, datedRightX, afterRightX);
     const tickDays = calendar.daysPerUnit(scale.unit);
     // Working-day counts on both sides of the comparison: under `show` x
     // is linear in calendar days, so the overflow is read back through
@@ -574,8 +598,8 @@ function extendTimeline(fx: FinalizeContext): boolean {
     for (const inc of includes) {
         captionRightX = Math.max(captionRightX, maxSpilledCaptionRightX(inc.nestedSwimlanes));
     }
+    const columns = new AxisColumns(fx.window, fx.scale);
     if (captionRightX > 0) {
-        const columns = new AxisColumns(fx.window, fx.scale);
         const axisDays = Math.max(spanDays, paddedDays);
         if (columns.isPast(captionRightX, axisDays)) {
             paddedDays = Math.max(
@@ -589,6 +613,18 @@ function extendTimeline(fx: FinalizeContext): boolean {
     }
     let extended = false;
     if (paddedDays > spanDays) {
+        // For the trace: every kind of content past the natural window.
+        const rightX: Record<TimelineExtensionCause, number> = {
+            bar: barRightX,
+            caption: captionRightX,
+            datedMarker: datedRightX,
+            afterMilestone: afterRightX,
+        };
+        fx.explain(
+            (Object.keys(rightX) as TimelineExtensionCause[]).filter(
+                (cause) => rightX[cause] > 0 && columns.isPast(rightX[cause], spanDays),
+            ),
+        );
         const extendedEndDate = calendar.dateAtWorkingIndex(startDate, paddedDays);
         const extendedWidth = fx.scale.showsNonWorking
             ? daysBetween(startDate, extendedEndDate) * ppd
