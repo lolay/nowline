@@ -8,6 +8,9 @@ import { buildExportInputs } from './helpers.js';
 // names an unknown id on the day the chart renders, so the exporter writes
 // the tasks that end the container: a group's last child, every parallel
 // track. Mermaid's `after a b` starts at the latest of them.
+//
+// A lane item that follows a parallel chains the same way: after every
+// track's end, not just the last track's, so a long first track holds it.
 
 const FIXTURE = `nowline v1
 
@@ -36,6 +39,31 @@ swimlane later "Later"
 
 swimlane last "Last"
   item wait-both "Wait Both" duration:1w after:[g, mid]
+
+swimlane chain "Chain"
+  item c0 "C0" duration:1w
+  parallel cp "CP"
+    item long "Long" duration:4w
+    group cg "CG"
+      item cg1 "CG1" duration:1w
+      item cg2 "CG2" duration:1w
+    item short "Short" duration:1w
+  item after-cp "After CP" duration:1w
+
+swimlane inner "Inner"
+  group ig "IG"
+    parallel ip "IP"
+      item i-long "I Long" duration:3w
+      item i-short "I Short" duration:1w
+    item i-next "I Next" duration:1w
+
+swimlane outer "Outer"
+  group og "OG"
+    item o0 "O0" duration:1w
+    parallel op "OP"
+      item o-long "O Long" duration:3w
+      item o-short "O Short" duration:1w
+  item o-after "O After" duration:1w
 
 milestone mp "MP" after:p
 milestone mg "MG" after:g
@@ -86,6 +114,20 @@ describe('exportMermaid — after: a group or a parallel', () => {
         expect(startOf('wait-both')).toBe('after q1 q-two mid');
     });
 
+    it("chains a lane item after a parallel to every track's end", async () => {
+        const tasks = parseTasks(exportMermaid(await buildExportInputs(FIXTURE)));
+        const startOf = (id: string) => tasks.find((t) => t.id === id)!.start;
+        // Each track still starts from the lane cursor on entry.
+        expect(startOf('long')).toBe('after c0');
+        expect(startOf('cg1')).toBe('after c0');
+        expect(startOf('short')).toBe('after c0');
+        // A group track ends at its last child.
+        expect(startOf('after-cp')).toBe('after long cg2 short');
+        // A parallel inside a group, followed in the group and in the lane.
+        expect(startOf('i-next')).toBe('after i-long i-short');
+        expect(startOf('o-after')).toBe('after o-long o-short');
+    });
+
     it("starts the dependents on engine C's day, the date the xlsx export writes", async () => {
         const inputs = await buildExportInputs(FIXTURE);
         const tasks = parseTasks(exportMermaid(inputs));
@@ -101,12 +143,14 @@ describe('exportMermaid — after: a group or a parallel', () => {
                 : working.workingIndexOf(schedule.startDate, new Date(`${t.start}T00:00:00Z`));
         const mermaidDate = (id: string) =>
             working.dateAtWorkingIndex(schedule.startDate, start(byId.get(id)!)).toISOString();
-        for (const id of ['wait-p', 'wait-g', 'wait-both']) {
+        for (const id of ['wait-p', 'wait-g', 'wait-both', 'after-cp', 'i-next', 'o-after']) {
             expect(mermaidDate(id)).toBe(schedule.items.get(id)!.start.toISOString());
         }
         for (const id of ['mp', 'mg']) {
             expect(mermaidDate(id)).toBe(schedule.milestones.get(id)!.toISOString());
         }
         expect(mermaidDate('wait-p')).toBe('2026-03-30T00:00:00.000Z');
+        // c0's week plus the four-week first track, not the one-week last one.
+        expect(mermaidDate('after-cp')).toBe('2026-04-06T00:00:00.000Z');
     });
 });
