@@ -8,7 +8,7 @@
     ],
     "steps": {
         "growCanvasForSpill": {
-            "count": 26,
+            "count": 27,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -29,6 +29,7 @@
                 "tests/item-bumps-up.nowline",
                 "tests/large-roadmap-title.nowline",
                 "tests/large-swimlane-title.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
                 "tests/text-spills-right.nowline",
@@ -39,7 +40,7 @@
             ]
         },
         "extendTimeline": {
-            "count": 30,
+            "count": 32,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -63,6 +64,8 @@
                 "tests/isolate-include-multi.nowline",
                 "tests/item-bumps-up.nowline",
                 "tests/late-row-shifts.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
@@ -78,7 +81,7 @@
             "samples": ["tests/marker-left-overflow.nowline"]
         },
         "fitWidths": {
-            "count": 34,
+            "count": 36,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -105,6 +108,8 @@
                 "tests/large-swimlane-title.nowline",
                 "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
@@ -117,18 +122,20 @@
             ]
         },
         "packMarkers": {
-            "count": 6,
+            "count": 8,
             "samples": [
                 "examples/dependencies.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
                 "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/working-exceptions.nowline"
             ]
         },
         "placeMarkers": {
-            "count": 8,
+            "count": 10,
             "samples": [
                 "examples/long.nowline",
                 "examples/platform-2026.nowline",
@@ -136,16 +143,20 @@
                 "examples/teams.nowline",
                 "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/waves-coarse.nowline",
                 "tests/working-exceptions.nowline"
             ]
         },
         "growHeaderRows": {
-            "count": 3,
+            "count": 5,
             "samples": [
                 "examples/dependencies.nowline",
                 "tests/late-row-shifts.nowline",
-                "tests/marker-left-overflow.nowline"
+                "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline"
             ]
         },
         "bottomTickPanel": {
@@ -174,7 +185,7 @@
             ]
         },
         "anchors": {
-            "count": 27,
+            "count": 29,
             "samples": [
                 "examples/continuation.nowline",
                 "examples/dependencies.nowline",
@@ -198,6 +209,8 @@
                 "tests/isolate-include-multi.nowline",
                 "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-recurrence.nowline",
                 "tests/partner-multi.nowline",
@@ -225,7 +238,7 @@
             ]
         },
         "nowline": {
-            "count": 53,
+            "count": 55,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/continuation.nowline",
@@ -267,6 +280,8 @@
                 "tests/logo-above-xl.nowline",
                 "tests/logo-beside.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/partner-multi.nowline",
                 "tests/size-and-capacity.nowline",
@@ -306,7 +321,7 @@
             ]
         },
         "header": {
-            "count": 59,
+            "count": 61,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/continuation.nowline",
@@ -348,6 +363,8 @@
                 "tests/late-row-shifts.nowline",
                 "tests/logo-beside.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/non-working-recurrence.nowline",
@@ -370,7 +387,7 @@
             ]
         },
         "attribution": {
-            "count": 60,
+            "count": 62,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/continuation.nowline",
@@ -413,6 +430,8 @@
                 "tests/logo-above-xl.nowline",
                 "tests/logo-beside.nowline",
                 "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/marker-predecessor-partner.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/non-working-recurrence.nowline",
