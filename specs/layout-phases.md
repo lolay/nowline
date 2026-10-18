@@ -1,6 +1,6 @@
 # Nowline — Layout Phases
 
-**Status: Implemented** (m1 to m6, including L2 and F1; F2 and F3 are open). Where the code differs from the text below, [§9 As built](#9-as-built) wins. Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that added this spec (source identical to 0062df3 plus the m2 fixes of the same review); the problem sections describe that code, not the code after the migration.
+**Status: Implemented** (m1 to m6, including L2, F1 and F3; F2 is open). Where the code differs from the text below, [§9 As built](#9-as-built) wins. Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that added this spec (source identical to 0062df3 plus the m2 fixes of the same review); the problem sections describe that code, not the code after the migration.
 
 ## 1. Problem
 
@@ -581,7 +581,7 @@ Each changes rendered bytes, so none belongs to the byte-identical plan. They st
 |---|---|---|---|
 | F1 | **Done (m6.s2).** f15 passes the grown band's bottom, so the beside card hugs the header rows after f7 (L1) | the three samples whose band grows; two of them have snapshots (`dependencies.svg`, `marker-left-overflow.svg`), and `dependencies` has determinism goldens (as built: exactly these, §9) | §1.3 |
 | F2 | Place the chart in local coordinates and translate it once in finalize, so f7's conditional shift disappears | possibly any sample: a translated sum can round differently (§3.10, rule 1) | §3.5 |
-| F3 | After R1 F3 keeps pixel quirks out of the lane cursor, measure how often f2 still fires; if never on the corpus, report it as a layout insight instead of growing silently | whatever R1 F3 changes | [`scheduler-unification.md`](./scheduler-unification.md) §1.3 |
+| F3 | **Done (after m4.15): every firing is by design, so no layout insight (§9).** After R1 F3 keeps pixel quirks out of the lane cursor, measure how often f2 still fires; if never on the corpus, report it as a layout insight instead of growing silently | nothing: measurement only | [`scheduler-unification.md`](./scheduler-unification.md) §1.3 |
 
 ## 6. Test strategy
 
@@ -663,7 +663,13 @@ Where the implementation differs from the text above, or makes a choice the text
 
 - **`HeaderNode` takes the logo already resolved** (`ScaledLogo`, exported from `header-logo.ts`); `resolveHeaderLogo` stays with the caller. `MeasuredHeader.position` is the `HeaderPosition` type. `place` returns `PositionedHeaderParts` (`PositionedHeader` without `attributionBox`). f15 stores only those parts, f16 computes the attribution box, and `assembleModel` merges `{ ...headerParts, attributionBox }` after the finalize pass. The 8 px chart-top gap is `CHART_TOP_GAP_PX`, and the private helper keeps the name `sizeBesideHeader` because renderer comments cite it. The provisional header box (height 0 beside, width 0 above) is gone: `place` builds the final box.
 
+**F3 (after m4.15)**
+
+- **f2 still fires on 30 of the 60 samples, and every firing is by design.** The trace now says why: `FinalizeTrace` takes a third argument, the reasons a step gives through `FinalizeContext.explain`, and f2 names each kind of content past the natural window (`TimelineExtensionCause`): `bar`, `caption`, `datedMarker` or `afterMilestone`. No sample names `bar`: since m4.15 every bar is drawn on its dates, and the window is engine C's extent, which holds those dates, so the window and the placement agree everywhere. What passes the window is a spilled caption earning its one capped column ([`scheduler-unification.md`](./scheduler-unification.md) decision 12; 23 samples) and a diamond on the window's last day, whose right half passes a window that ends on its day: a dated anchor or milestone (5 samples: `nested`'s `eoy`, `platform-2026`, `header-height-none`, `header-height-xl`, `nested-both-headers`) or an after-only milestone on the window end (decision 14; 6 samples, 4 of them with a caption too). No firing comes from an isolated region alone: `isolate-include` and `isolate-include-multi` have region captions past the end, and main captions too.
+- **The edge of the caption rule.** In `tests/inline-date-corners` the only cause is `downstream`'s caption, 0.4 px past a `length:14w` axis, and it earns the full column. That is the rule as [`rendering.md`](./rendering.md#caption-cap) writes it (any caption past the end), not a quirk the window could fix; a tolerance would be a visual change and a decision of its own.
+- **Gate.** `timeline-extension.test.ts` checks that every f2 firing on the corpus and on the 60 generated wave roadmaps names a cause and that none is `bar`, pins one fixture per cause, and pushes a bar past the window with an injected step to show the trace would catch a window that misses what A draws. `finalize-coverage.json` is unchanged: no render moved.
+
 **Open and out of scope**
 
-- F2 (local coordinates) and F3 (measure how often f2 fires after R1's F3) stay open; the milestone entry says so.
-- Neither `setFinalizeTrace` nor `setItemNodeTrace` is public API. The only public addition is `Theme.statusTint`, which the pull request names.
+- F2 (local coordinates) stays open; the milestone entry says so.
+- Neither `setFinalizeTrace` (nor its `TimelineExtensionCause`) nor `setItemNodeTrace` is public API. The only public addition is `Theme.statusTint`, which the pull request names.
