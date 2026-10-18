@@ -17,6 +17,11 @@
 import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { AxisColumns } from '../axis-columns.js';
 import { daysBetween } from '../calendar.js';
+import {
+    translateIncludeY,
+    translateMilestoneChartY,
+    translateSwimlaneY,
+} from '../chart-translation.js';
 import { localeStrings } from '../i18n.js';
 import type { LayoutOptions, LayoutResult } from '../layout.js';
 import type { LayoutContext } from '../layout-context.js';
@@ -41,7 +46,6 @@ import { positionMilestones } from '../nodes/milestone-node.js';
 import { buildNowline } from '../nodes/nowline-node.js';
 import { regionMarkerCanvasRightX } from '../nodes/region-markers.js';
 import { type BuiltWaves, buildWaveLegend, buildWaves } from '../nodes/wave-node.js';
-import { shiftIncludeY, shiftSwimlaneY } from '../positioned-shift.js';
 import { estimateTextWidth } from '../text-measure.js';
 import {
     ATTRIBUTION_GLYPH_HEIGHT,
@@ -793,8 +797,9 @@ function placeMarkers(fx: FinalizeContext): boolean {
 
 /**
  * f7 (was P12): grow the header rows to what the final axis and the final
- * marker pack need, and translate every chart coordinate below them, in
- * one shift. The rows grow at two places: the now-pill row above the tick
+ * marker pack need, then translate the chart, which placement laid out
+ * with its top at 0, to its top below them, in one translation on every
+ * layout. The rows grow at two places: the now-pill row above the tick
  * panel, when f2 brought `today` into the axis (L2; the tick panel, wave
  * strip and marker band move down with it, and f5 already packed the band
  * there), and the marker band's bottom, when the final pack needs more
@@ -809,8 +814,6 @@ function growHeaderRows(fx: FinalizeContext): boolean {
     const timeline = ctx.timeline;
     let changed = false;
     if (rowsTop.pillRowHeight !== bands.pillRowHeight) {
-        // The box keeps its bottom here; the chart shift below moves it.
-        timeline.box.height += timeline.box.y - rowsTop.timelineY;
         timeline.box.y = rowsTop.timelineY;
         timeline.pillRowHeight = rowsTop.pillRowHeight;
         timeline.tickPanelY = rowsTop.tickPanelY;
@@ -827,31 +830,22 @@ function growHeaderRows(fx: FinalizeContext): boolean {
     }
     // The beside card hugs this bottom (f15).
     fx.setHeaderRowsBottom(rowsTop.markerRowY + timeline.markerRow.height);
-    if (deltaY === 0) return changed;
-    timeline.box.height += deltaY;
-    fx.chartY.top += deltaY;
-    fx.chartY.bottom += deltaY;
-    fx.chartY.swimlaneBottom += deltaY;
-    // `shiftSwimlaneY` moves every absolute y the positioned model
-    // carries (see `positioned-shift.ts`). No LayoutContext map needs
-    // a shift: item attach ports are derived from the (now-shifted)
-    // boxes in `placedItems` when edges are built (f11), the edge maps
-    // hold X only, itemFlowKey holds strings, marker midpoints and
-    // markerRowPlacements are already final, and slackCorridors are
-    // pass-2 inputs consumed during placement.
-    for (const lane of fx.chart.swimlanes) shiftSwimlaneY(lane, deltaY);
-    for (const inc of fx.chart.includes) shiftIncludeY(inc, deltaY);
-    for (const m of need(fx.draft.milestones, 'the milestones')) {
-        m.cutTopY = fx.chartY.top;
-        m.cutBottomY = fx.chartY.swimlaneBottom;
-        // Slack arrows were baked with the pre-shift attach Y when the
-        // milestones were placed. Shift them now so they land on the same
-        // row band as the (now-shifted) predecessor bar.
-        if (m.slackArrows) {
-            for (const arrow of m.slackArrows) arrow.y += deltaY;
-        }
-    }
-    return true;
+    const topY = ctx.estimatedChartTopY + deltaY;
+    fx.chartY.top = topY;
+    fx.chartY.bottom += topY;
+    fx.chartY.swimlaneBottom += topY;
+    timeline.box.height = fx.chartY.bottom - timeline.box.y;
+    // The translation moves every y the chart's positioned model carries
+    // (see `chart-translation.ts`). No LayoutContext map needs it: item
+    // attach ports are derived from the (now-translated) boxes in
+    // `placedItems` when edges are built (f11), the edge maps hold x only,
+    // itemFlowKey holds strings, marker midpoints and markerRowPlacements
+    // sit in the header, and slackCorridors are pass-2 inputs consumed
+    // during placement.
+    for (const lane of fx.chart.swimlanes) translateSwimlaneY(lane, topY);
+    for (const inc of fx.chart.includes) translateIncludeY(inc, topY);
+    for (const m of need(fx.draft.milestones, 'the milestones')) translateMilestoneChartY(m, topY);
+    return changed;
 }
 
 /**

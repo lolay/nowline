@@ -374,7 +374,7 @@ Milestones render as a **diamond in the timeline header row** at the milestone's
 
 ### Dependency Arrows
 
-Arrows are drawn for `after:` on items and run on the dates ([`true-width-layout.md`](./true-width-layout.md) §3.4). They use orthogonal routing (horizontal and vertical legs only) with small rounded corners, and are built in finalize step f11 from the final model, so they move with every bar a row or marker-band shift moved. Wave references and inline dates draw no arrow.
+Arrows are drawn for `after:` on items and run on the dates ([`true-width-layout.md`](./true-width-layout.md) §3.4). They use orthogonal routing (horizontal and vertical legs only) with small rounded corners, and are built in finalize step f11 from the final model, after the chart's one translation to its top on the canvas (f7), so every port reads the box its bar is drawn with. Wave references and inline dates draw no arrow.
 
 - **Z-order**: every arrow paints behind the bars and the container chrome, after the lane bands and grid. A leg that crosses a bar passes behind it at a right angle; its head always lands in a gap, so it stays in view.
 - **Stroke**: 1.1 px in the theme's dependency colour. Vertical legs are solid; the horizontal leg is **dotted** (`3 3`, the milestone slack-line pattern) when the target waits on its source (its start is later than the source's end, so the leg's length is the slack) and solid when the target starts the day the source ends.

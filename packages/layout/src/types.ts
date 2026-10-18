@@ -782,7 +782,7 @@ export interface MarkerRowPlacement {
 export interface SlackCorridor {
     xStart: number; // slack pred's right edge (logical chart x)
     xEnd: number; // binding pred's right edge / milestone center.x
-    y: number; // slack pred's slack-arrow attach y
+    y: number; // slack pred's slack-arrow attach y, in the chart's local frame
     slackPredId: string; // exempt from bumping (owns the arrow's origin)
     milestoneId: string;
 }

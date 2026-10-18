@@ -1,6 +1,6 @@
 # Nowline — Layout Phases
 
-**Status: Implemented** (m1 to m6, including L2, F1 and F3; F2 is open). Where the code differs from the text below, [§9 As built](#9-as-built) wins. Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that added this spec (source identical to 0062df3 plus the m2 fixes of the same review); the problem sections describe that code, not the code after the migration.
+**Status: Implemented** (m1 to m6, including L2, F1, F2 and F3). Where the code differs from the text below, [§9 As built](#9-as-built) wins. Milestone **m4.14** in [`milestones.md`](./milestones.md); decisions in the last section. This is refactor R2 from [`review-since-v086.md`](./review-since-v086.md): split `RoadmapNode.place` into date-window, measure, place and finalize phases, so the post-placement fixups run as one ordered pass over an explicit context. It builds on [`rendering-v2.md`](./rendering-v2.md) (m2.5c, the measure/place node model) and on [`scheduler-unification.md`](./scheduler-unification.md) (R1, one day-level scheduler). Every `file:line` below was checked at the commit that added this spec (source identical to 0062df3 plus the m2 fixes of the same review); the problem sections describe that code, not the code after the migration.
 
 ## 1. Problem
 
@@ -287,7 +287,7 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 | f4 `fitWidths` | P9, N2, N4 | canvas (final) | lane and region widths |
 | f5 `packMarkers` | P10 | canvas (final), marker entries, scale (final), header bands | marker band |
 | f6 `placeMarkers` | P11, N7 | marker band | milestone rows and labels, runs, exceptions, marker midpoints |
-| f7 `growHeaderRows` | P12 | marker band, header bands, scale (final) | chart top, rows bottom, lane bottom, chart bottom, lane and region y, milestone cuts and slack arrows, timeline height |
+| f7 `growHeaderRows` | P12 | marker band, header bands, scale (final) | chart top, rows bottom, lane bottom, chart bottom, timeline height; translates the chart (lane and region y, milestone cuts and slack arrows) from its local top 0 to the final top |
 | f8 `bottomTickPanel` | P13 | chart bottom | chart bottom, timeline |
 | f9 `waves` | P14 | scale (final), chart top, lane bottom, timeline, lanes, regions | waves, crossings |
 | f10 `anchors` | P15 | scale (final), marker band, chart top, lane bottom | anchors |
@@ -300,7 +300,8 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 
 - **Checked order.** Each slot has one rule. The canvas, the scale and the marker band are final after f3, f2 and f5, and the chart top, the header rows' bottom and the lane bottom after f7: nothing writes a final slot again, and only the step that makes a slot final may read it before then. The chart bottom is a cursor that f7, f8 and f13 advance and f14 to f16 only read. A unit test checks the table against these rules. #93 broke exactly such a rule (lanes read the canvas before the extension had finished growing it). L1 and L2 were reads of measure-phase estimates, which the check cannot see. They are fixed by making the value a slot: f7 records the final rows' bottom (`rowsBottom`) and f15 reads it, and the pill row is reserved on the final axis (m6.s1, m6.s2; §9).
 - **Guards.** `canvas.final`, `finalScale()`, `markerBand()`, `headerRowsTop()` and `headerRowsBottom()` throw when read before their writer. The order is static, so a guard can only fire on a code change, and every layout runs every step, so the corpus tests exercise every guard.
-- **Patches stay where they must.** f6 and f7 still write into milestones, lanes and regions built earlier, because the marker rows and the chart top are only known after placement. The difference is that they are the only writers, they run once, at one place in the order, and they say what they write. Placing the chart in local coordinates and translating it once would remove f7's shift but can change bytes (F2).
+- **Patches stay where they must.** f6 still writes into milestones built earlier, because the marker rows are only known after placement; it is the only writer, runs once, at one place in the order, and says what it writes.
+- **The chart is placed in local coordinates** (F2). Placement lays out lanes, regions, milestone cut lines and slack arrows with the chart's top at y 0, and f7 translates all of it, once and on every layout, to the top below the grown header rows (`chart-translation.ts`). Nothing moves a placed bar conditionally any more: a positioned y that the translation forgets sits a chart top too high on every render, so the attach-geometry sweep and `chart-translation.test.ts` see it on any sample, not only on the three whose marker band grows. The one y placement takes from the header, a marker predecessor's estimated row centre where its slack arrow starts, enters the chart frame relative to the estimated top (`chartFrameY`), so the translation moves it by the rows' growth, as the conditional shift did.
 
 ### 3.6 Items are measured once
 
@@ -580,7 +581,7 @@ Each changes rendered bytes, so none belongs to the byte-identical plan. They st
 | # | Change | Changes | Evidence |
 |---|---|---|---|
 | F1 | **Done (m6.s2).** f15 passes the grown band's bottom, so the beside card hugs the header rows after f7 (L1) | the three samples whose band grows; two of them have snapshots (`dependencies.svg`, `marker-left-overflow.svg`), and `dependencies` has determinism goldens (as built: exactly these, §9) | §1.3 |
-| F2 | Place the chart in local coordinates and translate it once in finalize, so f7's conditional shift disappears | possibly any sample: a translated sum can round differently (§3.10, rule 1) | §3.5 |
+| F2 | **Done (after F3): no render, snapshot, golden or export moved (§9).** Place the chart in local coordinates and translate it once in finalize, so f7's conditional shift disappears | possibly any sample: a translated sum can round differently (§3.10, rule 1) | §3.5 |
 | F3 | **Done (after m4.15): every firing is by design, so no layout insight (§9).** After R1 F3 keeps pixel quirks out of the lane cursor, measure how often f2 still fires; if never on the corpus, report it as a layout insight instead of growing silently | nothing: measurement only | [`scheduler-unification.md`](./scheduler-unification.md) §1.3 |
 
 ## 6. Test strategy
@@ -590,7 +591,7 @@ Each changes rendered bytes, so none belongs to the byte-identical plan. They st
 - **Order check** (m5.s4): the reads and writes of §3.5 are consistent; a test edits a copy of the table to move f4 before f2 and expects the check to fail.
 - **Guards** (m5.s4): growing a frozen canvas, reading the canvas before f3, the final scale before f2 and the marker band before f5 each throw.
 - **Measure equals placement** (m2): the placed height of every corpus item equals its measure; unit fixtures for the cases the corpus does not reach (§4).
-- **Existing tests stay**: the #93 and #80 regressions in `layout.test.ts`, `positioned-shift.test.ts`, the attach-geometry sweep, the snapshot invariants in `snapshot.test.ts`, the header, logo, waves and working-calendar suites.
+- **Existing tests stay**: the #93 and #80 regressions in `layout.test.ts`, `positioned-shift.test.ts` (`chart-translation.test.ts` since F2), the attach-geometry sweep, the snapshot invariants in `snapshot.test.ts`, the header, logo, waves and working-calendar suites.
 - **Theme tokens** (m1.s1): tsc enforces the group in all three themes; a test checks a default item's tint per status and theme, and that an explicit `bg:` wins.
 
 ## 7. Risks
@@ -669,7 +670,14 @@ Where the implementation differs from the text above, or makes a choice the text
 - **The edge of the caption rule.** In `tests/inline-date-corners` the only cause is `downstream`'s caption, 0.4 px past a `length:14w` axis, and it earns the full column. That is the rule as [`rendering.md`](./rendering.md#caption-cap) writes it (any caption past the end), not a quirk the window could fix; a tolerance would be a visual change and a decision of its own.
 - **Gate.** `timeline-extension.test.ts` checks that every f2 firing on the corpus and on the 60 generated wave roadmaps names a cause and that none is `bar`, pins one fixture per cause, and pushes a bar past the window with an injected step to show the trace would catch a window that misses what A draws. `finalize-coverage.json` is unchanged: no render moved.
 
-**Open and out of scope**
+**F2 (after F3)**
 
-- F2 (local coordinates) stays open; the milestone entry says so.
+- **Layout translates, the renderer does not.** The chart is placed with its top at 0 and f7 adds the final top to every chart y, so the positioned model stays in canvas coordinates for every consumer (the renderer, layout insights, MCP, the VS Code preview, the embed). A `<g transform>` in the renderer would have kept the field list out of layout, but every consumer would then have to apply the offset to the chart's boxes, and every SVG would change.
+- **`positioned-shift.ts` is `chart-translation.ts`** (`translateTrackChildY`, `translateSwimlaneY`, `translateIncludeY`, and `translateMilestoneChartY` for a host milestone's cut line and slack arrows, whose diamond and label stay in the header). f7 calls it once on every layout with the final top `estimatedChartTopY + deltaY`, the same operands as the old `chartTopY += deltaY`; it reports a change only when the header rows grew, so `finalize-coverage.json` is unchanged. Placement no longer sets `timeline.box.height`; f7 sets it from the translated chart bottom.
+- **The one header y in the chart.** A slack arrow from a marker predecessor (and a dated milestone's overrun fallback) starts on the marker's estimated row centre, a canvas y. `LayoutContext.estimatedChartTopY` carries the measure phase's top, and `chartFrameY` brings that y into the chart frame, so the translation moves it by the rows' growth, as the shift did (§3.10 rule 4: a kept stale read). A marker predecessor's y is now `undefined`, not 0, when it has none, so the slack-arrow and corridor tests read presence instead of `y > 0`, which a local y no longer means; a header-frame corridor is negative and, as before, never meets a lane row.
+- **What stays a shift.** An isolated region still moves its own lanes down below its marker band while it is placed (`include-node.ts`, through `translateSwimlaneY`): the band's rows need the region milestones' x, which need its lanes placed. That is inside placement, before anything reads the region, and its slack arrows add the same `laneShift`.
+- **Gate.** All 180 renders of the 60 samples, their xlsx, msproj and Mermaid exports, stderr and exit codes are byte-identical to `main` at db10ecc; no layout snapshot or determinism cell moved. `chart-local-frame.test.ts` (fails on the base) checks that placement leaves the chart at top 0, that a layout whose rows do not grow is still translated, that `late-row-shifts` lands below its grown band, and that a marker predecessor's slack arrow stays on the marker's row; the attach-geometry sweep and `chart-translation.test.ts` now exercise the translation on every sample.
+
+**Out of scope**
+
 - Neither `setFinalizeTrace` (nor its `TimelineExtensionCause`) nor `setItemNodeTrace` is public API. The only public addition is `Theme.statusTint`, which the pull request names.
