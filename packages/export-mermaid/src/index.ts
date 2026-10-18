@@ -41,11 +41,12 @@
 // start (`:done, my-id, 2w`) collapses to two fields after the status strip,
 // so Mermaid mis-reads the id as a start date and throws `Invalid date: my-id`
 // at render time. To keep an explicit id we therefore MUST emit a start token:
-//   - declared `after:` deps  -> `after <ids>`, a group or parallel id
-//     expanded to the tasks that end it (neither is a Mermaid task)
-//   - otherwise a lane follower -> `after <previous item in the lane>`, or
-//     after every track end when it follows a parallel
-//   - otherwise a lane/track leader -> the roadmap start date
+//   - `after <ids>`: the declared `after:` deps (a group or parallel id
+//     expanded to the tasks that end it; neither is a Mermaid task), then the
+//     lane chain: the previous item in the lane, or every track end when it
+//     follows a parallel; a first child also gets its group's or parallel's
+//     own `after:`. Engine C starts an item at `max(prevEnd, ...after)`.
+//   - with none of those, a lane/track leader -> the roadmap start date
 //   - a member of wave k >= 2 also gets `after <wave k-1 id>`: appended to
 //     its `after` token, or replacing a lane/track leader's start date
 //     (specs/waves.md §10)
@@ -315,7 +316,8 @@ function emitGroup(
     ctx: EmitCtx,
 ): void {
     // A group is a visual container within a lane — its items continue the
-    // lane's sequential chain.
+    // lane's sequential chain, which its own `after:` joins for the first child.
+    joinContainerAfter(group, chain, ctx);
     for (const child of group.content as GroupContent[]) {
         if (child.$type === 'ItemDeclaration') {
             emitItem(child, drops, out, chain, ctx);
@@ -340,7 +342,9 @@ function emitParallel(
     ctx: EmitCtx,
 ): void {
     // Tracks run concurrently: each starts from the parallel's entry point
-    // (the lane cursor as it was on entry), not after the previous track.
+    // (the lane cursor as it was on entry, joined by the parallel's own
+    // `after:`), not after the previous track.
+    joinContainerAfter(parallel, chain, ctx);
     const entryIds = chain.prevIds;
     for (const child of parallel.content) {
         if (child.$type === 'ItemDeclaration') {
@@ -355,6 +359,22 @@ function emitParallel(
     // After the block, the lane continues after every track's end: Mermaid's
     // `after a b` starts at the latest of them, where engine C ends a parallel.
     chain.prevIds = endTaskIds(parallel);
+}
+
+/**
+ * Adds a group's or parallel's own `after:` ids to the chain its first children
+ * start from. Engine C starts a container at `max(prevEnd, ...after)`, and
+ * neither container is a Mermaid task, so its first children carry both. An
+ * inline date stays dropped: as an id it would name no task, and a leader with
+ * no other id would start on the day the chart renders.
+ */
+function joinContainerAfter(
+    container: GroupBlock | ParallelBlock,
+    chain: Chain,
+    ctx: EmitCtx,
+): void {
+    const refs = getProps(container, 'after').filter((raw) => !parseIsoDate(raw));
+    chain.prevIds = union(chain.prevIds, expandAfter(refs, ctx.containers));
 }
 
 function emitItem(
@@ -401,13 +421,14 @@ function emitMilestone(
 }
 
 /**
- * Start token for a task: declared `after:` deps win, otherwise chain after the
- * previous item in the lane (every track end after a parallel), otherwise
- * anchor the lane/track leader at the roadmap start date. Always non-empty so Mermaid never mis-reads the task id
- * as a start date. A member of wave k >= 2 also waits for wave k-1's end
- * milestone (`barrier`): Mermaid's `after a b` starts at the latest of them,
- * and a lane leader's start date gives way to the barrier, which is never
- * earlier.
+ * Start token for a task: `after` its declared `after:` deps and the lane chain
+ * (the previous item, every track end after a parallel), deduplicated, as
+ * engine C starts it at `max(prevEnd, ...after)`. A member of wave k >= 2 also
+ * waits for wave k-1's end milestone (`barrier`). Mermaid's `after a b` starts
+ * at the latest of them. With none, a lane or track leader anchors at the
+ * roadmap start date. Always non-empty so Mermaid never mis-reads the task id
+ * as a start date; a leader's start date gives way to the barrier, which is
+ * never earlier.
  */
 function startTokenFor(
     after: readonly string[],
@@ -415,13 +436,13 @@ function startTokenFor(
     startDate: string,
     barrier?: string,
 ): string {
-    let deps: string[];
-    if (after.length > 0) deps = [...after];
-    else if (chain.prevIds.length > 0) deps = [...chain.prevIds];
-    else if (barrier) deps = [];
-    else return startDate;
-    if (barrier && !deps.includes(barrier)) deps.push(barrier);
-    return `after ${deps.join(' ')}`;
+    const deps = union(union(after, chain.prevIds), barrier ? [barrier] : []);
+    return deps.length > 0 ? `after ${deps.join(' ')}` : startDate;
+}
+
+/** `a` then the ids of `b` it lacks, in order. */
+function union(a: readonly string[], b: readonly string[]): string[] {
+    return [...a, ...b.filter((id) => !a.includes(id))];
 }
 
 /** An item's Mermaid task id: its own id, else a slug of its title. */
