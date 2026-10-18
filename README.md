@@ -252,7 +252,7 @@ For the full grammar reference, see [`specs/dsl.md`](./specs/dsl.md).
 
 ## Examples
 
-Progressively-richer examples are included:
+Progressively-richer examples are included. Every build of `main` renders them, and the renderer fixtures in [`tests/`](./tests), at [review.nowline.dev](https://review.nowline.dev).
 
 - [`examples/minimal.nowline`](./examples/minimal.nowline) — smallest complete file.
 - [`examples/capacity.nowline`](./examples/capacity.nowline) — lane and item `capacity:` with on-call support taking a quarter of team bandwidth; lane utilization underline.

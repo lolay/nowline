@@ -1,6 +1,6 @@
 # Continuous integration
 
-This document explains what CI runs, on which platforms and events, and why. The workflows are [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the reusable [`.github/workflows/build.yml`](../.github/workflows/build.yml), and the changelog fragment check in [`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml). Every command they run is a `make` target ([`Makefile.md`](../Makefile.md)). The branch ruleset and the merge queue are covered in [`ops/branch-policies.md`](../ops/branch-policies.md) and applied by [`scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh).
+This document explains what CI runs, on which platforms and events, and why. The workflows are [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the reusable [`.github/workflows/build.yml`](../.github/workflows/build.yml), the changelog fragment check in [`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml), and the review gallery publish in [`.github/workflows/gallery.yml`](../.github/workflows/gallery.yml). Every command they run is a `make` target ([`Makefile.md`](../Makefile.md)). The branch ruleset and the merge queue are covered in [`ops/branch-policies.md`](../ops/branch-policies.md) and applied by [`scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh).
 
 ## Principles
 
@@ -22,6 +22,7 @@ This document explains what CI runs, on which platforms and events, and why. The
 | Bundle size, export determinism, MCP harness | yes | yes | yes |
 | Release build smoke (`build.yml`) | Linux cells (`platforms: linux`) | all ten cells | all ten cells |
 | `CI gate` | yes | yes | yes |
+| Review gallery collect (canonical cell) and publish (`gallery.yml`) | same-repo PRs | no | yes |
 | `Changelog` (`changelog.yml`): fragment check | yes, and on label changes | validates fragments only | no |
 
 On `pull_request` and `merge_group`, a docs-only change skips every job in that table except `changes`, the two lint jobs, triage and `CI gate`.
@@ -104,6 +105,18 @@ When a test or build step starts reading a Markdown file outside `packages/`, ad
 The script decides whether it can execute a binary from the host's `uname`, not from the runner label. Under GitHub Actions, a binary it would skip as cross-target fails the step instead. The exception is a cell that sets `SMOKE_ALLOW_CROSS_TARGET=1`, so a mistake in host detection can't quietly leave a shipped binary untested.
 
 The ten-cell list lives once, in the `plan` job of `build.yml`, and the `platforms: linux` subset is filtered from it. A matrix `include` can't be filtered by an input any other way.
+
+## Review gallery
+
+Every push to `main` and every push to a same-repo PR publishes its rendered `examples/` and `tests/` to [review.nowline.dev](https://review.nowline.dev): each `.nowline` beside its SVG, compared with a baseline build, with a changes digest per build. The site, its data model and its validation are specified in [`review-gallery.md`](./review-gallery.md); `make gallery` runs the same collect and publish locally ([`Makefile.md`](../Makefile.md)).
+
+- **Collect.** The canonical Build & test cell already rendered everything in `make ci`, so it runs `make gallery-collect` and uploads the snapshot as the `gallery-raw` artifact (7-day retention), with `!cancelled()` so a red build still shows what it drew. A PR is checked out as its merge commit, so the PR's number, title, head and base come from the event in `GALLERY_*` variables, and the build's sha is the PR head. Never on `merge_group` or fork PRs.
+- **Publish.** [`gallery.yml`](../.github/workflows/gallery.yml) runs on `workflow_run` when CI completes. It checks out the default branch and never runs PR code. It downloads the run's `gallery-raw`, restores the history from the orphan `gallery-data` branch, runs `make gallery-publish`, force-pushes the new history as a single orphan commit, deploys the regenerated site with `actions/deploy-pages`, and posts an informational `review/renders` commit status on the head sha linking to the build's changes page. No ruleset requires that status. A run without the artifact (docs-only, or a build that failed before rendering) publishes nothing.
+- **Trust.** Same-repo PR builds are served from the gallery's origin; only collaborators can open those, and fork PRs never get a build. The artifact is still treated as untrusted: `publish.mjs` validates every id, path and link before writing, and accepts only the build the event describes. `--pr <n>` comes from the event's PR whose head is the run's head sha (none or several: skip), `--trusted-main` only for a push to `main`, `--sha` is the run's head sha and `--repo` this repository. Diagrams are embedded as `<img>`, so script inside an SVG never runs in the page.
+- **Retention.** 100 builds on `main`, 10 pushes per open PR. A PR's line goes when the PR closes, except a `main` build that a retained PR build still compares against. The site is rebuilt from the history on every publish, so every page carries the current templates.
+- **Concurrency.** One publish at a time (`gallery-publish`, never cancelled midway). GitHub keeps one pending run per group, so a burst of CI completions can skip a middle run; its build never lands, and the next build compares against whatever came before it. Rerunning the skipped `gallery.yml` run adds it back.
+- **Browser leg.** `make gallery-e2e` runs in the MCP harness job, which already provisions Chromium.
+- **One-time setup.** Pages source is **GitHub Actions** with the custom domain `review.nowline.dev` and HTTPS enforced. The domain is verified for the `lolay` org, and its CNAME and verification TXT live in nowline-infra (pull direction: nowline never writes there). Deploy notifications come from the GitHub Slack app: `/github subscribe lolay/nowline deployments`.
 
 ## Node versions
 

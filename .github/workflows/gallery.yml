@@ -1,0 +1,192 @@
+name: Review gallery
+
+# Publishes the review gallery at review.nowline.dev after every CI run that
+# collected renders (push to main and same-repo PRs; see the collect step in
+# ci.yml). specs/ci.md § Review gallery has the design.
+#
+# Trust: workflow_run runs this file from the default branch with a write
+# token, so it never checks out or runs PR code. The one input from the
+# triggering run is its `gallery-raw` artifact, which PR code produced.
+# scripts/gallery/publish.mjs validates it before touching anything and
+# accepts only the build this event describes: `--pr <n>` or
+# `--trusted-main` from the event, `--sha` the run's head sha, `--repo`
+# this repository. Nothing from the artifact reaches a shell.
+#
+# State: the raw history (SVGs, sources, manifests) lives on the orphan
+# `gallery-data` branch, rewritten as one commit per publish. Each run
+# regenerates the whole site from it and deploys that as the Pages artifact.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions: {}
+
+# One publish at a time, never cancelled midway: each run rewrites
+# gallery-data and the whole site. GitHub keeps one pending run per group,
+# so a burst of CI completions can skip a middle run's build; the next run
+# still publishes its own build and everything already in the history.
+concurrency:
+  group: gallery-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish review gallery
+    # Never merge_group, never forks. A failed CI run still publishes when
+    # it got as far as uploading renders; the artifact check below skips
+    # the rest (docs-only changes, early failures).
+    if: >-
+      github.event.workflow_run.conclusion != 'cancelled' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      ((github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main') ||
+      github.event.workflow_run.event == 'pull_request')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # download the CI run's artifact
+      contents: write # force-push gallery-data
+      pull-requests: read # open PRs, for retention
+      pages: write # deploy-pages
+      id-token: write # deploy-pages
+      statuses: write # review/renders
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}${{ steps.publish.outputs.path }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      EVENT: ${{ github.event.workflow_run.event }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Find the CI run's renders
+        id: find
+        run: |
+          set -euo pipefail
+          echo "GALLERY_DIR=$RUNNER_TEMP/gallery" >> "$GITHUB_ENV"
+          count=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts?name=gallery-raw" \
+            --jq '[.artifacts[] | select(.expired | not)] | length')
+          if [[ "$count" == 0 ]]; then
+            echo "CI run $RUN_ID uploaded no gallery-raw (docs-only change, or it failed before rendering): nothing to publish"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The PR comes from the event, never from the artifact: the open PR
+      # whose head is the commit this run built. None or several (one branch
+      # opened against two bases) skips publishing rather than guessing.
+      - name: Resolve which build this is
+        id: trust
+        if: steps.find.outputs.found == 'true'
+        env:
+          PULL_REQUESTS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == push ]]; then
+            echo "flag=--trusted-main" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          numbers=$(jq -r --arg sha "$HEAD_SHA" \
+            '[.[] | select(.head.sha == $sha) | .number] | unique | .[]' <<< "$PULL_REQUESTS")
+          if [[ $(wc -w <<< "$numbers") -ne 1 ]]; then
+            echo "::notice::run $RUN_ID matches PRs [${numbers//$'\n'/ }] at $HEAD_SHA, not exactly one: not publishing"
+            exit 0
+          fi
+          echo "flag=--pr $numbers" >> "$GITHUB_OUTPUT"
+
+      # Full history: a PR build compares with the main build at its base
+      # sha, or the newest retained main ancestor of it (git merge-base).
+      - uses: actions/checkout@v7
+        if: steps.trust.outputs.flag
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        if: steps.trust.outputs.flag
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@v8
+        if: steps.trust.outputs.flag
+        with:
+          name: gallery-raw
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/gallery/raw
+
+      # A missing branch starts an empty history; any other fetch failure
+      # stops here, so a blip can never overwrite the history with one build.
+      - name: Check out the gallery history
+        if: steps.trust.outputs.flag
+        run: |
+          set -euo pipefail
+          mkdir -p "$GALLERY_DIR/data"
+          status=0
+          git ls-remote --exit-code --heads origin gallery-data > /dev/null || status=$?
+          if [[ "$status" == 2 ]]; then
+            echo "no gallery-data branch yet: starting an empty history"
+          elif [[ "$status" == 0 ]]; then
+            git fetch --no-tags --depth=1 origin gallery-data
+            git archive FETCH_HEAD | tar -x -C "$GALLERY_DIR/data"
+          else
+            exit "$status"
+          fi
+
+      - name: Publish the site
+        id: publish
+        if: steps.trust.outputs.flag
+        env:
+          TRUST: ${{ steps.trust.outputs.flag }}
+        run: |
+          set -euo pipefail
+          open_prs=$(gh pr list --repo "$REPO" --state open --limit 1000 --json number \
+            --jq 'map(.number) | join(",")')
+          make gallery-publish GALLERY_DIR="$GALLERY_DIR" GALLERY_TRUST="$TRUST" \
+            GALLERY_REPO="$REPO" GALLERY_SHA="$HEAD_SHA" GALLERY_OPEN_PRS="$open_prs"
+
+      # One orphan commit holding the data dir, built with a scratch index
+      # so the checkout's own index and work tree stay untouched.
+      - name: Save the gallery history
+        if: steps.trust.outputs.flag
+        env:
+          BUILD_ID: ${{ steps.publish.outputs.id }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          data() {
+            GIT_INDEX_FILE="$RUNNER_TEMP/gallery-data.index" git -C "$GALLERY_DIR/data" \
+              --git-dir="$GITHUB_WORKSPACE/.git" --work-tree="$GALLERY_DIR/data" "$@"
+          }
+          data add --all --force
+          commit=$(data commit-tree "$(data write-tree)" -m "Review gallery data after $BUILD_ID")
+          git push --force origin "$commit:refs/heads/gallery-data"
+
+      - uses: actions/upload-pages-artifact@v5
+        if: steps.trust.outputs.flag
+        with:
+          path: ${{ runner.temp }}/gallery/site
+
+      - id: deploy
+        if: steps.trust.outputs.flag
+        uses: actions/deploy-pages@v5
+
+      # Informational only: no ruleset requires it.
+      - name: Post the review/renders status
+        if: steps.trust.outputs.flag
+        env:
+          BUILD_ID: ${{ steps.publish.outputs.id }}
+          TARGET_URL: ${{ steps.deploy.outputs.page_url }}${{ steps.publish.outputs.path }}
+        run: |
+          set -euo pipefail
+          description=$(jq -r --arg id "$BUILD_ID" \
+            '.[] | select(.id == $id) | .counts
+              | "\(.drift) drift, \(.edit) edited, \(.new) new, \(.removed) removed, \(.unchanged) unchanged"' \
+            "$GALLERY_DIR/site/builds.json")
+          gh api "repos/$REPO/statuses/$HEAD_SHA" \
+            -f state=success -f context=review/renders \
+            -f target_url="$TARGET_URL" -f description="${description:-published}"

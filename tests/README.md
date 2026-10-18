@@ -18,7 +18,7 @@ Pair this with the byte-stable snapshot suite at [`packages/integration-tests/te
 
 `pnpm build` (or `pnpm render`) runs [`scripts/render-tests.mjs`](../scripts/render-tests.mjs) which writes a sibling `.svg` next to every entry in the `TESTS` list of [`scripts/lib/render-manifest.mjs`](../scripts/lib/render-manifest.mjs) (curated list of `tests/*.nowline` sources). The SVGs are gitignored — they are CLI output, not source. To skip rendering during build (e.g. while iterating on a broken renderer) set `NOWLINE_SKIP_RENDER=1`.
 
-To see each fixture's source and render together, and step through them with a previous-vs-this compare, run `make gallery` (then open `.gallery/site/index.html`, or `make gallery-serve` to browse from a phone). Each run is compared against the one before it, so running it on `main` and then on your branch shows what your change moved. [`Makefile.md`](../Makefile.md) has the details.
+To see each fixture's source and render together, and step through them with a previous-vs-this compare, run `make gallery` (then open `.gallery/site/index.html`, or `make gallery-serve` to browse from a phone). Each run is compared against the one before it, so running it on `main` and then on your branch shows what your change moved. [`Makefile.md`](../Makefile.md) has the details. CI publishes the same gallery for every build of `main` and every same-repo PR at [review.nowline.dev](https://review.nowline.dev) ([`specs/ci.md` § Review gallery](../specs/ci.md#review-gallery)).
 
 ## Starter fixtures
 

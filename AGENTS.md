@@ -16,6 +16,7 @@ Permitted outbound writes from `nowline`:
 - VS Code Marketplace + Open VSX extension publish
 - Homebrew tap formula update
 - Write to `lolay/nowline-action` (follow-only mirror, release pipeline only)
+- GitHub Pages deploy of the review gallery (`review.nowline.dev`, same repo; [`specs/ci.md` § Review gallery](./specs/ci.md#review-gallery))
 
 Prohibited (hard rule -- do not add exceptions without estate-level sign-off):
 - `repository_dispatch` into `nowline-api`, `nowline-app`, `nowline-site`, or
