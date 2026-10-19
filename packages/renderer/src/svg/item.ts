@@ -275,21 +275,22 @@ export function hasAfterPin(pins: InlineDatePin[] | undefined): boolean {
     return pins?.some((pin) => pin.side === 'after') ?? false;
 }
 
-export function renderItem(
-    i: PositionedItem,
-    options: RenderOptions,
-    idPrefix: string,
-    palette: Theme,
-    fonts: FontFamilies,
-): string {
-    const parts: string[] = [];
-    // The bar's hover tooltip: the full title when the caption cap at the
-    // chart's end truncated it (specs/rendering.md § "Caption cap at the
-    // chart's end"), then background work's line (specs/waves.md §9.3).
+/**
+ * The bar's hover tooltip: the full title when the caption cap at the
+ * chart's end truncated it (specs/rendering.md § "Caption cap at the
+ * chart's end"), then background work's line (specs/waves.md §9.3).
+ */
+function renderItemTooltip(i: PositionedItem): string {
     const tooltipLines: string[] = [];
     if (i.titleTruncated) tooltipLines.push(i.title);
     if (i.waveTooltip !== undefined) tooltipLines.push(i.waveTooltip);
-    if (tooltipLines.length > 0) parts.push(`<title>${escText(tooltipLines.join('\n'))}</title>`);
+    if (tooltipLines.length > 0) return `<title>${escText(tooltipLines.join('\n'))}</title>`;
+    return '';
+}
+
+/** The bar rect, plus background work's hatch overlay when the item is one. */
+function renderItemBar(i: PositionedItem, idPrefix: string): string {
+    const parts: string[] = [];
     const shadow = shadowFilterUrl(idPrefix, i.style.shadow);
     parts.push(
         rectFrame(i.box.x, i.box.y, i.box.width, i.box.height, i.style, {
@@ -300,6 +301,30 @@ export function renderItem(
     // rect (which stays the item group's first <rect>), under the progress
     // strip, the status dot and the text.
     if (i.waveRole === 'background') parts.push(hatchOverlay(i.box, i.style, idPrefix));
+    return parts.join('');
+}
+
+/**
+ * Bottom progress strip along the bottom edge. Height comes from
+ * `PROGRESS_STRIP_HEIGHT_PX` so layout's chip placement and the
+ * milestone slack-arrow attach Y stay in sync if it's ever bumped.
+ */
+function renderItemProgress(i: PositionedItem): string {
+    if (i.progressFraction > 0) {
+        const pw = Math.max(0, Math.min(i.box.width, i.box.width * i.progressFraction));
+        return tag('rect', {
+            x: num(i.box.x),
+            y: num(i.box.y + i.box.height - PROGRESS_STRIP_HEIGHT_PX),
+            width: num(pw),
+            height: PROGRESS_STRIP_HEIGHT_PX,
+            fill: i.style.fg,
+            opacity: 0.55,
+        });
+    }
+    return '';
+}
+
+function renderItemStatusDot(i: PositionedItem, palette: Theme): string {
     // Status-dot color — the dot communicates status via hue, but
     // the bar bg can range from pale status tints (`#eff6ff`) to
     // saturated mid-tones (`#1e88e5` from `bg:blue` labels) to
@@ -318,22 +343,6 @@ export function renderItem(
         neutral: dotPalette.neutral,
     };
     const dotColor = statusColors[i.status] ?? statusColors.neutral;
-    // Bottom progress strip along the bottom edge. Height comes from
-    // `PROGRESS_STRIP_HEIGHT_PX` so layout's chip placement and the
-    // milestone slack-arrow attach Y stay in sync if it's ever bumped.
-    if (i.progressFraction > 0) {
-        const pw = Math.max(0, Math.min(i.box.width, i.box.width * i.progressFraction));
-        parts.push(
-            tag('rect', {
-                x: num(i.box.x),
-                y: num(i.box.y + i.box.height - PROGRESS_STRIP_HEIGHT_PX),
-                width: num(pw),
-                height: PROGRESS_STRIP_HEIGHT_PX,
-                fill: i.style.fg,
-                opacity: 0.55,
-            }),
-        );
-    }
     // Status dot — upper-right inset inside the bar, OR pushed into
     // the spill column when the bar is too narrow to host the dot's
     // full inset (`dotSpills`). Layout pre-computes `dotSpillCx` for
@@ -342,33 +351,32 @@ export function renderItem(
         i.dotSpills && i.dotSpillCx !== null
             ? i.dotSpillCx
             : i.box.x + i.box.width - ITEM_STATUS_DOT_INSET_RIGHT_PX;
-    parts.push(
-        tag('circle', {
-            cx: num(dotCx),
-            cy: num(i.box.y + ITEM_STATUS_DOT_INSET_TOP_PX),
-            r: ITEM_STATUS_DOT_RADIUS_PX,
-            fill: dotColor,
-        }),
-    );
-    // Inline-date pins (after:DATE / before:DATE). Same z-order family as
-    // the status dot and footnote indicators — small badge in the top
-    // decoration row. Color matches the bar's resolved meta (`fg`) so the
-    // glyph reads against the bar fill the same way the meta text does.
-    parts.push(renderInlineDatePins(i.inlineDatePins, i.style.fg));
-    // Title + meta are an atomic caption. When `textSpills` is set the
-    // layout has already bumped the next item to a fresh row, so we draw
-    // both lines BESIDE the bar (just past its right edge, stacked) at
-    // the same vertical positions they would occupy inside. When they
-    // fit, both go inside at the bar's left padding.
-    //
-    // The spilled-decoration cluster reads `[bar] [icon?] [title]
-    // [footnote?] [dot?]` — the only decoration to the LEFT of the
-    // title is the link icon (the icon→title affordance must stay
-    // adjacent). The dot trails the title to mirror its in-bar
-    // upper-right position; the footnote walks alongside the title
-    // (between title and dot) just like its in-bar `text-anchor: end`
-    // placement at the upper-right.
+    return tag('circle', {
+        cx: num(dotCx),
+        cy: num(i.box.y + ITEM_STATUS_DOT_INSET_TOP_PX),
+        r: ITEM_STATUS_DOT_RADIUS_PX,
+        fill: dotColor,
+    });
+}
+
+/**
+ * Where the title and meta lines start. Title + meta are an atomic caption.
+ * When `textSpills` is set the layout has already bumped the next item to a
+ * fresh row, so we draw both lines BESIDE the bar (just past its right edge,
+ * stacked) at the same vertical positions they would occupy inside. When
+ * they fit, both go inside at the bar's left padding.
+ *
+ * The spilled-decoration cluster reads `[bar] [icon?] [title]
+ * [footnote?] [dot?]` — the only decoration to the LEFT of the
+ * title is the link icon (the icon→title affordance must stay
+ * adjacent). The dot trails the title to mirror its in-bar
+ * upper-right position; the footnote walks alongside the title
+ * (between title and dot) just like its in-bar `text-anchor: end`
+ * placement at the upper-right.
+ */
+function itemCaptionX(i: PositionedItem, options: RenderOptions): number {
     let captionX: number;
+
     if (i.textSpills) {
         captionX = i.box.x + i.box.width + ITEM_CAPTION_SPILL_GAP_PX;
         if (i.iconSpills) {
@@ -393,6 +401,18 @@ export function renderItem(
             : itemCaptionInsetX(!options.noLinks && hasLink && !i.iconSpills);
         captionX = i.box.x + insetX;
     }
+    return captionX;
+}
+
+/** The title lines and the meta line (with its capacity suffix). */
+function renderItemCaption(
+    i: PositionedItem,
+    captionX: number,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
+    const parts: string[] = [];
+
     // When the caption spills outside the bar it renders on the
     // chart / group bg instead of the bar fill — `i.style.text` is
     // resolved against the bar (e.g. `enterprise-style` propagates
@@ -453,6 +473,18 @@ export function renderItem(
             }),
         );
     }
+    return parts.join('');
+}
+
+/** Footnote superscript indicators, in the bar or spilled beside it. */
+function renderItemFootnoteIndicators(
+    i: PositionedItem,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
+    const parts: string[] = [];
+    const captionOutsideTextColor = palette.entities.item.text;
+
     // Footnote superscript indicators. Two render modes:
     //   - In-bar (default): glyphs walk LEFT from
     //     `bar.right - ITEM_FOOTNOTE_INDICATOR_INSET_RIGHT_PX`,
@@ -511,6 +543,12 @@ export function renderItem(
             }
         }
     }
+    return parts.join('');
+}
+
+function renderItemLinkIcon(i: PositionedItem, options: RenderOptions, palette: Theme): string {
+    const parts: string[] = [];
+
     // Link icon — colored tile + white external-link glyph. Default
     // position is the bar's UPPER-LEFT corner; on a bar too narrow
     // to host both the icon and the status-dot column with a gap
@@ -561,6 +599,12 @@ export function renderItem(
             : inner;
         parts.push(link);
     }
+    return parts.join('');
+}
+
+function renderItemOverflowTail(i: PositionedItem, palette: Theme, fonts: FontFamilies): string {
+    const parts: string[] = [];
+
     // Overflow tail — red fill + stroke + caption.
     if (i.hasOverflow && i.overflowBox) {
         const tailFill = palette.item.overflowTailFill;
@@ -594,6 +638,12 @@ export function renderItem(
             );
         }
     }
+    return parts.join('');
+}
+
+function renderItemLabelChips(i: PositionedItem, fonts: FontFamilies): string {
+    const parts: string[] = [];
+
     // Label chips
     for (const chip of i.labelChips) {
         const rx = Math.min(CORNER_RADIUS_PX[chip.style.cornerRadius] ?? 8, chip.box.height / 2);
@@ -622,5 +672,30 @@ export function renderItem(
             ),
         );
     }
+    return parts.join('');
+}
+
+export function renderItem(
+    i: PositionedItem,
+    options: RenderOptions,
+    idPrefix: string,
+    palette: Theme,
+    fonts: FontFamilies,
+): string {
+    const parts: string[] = [];
+    parts.push(renderItemTooltip(i));
+    parts.push(renderItemBar(i, idPrefix));
+    parts.push(renderItemProgress(i));
+    parts.push(renderItemStatusDot(i, palette));
+    // Inline-date pins (after:DATE / before:DATE). Same z-order family as
+    // the status dot and footnote indicators — small badge in the top
+    // decoration row. Color matches the bar's resolved meta (`fg`) so the
+    // glyph reads against the bar fill the same way the meta text does.
+    parts.push(renderInlineDatePins(i.inlineDatePins, i.style.fg));
+    parts.push(renderItemCaption(i, itemCaptionX(i, options), palette, fonts));
+    parts.push(renderItemFootnoteIndicators(i, palette, fonts));
+    parts.push(renderItemLinkIcon(i, options, palette));
+    parts.push(renderItemOverflowTail(i, palette, fonts));
+    parts.push(renderItemLabelChips(i, fonts));
     return tag('g', { 'data-layer': 'item', 'data-id': i.id ?? null }, parts.join(''));
 }
