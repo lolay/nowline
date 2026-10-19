@@ -1,3 +1,16 @@
+// Entry point of the SVG renderer: the option types, `renderSvg` and the
+// `__internal` test hook. `renderSvg` draws the layer modules bottom to top:
+//   shadow.ts defs, waves.ts hatch patterns, then the background;
+//   timeline.ts header strip; waves.ts strip; swimlanes.ts lane backgrounds;
+//   timeline.ts non-working bands; waves.ts tints; timeline.ts grid lines;
+//   waves.ts boundaries and labels; edges.ts dependency arrows;
+//   swimlanes.ts lanes (their bars come from item.ts); include-region.ts;
+//   waves.ts crossings; markers.ts cut lines; timeline.ts non-working labels;
+//   markers.ts anchors and milestones; nowline.ts now-line;
+//   footnotes.ts panel; waves.ts legend; header.ts card, attribution mark
+//   and logo.
+// Shared helpers live in primitives.ts.
+
 import type { PositionedRoadmap } from '@nowline/layout';
 import { FONT_STACK } from '@nowline/layout';
 import type { LoadedLogo } from '../logo.js';
@@ -33,7 +46,7 @@ import {
     usedWaveHatchKinds,
     waveHatchPatternDef,
 } from './waves.js';
-import { attrs, escAttr, escText, num, tag } from './xml.js';
+import { attrs, num, tag } from './xml.js';
 
 // Browser-safe types. The renderer never touches `fs`, `path`, or `Buffer`.
 // Callers inject an AssetResolver when they want logos embedded.
@@ -224,7 +237,3 @@ export const __internal = {
     renderHeader,
     renderEdge,
 };
-
-// These helpers are kept in the exports table so tsc doesn't prune them.
-void escAttr;
-void escText;
