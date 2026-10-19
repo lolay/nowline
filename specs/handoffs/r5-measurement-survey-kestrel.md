@@ -20,7 +20,7 @@ Line numbers are at `283bf38`. Each entry's "Status" says which m3 commit moved 
 - **Layout:** `nodes/wave-node.ts:257` (`fitStripLabel`) computes `estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) * MARKER_BOLD_WIDTH_FACTOR` for the candidate that won, but does not keep it.
 - **Agree:** yes, for every label (same expression; the renderer measures the label `fitStripLabel` returned).
 - **Verdict:** move in s2: carry the winning label's bold width on `PositionedWaveStrip`.
-- **Status:** moved in m3.s2 (`02c9aba`): `estimateTextWidth` exported from `@nowline/layout`; `PositionedWaveStrip.labelWidth`.
+- **Status:** moved in m3.s2 (`02c9aba`): `estimateTextWidth` exported from `@nowline/layout`; `PositionedWaveStrip.labelWidth`. Once m3.s5 (`781c7a0`) carried the label's drawn x and halo (E4), nothing read `labelWidth`; the m3.s4 fix-up (`045731f`) removed it.
 
 ### E3. Wave gap-label and placeholder halo widths (`waveTextWidth`, regular)
 
@@ -28,7 +28,7 @@ Line numbers are at `283bf38`. Each entry's "Status" says which m3 commit moved 
 - **Layout:** the gap label's width is computed at `nodes/wave-node.ts:171` (`estimateTextWidth(span.floorRef, 10)`) for its fit test. The placeholder is built at `nodes/wave-node.ts:229` and copied onto `timeline.waveStrip.placeholder` by `phases/finalize.ts:911-912`; nothing measures it.
 - **Agree:** gap label yes (same expression). Placeholder: no layout value exists.
 - **Verdict:** gap label width: move in s2 (carry on `gapLabel`). Placeholder width: leave (see F1).
-- **Status:** gap label moved in m3.s2 (`02c9aba`) (`gapLabel.width`); placeholder left (F1): the renderer measures it with layout's `estimateTextWidth`.
+- **Status:** gap label moved in m3.s2 (`02c9aba`) (`gapLabel.width`); placeholder left (F1): the renderer measures it with layout's `estimateTextWidth`. Once m3.s5 (`781c7a0`) carried `gapLabel.halo` (E4), nothing read `gapLabel.width`; the m3.s4 fix-up (`045731f`) removed it.
 
 ### E4. Wave label halo boxes and superscript offsets
 
@@ -60,23 +60,46 @@ Line numbers are at `283bf38`. Each entry's "Status" says which m3 commit moved 
 - **Layout:** none.
 - **Agree:** n/a.
 - **Verdict:** candidate for s6 (not covered by s2-s5): layout resolves each background item's hatch kind and the legend swatch's.
-- **Status:** moved in m3.s6: layout's `wave-hatch.ts` (`waveHatchKind`, with the 0.24 threshold and `barFill`, verbatim), `PositionedItem.waveHatch` on background items, `WaveLegendEntry.hatch` on the background swatch, and the `WaveHatchKind` type. `hatchOverlay` takes the kind; the renderer no longer computes any luminance, so `fillLuminance` is no longer exported.
+- **Status:** moved in m3.s6 (`d299f05`): layout's `wave-hatch.ts` (`waveHatchKind`, with the 0.24 threshold and `barFill`, verbatim), `PositionedItem.waveHatch` on background items, `WaveLegendEntry.hatch` on the background swatch, and the `WaveHatchKind` type. `hatchOverlay` takes the kind; the renderer no longer computes any luminance, so `fillLuminance` is no longer exported.
 
 ### E8. Capacity suffix x positions (`renderCapacitySuffix`)
 
 - **Renderer:** `item.ts:79-84,107-110`: `numberX = x0 + precedingWidth + separator` from `estimateCaptionWidthPx(precedingText)` and a `0.58 em` separator, and the built-in icon's `iconX = numberX + estimateCaptionWidthPx(numberStr) + 0.1 em`. Both call sites (`item.ts:185`, `swimlanes.ts:293`) pass `precedingText = undefined`, so `numberX` is `x0` and only `iconX` depends on a width.
 - **Layout:** `capacity.ts:156` `estimateCapacitySuffixWidth` estimates the whole suffix for the item caption fit (`nodes/item-measure.ts:304-319`) and the lane badge (`nodes/swimlane-node.ts:51-66`); the icon offset inside it is not kept.
-- **Agree:** the offset is the same expression over the same values. Carried as an offset from the run's start, the renderer adds it once (`x0 + dx`) where it used to add two terms in turn; the sum can differ in the last bit of a double, which `num()` (2 decimals) only shows at an exact rounding tie. Parity decides.
+- **Agree:** the terms are the same expressions over the same values. Carried as one pre-summed offset from the run's start, the renderer would add it once (`x0 + dx`) where it used to add the terms in turn (`(x0 + width) + gap`); the sum can differ in the last bit of a double, which `num()` (2 decimals) shows at an exact rounding tie. It does: see the fixture under E9.
 - **Verdict:** move in s4: carry the built-in icon's offset on `PositionedCapacity`; drop the dead `precedingText` path.
-- **Status:** moved in m3.s4 (`fe92575`): `capacityIconDx` and `META_SUFFIX_DX_EM` in layout's `capacity.ts` (exported); `PositionedCapacity.iconDx` on items and lanes; `renderCapacitySuffix` takes the run start and reads `iconDx`, its unused `precedingText` parameter removed. Parity byte-identical. (m3.s6 rewrote the guard in `capacityIconDx` as an optional chain to clear a biome `useOptionalChain` warning s4 added.)
+- **Status:** moved in m3.s4 (`fe92575`, fixed in `045731f`): `capacityIconDxTerms` and `META_SUFFIX_DX_EM` in layout's `capacity.ts` (exported); `PositionedCapacity.iconDxTerms` on items and lanes; `renderCapacitySuffix` takes the run start and adds the terms to it in order, its unused `precedingText` parameter removed. As first committed, `fe92575` carried one pre-summed `iconDx`, which the parity matrix did not catch but moved icons 0.01 px at rounding ties (fixture under E9); `045731f` carries the terms instead (`[width, gap]` here), so the renderer's sum is the base's by construction. (m3.s6 `d299f05` rewrote the guard as an optional chain to clear a biome `useOptionalChain` warning s4 added.)
 
 ### E9. Meta-line icon x (`renderItemMetaLine`, tight width)
 
 - **Renderer:** `item.ts:223-227`: `numberStartX = x + 0.5 em * metaText.length + 0.6 em`, `iconX = numberStartX + 0.5 em * numberStr.length + 0.1 em` (`META_ICON_EM_PER_CHAR`, `META_SUFFIX_DX_EM`). The `<tspan dx>` separators (`:187`, `:209`) are em constants, not widths.
 - **Layout:** none; layout reserves `0.58 em` per char for the fit (`nodes/item-measure.ts:315-318`).
-- **Agree:** same caveat as E8.
+- **Agree:** same caveat as E8: one pre-summed offset rounds differently from `(((x + meta) + separator) + number) + gap` at ties.
 - **Verdict:** move in s4, with E8 (the same `PositionedCapacity` field: for an item with meta text it holds this offset).
-- **Status:** moved in m3.s4 (`fe92575`) with E8: `META_ICON_EM_PER_CHAR` lives in `capacity.ts`; `renderItemMetaLine` reads `capacity.iconDx`. The `<tspan dx>` separators stay em constants in the renderer.
+- **Status:** moved in m3.s4 (`fe92575`, fixed in `045731f`) with E8: `META_ICON_EM_PER_CHAR` lives in `capacity.ts`; `PositionedCapacity.iconDxTerms` holds `[tight(metaText), separator, tight(number), gap]` and `renderItemMetaLine` adds them to the caption x in that order, the base's summation order. The `<tspan dx>` separators stay em constants in the renderer. Fixture for the rounding tie (bars ending at fractional x; the base and `045731f` draw the three person icons at `x="1210.84"`, `"1251.09"`, `"1302.34"` in light, dark and grayscale, where `fe92575`'s pre-summed offset drew `1210.85`, `1251.1`, `1302.35`); it is also the renderer regression test "places a meta-line icon by adding each width to the caption x in turn" (`packages/renderer/test/render.test.ts`):
+
+  ```nowline
+  nowline v1
+
+  config
+
+  style fte
+    capacity-icon: person
+
+  roadmap r "Far probe" start:2026-01-05 scale:1w calendar:business
+
+  swimlane l1 "L1"
+    item a1 "A" duration:130.015625d
+    item b1 "B" duration:3w capacity:2 style:fte
+
+  swimlane l2 "L2"
+    item a2 "A" duration:135.046875d
+    item b2 "B" duration:4w capacity:3 style:fte
+
+  swimlane l3 "L3"
+    item a3 "A" duration:140.078125d
+    item b3 "B" duration:10d capacity:12 style:fte
+  ```
 
 ### E10. Lane frame-tab badge widths (`renderSwimlane`)
 
@@ -107,10 +130,21 @@ Line numbers are at `283bf38`. Each entry's "Status" says which m3 commit moved 
 Read and judged drawing, not layout: the capacity icon's vertical lift `baselineY - 0.85 em` (`item.ts:110`, `:228`); the overflow-tail caption's `width > 60` threshold and centre (`item.ts:624-629`); link-icon glyph path offsets (`item.ts:586-589`); chip text centre (`item.ts:666-667`); wave cell corner radii and rounded-end paths (`waves.ts:213-243`); edge arrow-head geometry from the last leg (`edges.ts:20-35`) and the rounded orthogonal path (`edges.ts:126-154`); the now-pill's half-stroke edge (`nowline.ts:63-68`); left marker labels end-anchored at `labelBox` right (`markers.ts:30`, `:85`, `timeline.ts:210-214`); grid-line spans (`timeline.ts:44-55`); the logo's `svgIntrinsicSize` fallback (`header.ts:216`), which needs the asset bytes only the renderer has.
 
 - **Verdict:** leave: none of them measures text, and each reads only model fields and drawing constants.
+- **Status:** left (reason above).
 
 ## Left as follow-ups
 
 - **F1. Wave placeholder halo width.** The all-empty placeholder's halo (`waves.ts:418`) is sized from its text in the renderer. Layout builds the placeholder in `buildWaves` but `phases/finalize.ts:911-912` copies only the string onto `timeline.waveStrip`, and finalize is out of scope for R5. Fixture: none under `tests/` or `examples/` draws the placeholder; a roadmap whose every wave has no members does (`wave w1` with no `wave:w1` item). Carry the width (or the halo box) on `timeline.waveStrip` when finalize is next touched.
-- **F2. Frame-tab owner text differs between layout and renderer.** Layout sizes the tab collision with the raw `owner:` value at `box.x = 0` (`nodes/swimlane-node.ts:105-114`); the renderer draws the tab with the resolved display owner (`s.owner`) at `s.box.x` (`swimlanes.ts:237-243`). For an owner whose id and title differ, the drawn tab is wider or narrower than the box layout reserved. Unifying them changes bytes (behaviour), so R5 keeps both calls.
-- **Status:** left (reason above).
+- **F2. Frame-tab owner text differs between layout and renderer.** Layout sizes the tab collision with the raw `owner:` value at `box.x = 0` (`nodes/swimlane-node.ts:105-114`); the renderer draws the tab with the resolved display owner (`s.owner`) at `s.box.x` (`swimlanes.ts:237-243`). For an owner whose id and title differ, the drawn tab is wider or narrower than the box layout reserved. Unifying them changes bytes (behaviour), so R5 keeps both calls. Fixture (checked at `045731f`): layout reserves the tab for `owner: sam` (right edge x 116, plus the 8 px gutter), so `a`, wanting x 174.52, is top-aligned with the tab at y 66; the renderer draws the tab for `owner: Samantha Rodriguez-Wellington`, spanning x 10..246 at y 66..88, so the bar overlaps the tab's owner text. With the person's title set to `sam`, the drawn tab ends at x 116 and the bar clears it.
+
+  ```nowline
+  nowline v1
+
+  roadmap r "Owner tab" start:2026-01-05 scale:1w
+
+  person sam "Samantha Rodriguez-Wellington"
+
+  swimlane l "Lane" owner:sam
+    item a "A" after:2026-01-12 duration:2w
+  ```
 
