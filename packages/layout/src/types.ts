@@ -640,6 +640,18 @@ export interface PositionedSwimlane {
      */
     capacity: PositionedCapacity | null;
     /**
+     * Estimated width (px) of the capacity badge inside the frame tab, at
+     * the badge's 10 px size (`estimateCapacitySuffixWidth`); 0 without a
+     * badge. With `footnoteIndicatorWidth`, the widths layout sized the tab
+     * with; the renderer passes both to `frameTabGeometry`.
+     */
+    capacityBadgeWidth: number;
+    /**
+     * Estimated width (px) of the comma-joined footnote indicators in the
+     * frame tab, at 10 px (`estimateTextWidth`); 0 without indicators.
+     */
+    footnoteIndicatorWidth: number;
+    /**
      * Tri-state utilization underline data when the lane declares
      * `capacity:` AND has at least one item contributing load AND has not
      * opted out of every color band via `utilization-*-at:none`. Null
@@ -954,9 +966,29 @@ export interface PositionedWaveStrip {
     /**
      * The label's estimated width at the strip's 10 px bold weight (the
      * width `fitStripLabel` tested it at); present exactly when `label` is.
-     * The renderer sizes the label's halo from it.
      */
     labelWidth?: number;
+    /**
+     * The painted cell: `box` clipped to the timeline's backing panel and
+     * inset by `WAVE_CELL_INSET_PX` (half the panel's stroke) so it never
+     * covers the panel border. Omitted for an empty wave and for one that
+     * lies outside the timeline.
+     */
+    cell?: BoundingBox;
+    /**
+     * Where the label is drawn when the wave has a `cell`: `x` is the text
+     * centre (`labelX`, moved left when the superscripts would cover it)
+     * and `halo` the backing box in the cell's fill. Omitted when there is
+     * no label or no cell.
+     */
+    labelDraw?: { x: number; halo: BoundingBox };
+    /**
+     * The footnote superscripts when `footnotesShown` and the wave has a
+     * `cell`: `rightX` is the last superscript's right edge (they walk left
+     * by `ITEM_FOOTNOTE_INDICATOR_STEP_PX`, end-anchored) and `halo` their
+     * backing box. Omitted otherwise.
+     */
+    superscripts?: { rightX: number; halo: BoundingBox };
     /**
      * Which step of the fit chain won: the title, the id, the title
      * ellipsized to 3 or more characters plus "…", the 1-based `#k`, or
@@ -991,9 +1023,10 @@ export interface PositionedWaveStrip {
      * The floor reference (`fy-budget`, `2026-02-02`) centred in the gap
      * this wave's start floor opened before it (`S_k > E_{k-1}`, k >= 2),
      * when it fits; drawn in muted italics. `width` is the text's estimated
-     * width at 10 px, the one its fit was tested at. Omitted otherwise.
+     * width at 10 px, the one its fit was tested at, and `halo` its backing
+     * box in the panel's fill. Omitted otherwise.
      */
-    gapLabel?: { text: string; x: number; width: number };
+    gapLabel?: { text: string; x: number; width: number; halo: BoundingBox };
 }
 
 /** A wave's resolved colours (specs/waves.md §9.4). */

@@ -23,13 +23,15 @@ import {
     fillLuminance,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     WAVE_BOUNDARY_WIDTH_PX,
+    WAVE_CELL_INSET_PX,
     WAVE_CROSS_DASH,
     WAVE_EMPTY_MARKER_SIZE_PX,
     WAVE_HATCH_OPACITY,
     WAVE_HATCH_STROKE_PX,
     WAVE_HATCH_TILE_PX,
+    WAVE_LABEL_HALO_INSET_Y_PX,
+    WAVE_LABEL_HALO_PAD_PX,
     WAVE_STRIP_LABEL_FONT_SIZE_PX,
-    WAVE_STRIP_LABEL_PAD_PX,
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
@@ -49,12 +51,6 @@ import { escText, num, tag, textTag } from './xml.js';
  * the hatch and the dot agree on which bars read as dark.
  */
 const WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE = 0.24;
-
-/** Horizontal padding of a strip label's halo on each side. */
-const WAVE_LABEL_HALO_PAD_PX = 2;
-
-/** Vertical inset of a strip label's halo from the strip's top and bottom. */
-const WAVE_LABEL_HALO_INSET_Y_PX = 3;
 
 /** Strip label baseline below the strip's vertical centre (10 px text). */
 const WAVE_LABEL_BASELINE_BELOW_CENTER_PX = 4;
@@ -174,33 +170,6 @@ export function hatchOverlay(box: BoundingBox, style: ResolvedStyle, idPrefix: s
 /** The strip's backing panel corner radius (matches the tick panel's). */
 const WAVE_STRIP_PANEL_RADIUS_PX = 4;
 
-/** How far a strip cell sits inside the backing panel: half its 1 px stroke. */
-const WAVE_CELL_INSET_PX = 0.5;
-
-/**
- * The strip cell's painted box: the wave's span clipped to the strip's
- * backing panel, inset by half the panel's 1 px stroke so the cell never
- * covers it. Undefined for an empty or off-screen wave.
- */
-function waveCellBox(w: PositionedWave, t: PositionedTimelineScale): BoundingBox | undefined {
-    if (w.empty) return undefined;
-    const inset = WAVE_CELL_INSET_PX;
-    return intersectBox(
-        {
-            x: w.strip.box.x,
-            y: w.strip.box.y + inset,
-            width: w.strip.box.width,
-            height: w.strip.box.height - 2 * inset,
-        },
-        {
-            x: t.box.x + inset,
-            y: w.strip.box.y,
-            width: t.box.width - 2 * inset,
-            height: w.strip.box.height,
-        },
-    );
-}
-
 /**
  * Corner radii of a cell's left and right ends: a cell that reaches an end
  * of the backing panel rounds its outer corners there to the panel's radius
@@ -292,7 +261,9 @@ export function renderWaveStrip(model: PositionedRoadmap, palette: Theme): strin
         }),
     ];
     for (const w of model.waves) {
-        const box = waveCellBox(w, t);
+        // The cell layout clipped to the panel; none for an empty or
+        // off-screen wave.
+        const box = w.strip.cell;
         if (!box) continue;
         parts.push(
             tag(
@@ -379,20 +350,17 @@ export function renderWaveLabels(
     const strip = t.waveStrip;
     if (!model.waves || !strip) return '';
     const baselineY = strip.y + strip.height / 2 + WAVE_LABEL_BASELINE_BELOW_CENTER_PX;
-    const haloY = strip.y + WAVE_LABEL_HALO_INSET_Y_PX;
-    const haloHeight = strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX;
     const parts: string[] = [];
     // Muted italics on a halo in the backing panel's fill, so the major
-    // grid lines drawn later never cut through the text (§9.1). `width` is
-    // the text's estimated width, as layout measured it.
-    const mutedText = (x: number, text: string, width: number): string => {
-        const haloWidth = width + 2 * WAVE_LABEL_HALO_PAD_PX;
+    // grid lines drawn later never cut through the text (§9.1). Layout
+    // placed the halo.
+    const mutedText = (x: number, text: string, halo: BoundingBox): string => {
         return (
             tag('rect', {
-                x: num(x - haloWidth / 2),
-                y: num(haloY),
-                width: num(haloWidth),
-                height: num(haloHeight),
+                x: num(halo.x),
+                y: num(halo.y),
+                width: num(halo.width),
+                height: num(halo.height),
                 fill: palette.timeline.panelFill,
             }) +
             textTag(
@@ -411,18 +379,27 @@ export function renderWaveLabels(
     };
 
     if (strip.placeholder !== undefined) {
-        // Layout keeps no width for the placeholder (survey F1), so it is
+        // Layout keeps no halo for the placeholder (survey F1), so it is
         // measured here with layout's estimator.
-        const width = estimateTextWidth(strip.placeholder, WAVE_STRIP_LABEL_FONT_SIZE_PX);
-        parts.push(mutedText(t.box.x + t.box.width / 2, strip.placeholder, width));
+        const x = t.box.x + t.box.width / 2;
+        const haloWidth =
+            estimateTextWidth(strip.placeholder, WAVE_STRIP_LABEL_FONT_SIZE_PX) +
+            2 * WAVE_LABEL_HALO_PAD_PX;
+        const halo: BoundingBox = {
+            x: x - haloWidth / 2,
+            y: strip.y + WAVE_LABEL_HALO_INSET_Y_PX,
+            width: haloWidth,
+            height: strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX,
+        };
+        parts.push(mutedText(x, strip.placeholder, halo));
     }
 
     for (const w of model.waves) {
         // A gap opened by a start floor: no cell, the floor reference in
         // muted italics on a halo in the backing panel's fill.
         if (w.strip.gapLabel) {
-            const { text, x, width } = w.strip.gapLabel;
-            parts.push(mutedText(x, text, width));
+            const { text, x, halo } = w.strip.gapLabel;
+            parts.push(mutedText(x, text, halo));
         }
 
         // An empty wave: a hollow diamond, with the wave's tooltip.
@@ -443,44 +420,22 @@ export function renderWaveLabels(
             );
         }
 
-        const cell = waveCellBox(w, t);
-        if (!cell) continue;
-        const cellRight = cell.x + cell.width;
-        const superscriptWidth = w.strip.footnotesShown
-            ? w.footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX
-            : 0;
-        if (superscriptWidth) {
+        // Layout placed the label and superscript halos in the painted
+        // cell; a wave without one draws neither.
+        if (!w.strip.cell) continue;
+        const { labelDraw, superscripts } = w.strip;
+        if (superscripts) {
             // The superscripts' own halo in the cell's fill, first so the
             // label's halo never covers them.
-            const right = cellRight - WAVE_STRIP_LABEL_PAD_PX + WAVE_LABEL_HALO_PAD_PX;
-            const left =
-                cellRight - WAVE_STRIP_LABEL_PAD_PX - superscriptWidth - WAVE_LABEL_HALO_PAD_PX;
-            parts.push(
-                waveCellFill(w, { x: left, y: haloY, width: right - left, height: haloHeight }),
-            );
+            parts.push(waveCellFill(w, superscripts.halo));
         }
-        if (w.strip.label !== undefined) {
-            const textWidth = w.strip.labelWidth ?? 0;
+        if (w.strip.label !== undefined && labelDraw) {
             // Centred on the visible span, but never under the superscripts.
-            const x = superscriptWidth
-                ? Math.min(
-                      w.strip.labelX,
-                      cellRight - WAVE_STRIP_LABEL_PAD_PX - superscriptWidth - textWidth / 2,
-                  )
-                : w.strip.labelX;
-            const haloWidth = textWidth + 2 * WAVE_LABEL_HALO_PAD_PX;
-            parts.push(
-                waveCellFill(w, {
-                    x: x - haloWidth / 2,
-                    y: haloY,
-                    width: haloWidth,
-                    height: haloHeight,
-                }),
-            );
+            parts.push(waveCellFill(w, labelDraw.halo));
             parts.push(
                 textTag(
                     {
-                        x: num(x),
+                        x: num(labelDraw.x),
                         y: num(baselineY),
                         'font-family': fonts.sans,
                         'font-size': WAVE_STRIP_LABEL_FONT_SIZE_PX,
@@ -492,9 +447,9 @@ export function renderWaveLabels(
                 ),
             );
         }
-        if (w.strip.footnotesShown) {
+        if (superscripts) {
             // Right-aligned in the cell, walking left like an item's.
-            let fx = cellRight - WAVE_STRIP_LABEL_PAD_PX;
+            let fx = superscripts.rightX;
             for (let k = w.footnoteIndicators.length - 1; k >= 0; k--) {
                 parts.push(
                     textTag(

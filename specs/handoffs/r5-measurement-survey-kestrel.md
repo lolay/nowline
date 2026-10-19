@@ -36,7 +36,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/wave-node.ts:120-137` computes the visible cell span (`cellLeft..cellRight`, unclipped by the half-pixel inset) and the superscript width for the fit; the boxes themselves are not kept. Timeline box and strip y are final when `buildWaves` runs (`phases/finalize.ts:897-916`, step f9, after `extendTimeline` and `fitWidths`).
 - **Agree:** the inputs layout sees (`ctx.timeline.box`, `strip`, the label width from E2) are the objects the renderer reads, so the same expressions over them give the same doubles.
 - **Verdict:** move in s5: carry the painted cell box, the label's drawn x and halo, the superscript halo and first superscript x, and the gap label's halo on the positioned wave. The placeholder halo stays with F1.
-- **Status:** pending (s5).
+- **Status:** moved in m3.s5: `PositionedWaveStrip.cell` (from `stripCellBox`, the renderer's `waveCellBox` arithmetic), `labelDraw` (`x`, `halo`), `superscripts` (`rightX`, `halo`) and `gapLabel.halo`; `WAVE_LABEL_HALO_PAD_PX`, `WAVE_LABEL_HALO_INSET_Y_PX` and `WAVE_CELL_INSET_PX` moved to layout's `themes/shared.ts` (exported; the renderer still needs the inset for the cell corners and the halo constants for F1). The matrix has no wave superscripts, so a scratch roadmap (Example 1 with footnotes on two waves) was also rendered on both sides: identical. The placeholder halo stays in the renderer (F1).
 
 ### E5. Status-key table and `pickStatusDotPalette`
 
@@ -84,7 +84,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/swimlane-node.ts:61` (`badgeWidthPx`, same call) and `:196-199` (`footnoteIndicatorWidthPx`, same expression), both at `LANE_CAPACITY_BADGE_FONT_SIZE_PX = 10`; used for the tab collision, not kept.
 - **Agree:** yes, for every lane (same expressions over the same inputs).
 - **Verdict:** move in s5: carry both widths on `PositionedSwimlane`. The tab geometry itself stays a renderer call to layout's `frameTabGeometry` (see F2).
-- **Status:** pending (s5).
+- **Status:** moved in m3.s5: `PositionedSwimlane.capacityBadgeWidth` and `footnoteIndicatorWidth`, the values layout already sized the tab collision with; `renderSwimlane` passes them to `frameTabGeometry`.
 
 ### E11. Item caption x (`itemCaptionX`)
 

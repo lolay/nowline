@@ -281,6 +281,8 @@ export class SwimlaneNode {
                 owner: ownerDisplay,
                 footnoteIndicators,
                 capacity,
+                capacityBadgeWidth: badgeWidthPx,
+                footnoteIndicatorWidth: footnoteIndicatorWidthPx,
                 utilization,
             },
             usedHeight: bandHeight,

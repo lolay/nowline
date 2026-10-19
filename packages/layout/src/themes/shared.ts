@@ -347,6 +347,12 @@ export const WAVE_LEGEND_GAP_PX = 8;
 // Wave strip and legend geometry (specs/waves.md §9.1, §9.5).
 /** Horizontal padding on each side of a strip label in the fit test. */
 export const WAVE_STRIP_LABEL_PAD_PX = 6;
+/** Horizontal padding of a strip label's halo on each side. */
+export const WAVE_LABEL_HALO_PAD_PX = 2;
+/** Vertical inset of a strip label's halo from the strip's top and bottom. */
+export const WAVE_LABEL_HALO_INSET_Y_PX = 3;
+/** How far a strip cell sits inside the backing panel: half its 1 px stroke. */
+export const WAVE_CELL_INSET_PX = 0.5;
 /** Step between the diamonds of empty waves that share an x. */
 export const WAVE_EMPTY_MARKER_STEP_PX = 9;
 /** Legend swatch (hatched bar or boundary line) size. */

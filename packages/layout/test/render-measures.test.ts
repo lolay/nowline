@@ -4,8 +4,9 @@
 
 import type { NowlineFile } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { capacityIconDx } from '../src/capacity.js';
+import { capacityIconDx, estimateCapacitySuffixWidth } from '../src/capacity.js';
 import { estimateTextWidth as estimateTextWidthFromIndex } from '../src/index.js';
+import { ITEM_FOOTNOTE_INDICATOR_STEP_PX } from '../src/item-bar-geometry.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { MARKER_BOLD_WIDTH_FACTOR } from '../src/nodes/marker-geometry.js';
 import { fillLuminance, statusDotColor } from '../src/status-dot.js';
@@ -203,5 +204,114 @@ describe('capacity icon offset', () => {
     it('starts the run at the number when there is no meta text', () => {
         const icon = { kind: 'builtin', name: 'time' } as const;
         expect(capacityIconDx('12', icon, 11)).toBe(estimateTextWidth('12', 11) + 11 * 0.1);
+    });
+});
+
+describe('lane frame-tab badge widths', () => {
+    it('carry the capacity badge and footnote indicator widths', async () => {
+        const model = await lay(
+            `${CAPACITY_SRC}\nfootnote f1 "One" on:crew\nfootnote f2 "Two" on:crew\n`,
+            { theme: 'light' },
+        );
+        const lane = model.swimlanes[0];
+        expect(lane.footnoteIndicators).toEqual([1, 2]);
+        expect(lane.capacityBadgeWidth).toBe(
+            estimateCapacitySuffixWidth('8', { kind: 'builtin', name: 'person' }, 10),
+        );
+        expect(lane.footnoteIndicatorWidth).toBe(estimateTextWidth('1,2', 10));
+    });
+
+    it('are 0 for a lane without a badge or indicators', async () => {
+        const model = await lay(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane a "A"
+  item x duration:1w
+`);
+        expect(model.swimlanes[0].capacityBadgeWidth).toBe(0);
+        expect(model.swimlanes[0].footnoteIndicatorWidth).toBe(0);
+    });
+});
+
+describe('wave strip label geometry', () => {
+    it('clips each cell to the panel and centres its label halo', async () => {
+        const model = await lay(EXAMPLE_1);
+        const t = model.timeline;
+        const strip = t.waveStrip;
+        expect(strip).toBeDefined();
+        for (const w of wavesOf(model)) {
+            const cell = w.strip.cell;
+            expect(cell).toBeDefined();
+            if (!cell || !strip) continue;
+            expect(cell.y).toBe(strip.y + 0.5);
+            expect(cell.height).toBe(strip.height - 1);
+            expect(cell.x).toBe(Math.max(w.strip.box.x, t.box.x + 0.5));
+            expect(cell.x + cell.width).toBeCloseTo(
+                Math.min(w.strip.box.x + w.strip.box.width, t.box.x + t.box.width - 0.5),
+                10,
+            );
+            const haloWidth = (w.strip.labelWidth ?? 0) + 4;
+            expect(w.strip.labelDraw).toEqual({
+                x: w.strip.labelX,
+                halo: {
+                    x: w.strip.labelX - haloWidth / 2,
+                    y: strip.y + 3,
+                    width: haloWidth,
+                    height: strip.height - 6,
+                },
+            });
+            expect('superscripts' in w.strip).toBe(false);
+        }
+    });
+
+    it('places shown superscripts right-aligned and keeps the label left of them', async () => {
+        const model = await lay(
+            `${EXAMPLE_1}\nfootnote n1 "One" on:build\nfootnote n2 "Two" on:build\n`,
+        );
+        const build = wavesOf(model)[1];
+        const strip = model.timeline.waveStrip;
+        const cell = build.strip.cell;
+        expect(build.strip.footnotesShown).toBe(true);
+        expect(cell && strip).toBeTruthy();
+        if (!cell || !strip) return;
+        const cellRight = cell.x + cell.width;
+        const width = 2 * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
+        expect(build.strip.superscripts?.rightX).toBe(cellRight - 6);
+        expect(build.strip.superscripts?.halo.x).toBe(cellRight - 6 - width - 2);
+        expect(build.strip.superscripts?.halo.width).toBeCloseTo(width + 4, 10);
+        const labelWidth = build.strip.labelWidth ?? 0;
+        expect(build.strip.labelDraw?.x).toBe(
+            Math.min(build.strip.labelX, cellRight - 6 - width - labelWidth / 2),
+        );
+    });
+
+    it('gives an empty wave no cell and a gap label its halo', async () => {
+        const model = await lay(EXAMPLE_11.replace('date:2026-02-02', 'date:2026-02-16'));
+        const strip = model.timeline.waveStrip;
+        const gap = wavesOf(model)[1].strip.gapLabel;
+        expect(gap && strip).toBeTruthy();
+        if (!gap || !strip) return;
+        expect(gap.halo).toEqual({
+            x: gap.x - (gap.width + 4) / 2,
+            y: strip.y + 3,
+            width: gap.width + 4,
+            height: strip.height - 6,
+        });
+        const empty = wavesOf(
+            await lay(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+wave w1 "One"
+wave w2 "Two"
+
+swimlane a
+  item a1 duration:2w wave:w1
+`),
+        )[1];
+        expect(empty.empty).toBe(true);
+        expect('cell' in empty.strip).toBe(false);
+        expect('labelDraw' in empty.strip).toBe(false);
     });
 });

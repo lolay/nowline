@@ -17,8 +17,6 @@ import {
     CONTAINER_MAX_FILLED_DEPTH,
     CONTAINER_NESTED_BODY_FILL_OPACITY,
     containerHeaderTitleX,
-    estimateCapacitySuffixWidth,
-    estimateTextWidth,
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
     frameTabGeometry,
@@ -220,27 +218,20 @@ export function renderSwimlane(
     // visible footprint matches the collision box layout reserved for it.
     if (s.title) {
         // Lane capacity badge + footnote indicator sit inside the frame
-        // tab after the owner (or after the title if no owner). Compute
-        // both widths up-front so `frameTabGeometry` can size the chiclet
-        // to fit them, then read the placement positions back out — no
-        // second placement pass in the renderer.
+        // tab after the owner (or after the title if no owner). Layout
+        // measured both widths (the ones it sized the tab's collision box
+        // with), so `frameTabGeometry` sizes the chiclet to fit them, then
+        // the placement positions are read back out — no second placement
+        // pass in the renderer.
         const LANE_BADGE_FONT_SIZE_PX = 10;
-        const capacityBadgeBareWidthPx = s.capacity
-            ? estimateCapacitySuffixWidth(s.capacity.text, s.capacity.icon, LANE_BADGE_FONT_SIZE_PX)
-            : 0;
-        // Footnote indicator is a comma-joined number list painted at
-        // 10 pt 700-weight; estimate via the shared caption helper.
         const footnoteIndicatorText =
             s.footnoteIndicators.length > 0 ? s.footnoteIndicators.join(',') : '';
-        const footnoteIndicatorWidthPx = footnoteIndicatorText
-            ? estimateTextWidth(footnoteIndicatorText, LANE_BADGE_FONT_SIZE_PX)
-            : 0;
         const tab = frameTabGeometry(
             s.box.x,
             s.title,
             s.owner,
-            capacityBadgeBareWidthPx,
-            footnoteIndicatorWidthPx,
+            s.capacityBadgeWidth,
+            s.footnoteIndicatorWidth,
         );
         const tabH = FRAME_TAB_HEIGHT_PX;
         const tabY = s.box.y + 10;

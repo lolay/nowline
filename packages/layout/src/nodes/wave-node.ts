@@ -21,7 +21,10 @@ import { resolveColor } from '../themes/index.js';
 import type { Theme } from '../themes/shape.js';
 import {
     GUTTER_PX,
+    WAVE_CELL_INSET_PX,
     WAVE_EMPTY_MARKER_STEP_PX,
+    WAVE_LABEL_HALO_INSET_Y_PX,
+    WAVE_LABEL_HALO_PAD_PX,
     WAVE_LEGEND_BASELINE_OFFSET_PX,
     WAVE_LEGEND_ENTRY_GAP_PX,
     WAVE_LEGEND_LINE_PX,
@@ -33,6 +36,7 @@ import {
     WAVE_STYLED_STRIP_MIX_OPACITY,
 } from '../themes/shared.js';
 import type {
+    BoundingBox,
     PositionedIncludeRegion,
     PositionedItem,
     PositionedSwimlane,
@@ -103,6 +107,9 @@ export function buildWaves(
     const visLeft = ctx.timeline.box.x;
     const visRight = visLeft + ctx.timeline.box.width;
     const stripMidY = strip.y + strip.height / 2;
+    // Every strip halo spans the strip less a vertical inset.
+    const haloY = strip.y + WAVE_LABEL_HALO_INSET_Y_PX;
+    const haloHeight = strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX;
     // Empty-wave diamonds placed so far, by their unstepped x.
     const emptyXs: number[] = [];
     let ordinal = 0;
@@ -170,7 +177,59 @@ export function buildWaves(
             const gapRight = Math.min(span.start, visRight);
             const textWidth = estimateTextWidth(span.floorRef, WAVE_STRIP_LABEL_FONT_SIZE_PX);
             if (textWidth + 2 * WAVE_STRIP_LABEL_PAD_PX <= gapRight - gapLeft) {
-                gapLabel = { text: span.floorRef, x: (gapLeft + gapRight) / 2, width: textWidth };
+                const x = (gapLeft + gapRight) / 2;
+                const haloWidth = textWidth + 2 * WAVE_LABEL_HALO_PAD_PX;
+                gapLabel = {
+                    text: span.floorRef,
+                    x,
+                    width: textWidth,
+                    halo: { x: x - haloWidth / 2, y: haloY, width: haloWidth, height: haloHeight },
+                };
+            }
+        }
+
+        // The painted cell, and in it the label and superscript halos
+        // (§9.1): the superscripts right-aligned, the label centred on the
+        // visible span but never under them.
+        const stripBox: BoundingBox = {
+            x: span.start,
+            y: strip.y,
+            width: span.end - span.start,
+            height: strip.height,
+        };
+        const cell = empty ? undefined : stripCellBox(stripBox, ctx.timeline.box);
+        let labelDraw: PositionedWave['strip']['labelDraw'];
+        let superscripts: PositionedWave['strip']['superscripts'];
+        if (cell) {
+            const paintedRight = cell.x + cell.width;
+            const superscriptWidth = footnotesShown
+                ? footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX
+                : 0;
+            if (superscriptWidth) {
+                const right = paintedRight - WAVE_STRIP_LABEL_PAD_PX + WAVE_LABEL_HALO_PAD_PX;
+                const left =
+                    paintedRight -
+                    WAVE_STRIP_LABEL_PAD_PX -
+                    superscriptWidth -
+                    WAVE_LABEL_HALO_PAD_PX;
+                superscripts = {
+                    rightX: paintedRight - WAVE_STRIP_LABEL_PAD_PX,
+                    halo: { x: left, y: haloY, width: right - left, height: haloHeight },
+                };
+            }
+            if (fit) {
+                const textWidth = stripLabelWidth(fit.label);
+                const x = superscriptWidth
+                    ? Math.min(
+                          labelX,
+                          paintedRight - WAVE_STRIP_LABEL_PAD_PX - superscriptWidth - textWidth / 2,
+                      )
+                    : labelX;
+                const haloWidth = textWidth + 2 * WAVE_LABEL_HALO_PAD_PX;
+                labelDraw = {
+                    x,
+                    halo: { x: x - haloWidth / 2, y: haloY, width: haloWidth, height: haloHeight },
+                };
             }
         }
 
@@ -203,6 +262,9 @@ export function buildWaves(
                 ...(fit ? { label: fit.label, labelWidth: stripLabelWidth(fit.label) } : {}),
                 labelKind: fit?.kind ?? 'none',
                 labelX,
+                ...(cell ? { cell } : {}),
+                ...(labelDraw ? { labelDraw } : {}),
+                ...(superscripts ? { superscripts } : {}),
                 tooltip: tooltipParts.join(' · '),
                 footnotesShown,
                 ...(marker ? { marker } : {}),
@@ -232,6 +294,33 @@ export function buildWaves(
         );
     }
     return built;
+}
+
+/**
+ * A strip cell's painted box: the wave's strip box clipped to the timeline's
+ * backing panel, inset by half the panel's 1 px stroke so the cell never
+ * covers it. Undefined when the two do not overlap (an off-screen wave).
+ */
+function stripCellBox(box: BoundingBox, timelineBox: BoundingBox): BoundingBox | undefined {
+    const inset = WAVE_CELL_INSET_PX;
+    const a: BoundingBox = {
+        x: box.x,
+        y: box.y + inset,
+        width: box.width,
+        height: box.height - 2 * inset,
+    };
+    const b: BoundingBox = {
+        x: timelineBox.x + inset,
+        y: box.y,
+        width: timelineBox.width - 2 * inset,
+        height: box.height,
+    };
+    const x1 = Math.max(a.x, b.x);
+    const y1 = Math.max(a.y, b.y);
+    const x2 = Math.min(a.x + a.width, b.x + b.width);
+    const y2 = Math.min(a.y + a.height, b.y + b.height);
+    if (x2 <= x1 || y2 <= y1) return undefined;
+    return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
 }
 
 interface LabelFit {
