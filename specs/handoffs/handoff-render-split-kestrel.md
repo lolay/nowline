@@ -10,7 +10,7 @@
 
 ## Pending
 
-Paused for Gary's `/compact` (his request). After it, re-read the plan's Status and this handoff, run `plan_state.py`, and launch wave 1 (m1 s1-s7) with `canaryDone: false`, `approved: []`.
+Gary skipped the `/compact` ("continue, compact not needed"). Wave 1's first unit (m1 s1-s7) is launching from `HEAD` of this commit. If this session is lost mid-run, reconcile from git (commits whose subjects start `m1.s`) and resume from the Kickoff prompt.
 
 ## After the run, before the PR
 
