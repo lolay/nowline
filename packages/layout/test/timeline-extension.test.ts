@@ -26,7 +26,7 @@ import { measureRoadmap } from '../src/phases/measure.js';
 import { placeChart } from '../src/phases/place.js';
 import { scheduleRoadmap } from '../src/schedule.js';
 import { generateRoadmap, mulberry32 } from './generated-roadmaps.js';
-import { parseAndResolve } from './helpers.js';
+import { parseAndResolve, parseAndResolveFiles } from './helpers.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -68,6 +68,13 @@ function causesOf(run: () => void): readonly string[] | undefined {
 
 async function causesOfSource(source: string): Promise<readonly string[] | undefined> {
     const { file, resolved } = await parseAndResolve(source);
+    return causesOf(() => layoutRoadmap(file, resolved, { today: TODAY }));
+}
+
+async function causesOfFiles(
+    files: Record<string, string>,
+): Promise<readonly string[] | undefined> {
+    const { file, resolved } = await parseAndResolveFiles(files);
     return causesOf(() => layoutRoadmap(file, resolved, { today: TODAY }));
 }
 
@@ -195,5 +202,103 @@ swimlane a "A"
         };
         const steps = [FINALIZE_STEPS[0], pushBar, ...FINALIZE_STEPS.slice(1)];
         expect(causesOf(() => finalizeRoadmap(fx, steps))).toEqual(['bar']);
+    });
+});
+
+describe('timeline extension for the markers of an isolated region', () => {
+    // The host and its region share one axis, and the window reaches the
+    // region's marker days (engine C counts them), so a region diamond on
+    // the last day grows the axis exactly as a host one does.
+    const host = `nowline v1
+
+include "./region.nowline" roadmap:isolate
+
+roadmap main "Main" start:2026-01-05 scale:1w
+
+swimlane a "A"
+  item a1 "A1" duration:2w
+`;
+
+    it('names a region anchor on the last day', async () => {
+        expect(
+            await causesOfFiles({
+                'main.nowline': host,
+                'region.nowline': `nowline v1
+
+roadmap region "Region" start:2026-01-05
+
+anchor cutoff "Cutoff" date:2026-02-16
+
+swimlane r "R"
+  item r1 "R1" duration:6w
+`,
+            }),
+        ).toEqual(['datedMarker']);
+    });
+
+    it('names a region after-only milestone on the window end', async () => {
+        expect(
+            await causesOfFiles({
+                'main.nowline': host,
+                'region.nowline': `nowline v1
+
+roadmap region "Region" start:2026-01-05
+
+milestone ship "Ship" after:r1
+
+swimlane r "R"
+  item r1 "R1" duration:6w
+`,
+            }),
+        ).toEqual(['afterMilestone']);
+    });
+
+    it('keeps a nested region anchor inside the axis', async () => {
+        // The F3 repro: the anchor is the region's, two includes down, and
+        // falls on the window's last day (Mon 2026-05-04).
+        const { file, resolved } = await parseAndResolveFiles({
+            'main.nowline': `nowline v1
+
+include "./region2.nowline" roadmap:isolate
+
+roadmap main "Main" start:2026-01-05 scale:1w
+
+swimlane a "A"
+  item x "X" duration:1w
+`,
+            'region2.nowline': `nowline v1
+
+include "./region.nowline" roadmap:isolate
+
+roadmap region2 "Region 2" start:2026-01-05
+
+anchor late date:2026-05-04
+
+swimlane r2 "R2"
+  item r2a "R2" duration:2w
+milestone rm "RM" after:r2a
+`,
+            'region.nowline': `nowline v1
+
+roadmap region "Region" start:2026-01-05
+
+size big effort:6w
+
+swimlane r "R"
+  item ra "Region long" size:big
+  item rb "Region tail" duration:3w
+`,
+        });
+        let model: ReturnType<typeof layoutRoadmap> | undefined;
+        const causes = causesOf(() => {
+            model = layoutRoadmap(file, resolved, { today: TODAY });
+        });
+        expect(causes).toEqual(['datedMarker']);
+        const { timeline, includes } = model!;
+        const late = includes.flatMap((inc) => inc.anchors ?? []).find((a) => a.id === 'late');
+        expect(late).toBeDefined();
+        expect(late!.center.x + late!.radius).toBeLessThanOrEqual(
+            timeline.box.x + timeline.box.width,
+        );
     });
 });
