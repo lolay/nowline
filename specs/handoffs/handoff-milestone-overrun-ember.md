@@ -4,9 +4,7 @@ Branch: `claude/intelligent-shannon-fvomdr`, cut from `main` at `8f093e8` (marke
 
 ## Status
 
-Waiting on the maintainer's call (AGENTS.md "Visual changes" gate). Nothing implemented yet.
-
-Pending question, verbatim: "Fix the renderer to the spec (diamond, label and overrun arrow red, in each theme's `milestoneDiamond.cutLineOverrun`), and drop the spec's 'overflowing predecessor bars also show their overflow in red' clause?"
+Approved: renderer to spec (diamond, label and overrun arrow in `cutLineOverrun`), spec's bar-overflow clause rewritten. Implemented with test, fixture `tests/milestone-overrun.nowline`, spec and changelog. Remaining: full render diff main vs branch (`.scratch/render-all.sh`; baseline in `.scratch/before`, rebuild it from `main` if the container was reclaimed), before/after report, PR per `.github/PULL_REQUEST_TEMPLATE.md`, delete this file last.
 
 ## Findings
 
