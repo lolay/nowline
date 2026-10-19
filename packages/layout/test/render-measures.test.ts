@@ -4,6 +4,7 @@
 
 import type { NowlineFile } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
+import { capacityIconDx } from '../src/capacity.js';
 import { estimateTextWidth as estimateTextWidthFromIndex } from '../src/index.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { MARKER_BOLD_WIDTH_FACTOR } from '../src/nodes/marker-geometry.js';
@@ -157,5 +158,50 @@ describe('status-dot colour', () => {
         expect(fillLuminance('ffffff')).toBeCloseTo(1, 10);
         expect(fillLuminance('#000000')).toBe(0);
         expect(Number.isNaN(fillLuminance('zzzzzz'))).toBe(true);
+    });
+});
+
+const CAPACITY_SRC = `nowline v1
+
+config
+
+style counted
+  capacity-icon: person
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane crew "Team" capacity:8 style:counted
+  item a "Alpha" duration:2w capacity:3 style:counted
+  item c "Gamma" duration:1w capacity:4
+`;
+
+describe('capacity icon offset', () => {
+    it('places an item meta-line icon past the meta text and the number', async () => {
+        const model = await lay(CAPACITY_SRC, { theme: 'light' });
+        const a = itemsOf(model).find((i) => i.id === 'a');
+        expect(a?.metaText).toBe('2w');
+        // 0.5 em per char of `2w` and `3`, the 0.6 em separator and the
+        // 0.1 em gap, all at the 11 px meta size.
+        expect(a?.capacity?.iconDx).toBeCloseTo(2 * 5.5 + 6.6 + 5.5 + 1.1, 10);
+        expect(a?.capacity?.iconDx).toBe(capacityIconDx('3', a?.capacity?.icon ?? null, 11, '2w'));
+    });
+
+    it('places a lane badge icon past the number at the badge size', async () => {
+        const lane = (await lay(CAPACITY_SRC, { theme: 'light' })).swimlanes[0];
+        expect(lane.capacity?.icon).toEqual({ kind: 'builtin', name: 'person' });
+        expect(lane.capacity?.iconDx).toBe(estimateTextWidth('8', 10) + 10 * 0.1);
+    });
+
+    it('is omitted for a glyph painted inside the text', async () => {
+        const c = itemsOf(await lay(CAPACITY_SRC, { theme: 'light' })).find((i) => i.id === 'c');
+        expect(c?.capacity?.icon).toEqual({ kind: 'builtin', name: 'multiplier' });
+        expect(c?.capacity && 'iconDx' in c.capacity).toBe(false);
+        expect(capacityIconDx('4', null, 11)).toBeUndefined();
+        expect(capacityIconDx('4', { kind: 'literal', text: '*' }, 11, 'm')).toBeUndefined();
+    });
+
+    it('starts the run at the number when there is no meta text', () => {
+        const icon = { kind: 'builtin', name: 'time' } as const;
+        expect(capacityIconDx('12', icon, 11)).toBe(estimateTextWidth('12', 11) + 11 * 0.1);
     });
 });

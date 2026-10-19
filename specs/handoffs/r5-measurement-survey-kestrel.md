@@ -68,7 +68,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `capacity.ts:156` `estimateCapacitySuffixWidth` estimates the whole suffix for the item caption fit (`nodes/item-measure.ts:304-319`) and the lane badge (`nodes/swimlane-node.ts:51-66`); the icon offset inside it is not kept.
 - **Agree:** the offset is the same expression over the same values. Carried as an offset from the run's start, the renderer adds it once (`x0 + dx`) where it used to add two terms in turn; the sum can differ in the last bit of a double, which `num()` (2 decimals) only shows at an exact rounding tie. Parity decides.
 - **Verdict:** move in s4: carry the built-in icon's offset on `PositionedCapacity`; drop the dead `precedingText` path.
-- **Status:** pending (s4).
+- **Status:** moved in m3.s4: `capacityIconDx` and `META_SUFFIX_DX_EM` in layout's `capacity.ts` (exported); `PositionedCapacity.iconDx` on items and lanes; `renderCapacitySuffix` takes the run start and reads `iconDx`, its unused `precedingText` parameter removed. Parity byte-identical.
 
 ### E9. Meta-line icon x (`renderItemMetaLine`, tight width)
 
@@ -76,7 +76,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** none; layout reserves `0.58 em` per char for the fit (`nodes/item-measure.ts:315-318`).
 - **Agree:** same caveat as E8.
 - **Verdict:** move in s4, with E8 (the same `PositionedCapacity` field: for an item with meta text it holds this offset).
-- **Status:** pending (s4).
+- **Status:** moved in m3.s4 with E8: `META_ICON_EM_PER_CHAR` lives in `capacity.ts`; `renderItemMetaLine` reads `capacity.iconDx`. The `<tspan dx>` separators stay em constants in the renderer.
 
 ### E10. Lane frame-tab badge widths (`renderSwimlane`)
 

@@ -293,7 +293,6 @@ export function renderSwimlane(
             parts.push(
                 renderCapacitySuffix(
                     s.capacity,
-                    undefined,
                     tab.badgeX,
                     labelY,
                     LANE_BADGE_FONT_SIZE_PX,

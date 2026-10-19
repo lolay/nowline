@@ -6,7 +6,6 @@
 import type { InlineDatePin, PositionedCapacity, PositionedItem, Theme } from '@nowline/layout';
 import {
     CORNER_RADIUS_PX,
-    estimateTextWidth,
     ITEM_CAPTION_META_FONT_SIZE_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
     ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX,
@@ -24,6 +23,7 @@ import {
     ITEM_STATUS_DOT_RADIUS_PX,
     itemCaptionInsetX,
     itemCaptionMetaBaselineOffset,
+    META_SUFFIX_DX_EM,
     PROGRESS_STRIP_HEIGHT_PX,
     TEXT_SIZE_PX,
 } from '@nowline/layout';
@@ -38,7 +38,8 @@ import { escAttr, escText, num, tag, textTag } from './xml.js';
  * Paint an item / lane capacity suffix starting at `(x0, baselineY)`. The
  * capacity model arrives pre-resolved from layout (`PositionedCapacity`):
  * `text` is the formatted number, `icon` is either `null` (no glyph), a
- * built-in name, or an inline literal string.
+ * built-in name, or an inline literal string, and `iconDx` places a
+ * built-in SVG icon.
  *
  * Three rendering paths:
  *
@@ -50,7 +51,8 @@ import { escAttr, escText, num, tag, textTag } from './xml.js';
  *      fonts and built-in side bearing, so no `<tspan dx>` separator.
  *   3. `icon.kind === 'builtin'` and `name` ∈ {person, people, points,
  *      time}: paint the number as `<text>`, then drop the curated SVG
- *      icon at the next column (`0.1em` gap, sized to one em). The
+ *      icon at `x0 + iconDx` (layout's `capacityIconDx`: past the
+ *      number's estimated width and a `0.1em` gap, sized to one em). The
  *      icon's `style="color:..."` propagates through the
  *      `currentColor`-bound paths in the icon library.
  *   4. `icon.kind === 'literal'` (inline Unicode literal or
@@ -58,26 +60,19 @@ import { escAttr, escText, num, tag, textTag } from './xml.js';
  *      `<text>`, with a `<tspan dx="0.1em">` separator before the
  *      glyph payload.
  *
- * `precedingText` is the existing meta-line text (or `undefined` when the
- * suffix is standalone). When present, the suffix's left edge starts one
- * space's width past the meta text's estimated right edge so `2w  5×`
- * reads as a single caption rather than running text together.
+ * The number always starts the run at `x0`: an item with meta text paints
+ * its suffix through `renderItemMetaLine` instead.
  */
 export function renderCapacitySuffix(
     capacity: PositionedCapacity,
-    precedingText: string | undefined,
     x0: number,
     baselineY: number,
     fontSize: number,
     fontFamily: string,
     color: string,
 ): string {
-    const charWidthPx = fontSize * 0.58;
-    const precedingWidthPx = precedingText ? estimateTextWidth(precedingText, fontSize) : 0;
-    const separatorPx = precedingText ? charWidthPx : 0;
-    const numberX = x0 + precedingWidthPx + separatorPx;
+    const numberX = x0;
     const { text: numberStr, icon } = capacity;
-    const numberWidthPx = estimateTextWidth(numberStr, fontSize);
     const baseAttrs = {
         'font-family': fontFamily,
         'font-size': fontSize,
@@ -95,14 +90,14 @@ export function renderCapacitySuffix(
     if (icon.kind === 'builtin') {
         const def = CAPACITY_ICON_SVG[icon.name];
         // Render `<text>5</text>` followed by the curated SVG icon. The
-        // icon sits at one font-em wide and tall, with a 0.1em separator
-        // gap. Vertical positioning lifts the icon so its visual center
-        // sits on the text x-height (`baselineY - fontSize * 0.85`); this
-        // matches how Lucide-style outline icons read in inline text.
+        // icon sits at one font-em wide and tall, where layout placed it
+        // past the number. Vertical positioning lifts the icon so its
+        // visual center sits on the text x-height
+        // (`baselineY - fontSize * 0.85`); this matches how Lucide-style
+        // outline icons read in inline text.
         const numberSvg = textTag({ x: num(numberX), y: num(baselineY), ...baseAttrs }, numberStr);
-        const gapPx = fontSize * 0.1;
         const iconSize = fontSize;
-        const iconX = numberX + numberWidthPx + gapPx;
+        const iconX = x0 + (capacity.iconDx ?? 0);
         const iconY = baselineY - fontSize * 0.85;
         const iconSvg = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
         return numberSvg + iconSvg;
@@ -120,26 +115,6 @@ export function renderCapacitySuffix(
 }
 
 /**
- * Em-distance the renderer reserves between an item's metaText and its
- * capacity suffix (or any inline trailing token). Half a space's worth
- * — wide enough to read as a separator, narrow enough not to look like
- * a stray gap. SVG `<tspan dx>` honors this exactly so we don't depend
- * on per-character estimation for the gap itself.
- */
-const META_SUFFIX_DX_EM = 0.6;
-
-/**
- * Tighter em-per-char width estimate used inside `renderItemMetaLine`
- * for positioning a built-in SVG icon after a metaText + number. Layout
- * still uses 0.58 em/char to pessimistically reserve bar width for
- * spill detection (so `metaText 5×` always fits its row); the renderer
- * paints the icon at a tighter offset so there's no visible
- * dead-space between the rendered number and its glyph. Lands inside
- * the layout reservation either way (`0.5 < 0.58`).
- */
-const META_ICON_EM_PER_CHAR = 0.5;
-
-/**
  * Paint the item meta line (metaText plus optional capacity suffix) as
  * a single SVG fragment. Call sites used to emit metaText and the
  * suffix as two unrelated `<text>` nodes whose horizontal offsets came
@@ -154,9 +129,9 @@ const META_ICON_EM_PER_CHAR = 0.5;
  * regardless of how wide metaText actually rendered.
  *
  * Built-in SVG icons (person/people/points/time) still need an `<svg>`
- * sibling outside `<text>`, so the icon's x is computed via the
- * tighter `META_ICON_EM_PER_CHAR` constant — which still lands inside
- * the layout's pessimistic spill reservation.
+ * sibling outside `<text>`; layout places the icon (`capacity.iconDx`,
+ * from `capacityIconDx` at its tighter `META_ICON_EM_PER_CHAR` estimate),
+ * which still lands inside its own pessimistic spill reservation.
  */
 function renderItemMetaLine(opts: {
     metaText: string | undefined;
@@ -178,7 +153,7 @@ function renderItemMetaLine(opts: {
         return textTag({ x: num(x), y: num(baselineY), ...baseAttrs }, metaText!);
     }
     if (!metaText) {
-        return renderCapacitySuffix(capacity, undefined, x, baselineY, fontSize, fontFamily, color);
+        return renderCapacitySuffix(capacity, x, baselineY, fontSize, fontFamily, color);
     }
     const sepDx = num(fontSize * META_SUFFIX_DX_EM);
     const openText =
@@ -212,15 +187,12 @@ function renderItemMetaLine(opts: {
         );
     }
     // Built-in SVG icon — text element holds metaText + tspan-separated
-    // number, then the icon SVG sits at an estimated position. Tighter
-    // per-character estimate than layout's spill detector so the icon
-    // visually hugs the number.
+    // number, then the icon SVG sits where layout placed it, at a tighter
+    // per-character estimate than its spill detector so the icon visually
+    // hugs the number.
     const def = CAPACITY_ICON_SVG[icon.name];
-    const tightWidth = (s: string) => s.length * fontSize * META_ICON_EM_PER_CHAR;
-    const numberStartX = x + tightWidth(metaText) + fontSize * META_SUFFIX_DX_EM;
-    const iconGapPx = fontSize * 0.1;
     const iconSize = fontSize;
-    const iconX = numberStartX + tightWidth(numberStr) + iconGapPx;
+    const iconX = x + (capacity.iconDx ?? 0);
     const iconY = baselineY - fontSize * 0.85;
     const textPart =
         openText +

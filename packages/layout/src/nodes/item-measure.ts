@@ -12,6 +12,7 @@
 import type { EntityProperty, ItemDeclaration, LabelDeclaration } from '@nowline/core';
 import { deriveTotalEffortDays, resolveDuration } from '../calendar.js';
 import {
+    capacityIconDx,
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
     parseCapacityValue,
@@ -306,8 +307,19 @@ export function resolveItemMeta(
     if (capacityValue !== null) {
         const capacityText = formatCapacityNumber(capacityValue);
         const capacityIcon = resolveCapacityIcon(capacityIconName, ctx.symbols);
-        capacity = { value: capacityValue, text: capacityText, icon: capacityIcon };
         const META_FONT_SIZE_PX_LOCAL = 11;
+        const iconDx = capacityIconDx(
+            capacityText,
+            capacityIcon,
+            META_FONT_SIZE_PX_LOCAL,
+            metaText,
+        );
+        capacity = {
+            value: capacityValue,
+            text: capacityText,
+            icon: capacityIcon,
+            ...(iconDx !== undefined ? { iconDx } : {}),
+        };
         // Add a small leading separator (a single space's worth) only when
         // the suffix sits next to existing meta text, so `m 5×` has air
         // between the driver token and the count. Standalone suffix needs no

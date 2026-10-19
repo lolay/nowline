@@ -541,6 +541,13 @@ export interface PositionedCapacity {
     text: string;
     /** Resolved glyph instruction, or `null` when the icon is `'none'`. */
     icon: ResolvedCapacityIconRef | null;
+    /**
+     * For a built-in SVG icon (person, people, points, time): the icon's x
+     * offset from the start of the text run the suffix is painted in (the
+     * item caption x, or the lane badge x), from `capacityIconDx`. Omitted
+     * for every other glyph, which paints inside the `<text>`.
+     */
+    iconDx?: number;
 }
 
 /**
