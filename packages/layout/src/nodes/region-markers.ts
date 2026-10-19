@@ -13,6 +13,7 @@ import { buildAnchors } from './anchor-node.js';
 import {
     datePinnedMarkerEntries,
     type MarkerEntity,
+    markerArrows,
     markerLabelsRightX,
     markerRowPlacements,
     packMarkerRow,
@@ -77,6 +78,7 @@ export function placeRegionMarkers(
             estimateTextWidth,
         ),
         estimateTextWidth,
+        markerArrows(placements),
     );
     const bandTopY = regionTopY + REGION_MARKER_BAND_TOP_PX;
     const laneShift =

@@ -34,7 +34,9 @@
 //                         the caption spilled
 //   slack arrow (marker) = (marker x, marker centre y): an arrow from an
 //                         anchor or milestone starts on that marker's own
-//                         row, in the host band or the region's band
+//                         row, in the host band or the region's band; its
+//                         target sits at or above that row, and no other
+//                         marker's diamond or label sits on its run
 //   item glyph          = top at box.y + 5, inside the bar's top half
 //   container glyph     = inside the header's title row, above the bracket
 //                         line (box.y .. box.y + 13)
@@ -48,7 +50,9 @@ import * as path from 'node:path';
 import { createNowlineServices, type NowlineFile, resolveIncludes } from '@nowline/core';
 import {
     layoutRoadmap,
+    type PositionedAnchor,
     type PositionedItem,
+    type PositionedMilestone,
     type PositionedRoadmap,
     type PositionedSwimlane,
     type PositionedTrackChild,
@@ -228,6 +232,8 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
                             `bar or marker ending there (attach y ${ys.join(', ')})`,
                     );
                 }
+                const source = markerSources.find((k) => near(k.center.y, arrow.y));
+                if (source) checkMarkerRun(m, source, markers, arrow.y, fail);
             }
         }
     }
@@ -256,6 +262,36 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
         }
     }
     return out;
+}
+
+/**
+ * A marker-to-marker arrow ends on its target's line (the target sits at
+ * or above the arrow's row) and its run, between the two diamonds, crosses
+ * no other marker's diamond or label on that row.
+ */
+function checkMarkerRun(
+    target: PositionedMilestone,
+    source: PositionedAnchor | PositionedMilestone,
+    markers: (PositionedAnchor | PositionedMilestone)[],
+    y: number,
+    fail: (msg: string) => void,
+): void {
+    const label = `milestone ${target.id} arrow from ${source.id}`;
+    if (target.center.y > y + EPSILON_PX) {
+        fail(`${label} at y=${y} ends below its target's diamond (y=${target.center.y})`);
+    }
+    const left = Math.min(source.center.x, target.center.x) + source.radius;
+    const right = Math.max(source.center.x, target.center.x) - target.radius;
+    for (const k of markers) {
+        if (k === source || k === target || !near(k.center.y, y)) continue;
+        const spans = [
+            [k.center.x - k.radius, k.center.x + k.radius],
+            [k.labelBox.x, k.labelBox.x + k.labelBox.width],
+        ];
+        if (spans.some(([l, r]) => l < right - EPSILON_PX && r > left + EPSILON_PX)) {
+            fail(`${label} crosses ${k.id} on its row (y=${y})`);
+        }
+    }
 }
 
 const scans: FileScan[] = [];

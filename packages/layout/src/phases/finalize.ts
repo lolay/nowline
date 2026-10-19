@@ -35,6 +35,7 @@ import {
     calendarMarkerEntries,
     type MarkerBand,
     type MarkerEntity,
+    markerArrows,
     markerLabelsRightX,
     markerRowPlacements,
     nonWorkingRunMarkerId,
@@ -727,7 +728,8 @@ function fitWidths(fx: FinalizeContext): boolean {
 /**
  * f5 (was P10): pack every marker once, against the final canvas, so
  * `packMarkerRow` can sort by tick and assign rows and label sides
- * bottom-first. This is the single source of the context's marker
+ * bottom-first, keeping the milestones' marker-to-marker arrows clear
+ * (`markerArrows`, from the placements). This is the single source of the context's marker
  * placements from here on; the measure phase's pre-pack only sized the
  * band before the lanes ran. The band sits at its final top: below a
  * now-pill row that f7 reserves when f2 brought `today` into the axis.
@@ -739,6 +741,7 @@ function packMarkers(fx: FinalizeContext): boolean {
         fx.measured.header.chartLeftX,
         fx.canvas.final,
         estimateTextWidth,
+        markerArrows(fx.chart.milestones),
     );
     const placements = markerRowPlacements(repacked.placements, fx.headerRowsTop().markerRowY);
     const rowCount =
@@ -1065,7 +1068,7 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'packMarkers',
-        reads: ['canvas', 'markerEntries', 'headerBands', 'scale'],
+        reads: ['placement', 'canvas', 'markerEntries', 'headerBands', 'scale'],
         writes: ['markerBand'],
         run: packMarkers,
     },
