@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
     darkTheme,
+    grayscaleTheme,
     HEADER_HEIGHT_PX,
     lightTheme,
     timelineTickLabelBaselineOffsetPx,
@@ -1833,6 +1834,116 @@ milestone beta "Beta" after:alpha
         expect(arrow).toBeGreaterThan(-1);
         expect(arrow).toBeLessThan(region.indexOf('data-layer="item"'));
         expect(arrow).toBeLessThan(region.indexOf('data-id="kickoff"'));
+    });
+});
+
+describe('renderSvg — dated milestone overrun', () => {
+    // Polish ends Mar 2, three weeks past Ship's date: Ship is overrun by
+    // an item and draws one overrun arrow from Polish's end. Review's
+    // predecessor ends on time, so it stays in ink.
+    const OVERRUN_DSL = `nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w
+
+swimlane core "Core"
+  item build "Build" duration:6w
+  item polish "Polish" duration:3w after:build
+
+milestone review "Review" date:2026-02-23 after:build
+milestone ship "Ship" date:2026-02-09 after:polish
+`;
+
+    const milestoneGroup = (svg: string, id: string): string =>
+        groupsMatching(svg, new RegExp(`<g data-id="${id}" data-layer="milestone">`))[0] ?? '';
+    const pathsOf = (fragment: string): string[] =>
+        [...fragment.matchAll(/<path [^>]*>/g)].map((m) => m[0]);
+    const textsOf = (fragment: string): string[] =>
+        [...fragment.matchAll(/<text [^>]*>/g)].map((m) => m[0]);
+    const overrunArrows = (svg: string): string[] =>
+        pathsOf(svg).filter((p) => (attrOf(p, 'marker-end') ?? '').includes('arrow-overrun'));
+
+    for (const [name, theme] of [
+        ['light', lightTheme],
+        ['dark', darkTheme],
+        ['grayscale', grayscaleTheme],
+    ] as const) {
+        it(`paints the diamond, label and overrun arrow in the overrun colour (${name})`, async () => {
+            const model = await parseToModel(OVERRUN_DSL, { theme: name });
+            const ship = model.milestones.find((m) => m.id === 'ship');
+            expect(ship?.isOverrun).toBe(true);
+            expect(ship?.slackArrows).toHaveLength(1);
+            const svg = await renderSvg(model);
+            const red = theme.milestoneDiamond.cutLineOverrun;
+
+            const [diamond] = pathsOf(milestoneGroup(svg, 'ship'));
+            expect(attrOf(diamond, 'fill')).toBe(red);
+            expect(attrOf(diamond, 'stroke')).toBe(red);
+            const [label] = textsOf(milestoneGroup(svg, 'ship'));
+            expect(attrOf(label, 'fill')).toBe(red);
+
+            const arrows = overrunArrows(svg);
+            expect(arrows).toHaveLength(1);
+            expect(attrOf(arrows[0], 'stroke')).toBe(red);
+            expect(attrOf(arrows[0], 'marker-end')).toBe('url(#nl-0-root-arrow-overrun)');
+            expect(svg).toContain(
+                `<marker id="nl-0-root-arrow-overrun" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="${red}"/></marker>`,
+            );
+
+            // A dated milestone that is not overrun keeps the ink.
+            const [inkDiamond] = pathsOf(milestoneGroup(svg, 'review'));
+            expect(attrOf(inkDiamond, 'fill')).toBe(theme.milestoneDiamond.fill);
+            const [inkLabel] = textsOf(milestoneGroup(svg, 'review'));
+            expect(attrOf(inkLabel, 'fill')).toBe(theme.milestoneDiamond.label);
+        });
+    }
+
+    it('paints a wave-overrun milestone red with no arrow and no red marker', async () => {
+        const model = await parseToModel(WAVE_GAP_SRC);
+        expect(model.milestones[0].overrunByWave).toBe('execute');
+        const svg = await renderSvg(model);
+        const red = lightTheme.milestoneDiamond.cutLineOverrun;
+        const group = milestoneGroup(svg, 'exec-done');
+        expect(attrOf(pathsOf(group)[0], 'fill')).toBe(red);
+        expect(attrOf(textsOf(group)[0], 'fill')).toBe(red);
+        expect(overrunArrows(svg)).toEqual([]);
+        expect(svg).not.toContain('arrow-overrun');
+    });
+
+    it("defines the red marker for a region's overrun arrow", async () => {
+        const model = await parseFilesToModel(
+            {
+                'host.nowline': `nowline v1
+
+include "./partner.nowline" roadmap:isolate
+
+roadmap host "Host" start:2026-01-05
+
+swimlane core "Core"
+  item api "API" duration:3w
+`,
+                'partner.nowline': `nowline v1
+
+roadmap partner "Partner" start:2026-01-05
+
+swimlane plugin "Plugin"
+  item build "Plugin build" duration:5w
+
+milestone due "Partner due" date:2026-01-26 after:build
+`,
+            },
+            'host.nowline',
+        );
+        expect(model.milestones).toEqual([]);
+        expect(model.includes[0].milestones?.[0].isOverrun).toBe(true);
+        const svg = await renderSvg(model);
+        const region = groupsMatching(svg, /<g data-layer="include">/)[0] ?? '';
+        expect(overrunArrows(region)).toHaveLength(1);
+        expect(svg).toContain('<marker id="nl-0-root-arrow-overrun"');
+    });
+
+    it('defines no red marker when nothing overruns', async () => {
+        const svg = await renderSvg(await parseToModel(BASIC_DSL));
+        expect(svg).not.toContain('arrow-overrun');
     });
 });
 
