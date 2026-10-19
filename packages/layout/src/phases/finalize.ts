@@ -165,8 +165,9 @@ export type FinalizeTrace = (step: string, changed: boolean, why?: readonly stri
  * §9, F3): a leaf item bar (a bug: the schedule's extent and the placement
  * disagree), a spilled caption (its one capped column), a date-pinned marker
  * (a dated anchor or milestone on the last day), or an after-only milestone
- * on the window end (decision 14). A diamond sits on its day, so its right
- * half passes a window that ends on that day.
+ * on the window end (decision 14), in the main chart or in an isolated
+ * region. A diamond sits on its day, so its right half passes a window that
+ * ends on that day.
  */
 export type TimelineExtensionCause = 'bar' | 'caption' | 'datedMarker' | 'afterMilestone';
 
@@ -551,7 +552,8 @@ function growCanvasForSpill(fx: FinalizeContext): boolean {
  * what passes it is a spilled caption and the right half of a diamond on
  * the window's last day (specs/layout-phases.md §9, F3). Measure the
  * rightmost CONTENT BOX edge — leaf item bars (never a spilled caption,
- * see `maxLeafItemRightX`) and marker diamonds — and grow the window to
+ * see `maxLeafItemRightX`) and marker diamonds, an isolated region's own
+ * included — and grow the window to
  * the next tick boundary when content overflows it. A spilled caption past
  * that end grows it by one more full column at most, labelled by the
  * same rules as any other column: the item measure capped the caption to
@@ -577,6 +579,17 @@ function extendTimeline(fx: FinalizeContext): boolean {
     for (const m of milestones) {
         if (m.fixed) datedRightX = Math.max(datedRightX, m.x + m.radius);
         else afterRightX = Math.max(afterRightX, m.x + m.radius);
+    }
+    // An isolated region's own markers sit on the same axis: placement put
+    // them at their final centre, and the window already reaches their days.
+    for (const inc of includes) {
+        for (const a of inc.anchors ?? []) {
+            datedRightX = Math.max(datedRightX, a.center.x + a.radius);
+        }
+        for (const m of inc.milestones ?? []) {
+            if (m.fixed) datedRightX = Math.max(datedRightX, m.center.x + m.radius);
+            else afterRightX = Math.max(afterRightX, m.center.x + m.radius);
+        }
     }
     const maxContentRightX = Math.max(barRightX, datedRightX, afterRightX);
     const tickDays = calendar.daysPerUnit(scale.unit);
