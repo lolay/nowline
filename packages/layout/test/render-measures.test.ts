@@ -18,8 +18,9 @@ import type {
     PositionedTrackChild,
     PositionedWave,
 } from '../src/types.js';
+import { waveHatchKind } from '../src/wave-hatch.js';
 import { parseAndResolve } from './helpers.js';
-import { EXAMPLE_1, EXAMPLE_11 } from './wave-examples.js';
+import { EXAMPLE_1, EXAMPLE_3, EXAMPLE_11 } from './wave-examples.js';
 
 function errorsOf(file: NowlineFile): string[] {
     return (file.$document?.diagnostics ?? [])
@@ -313,5 +314,43 @@ swimlane a
         expect(empty.empty).toBe(true);
         expect('cell' in empty.strip).toBe(false);
         expect('labelDraw' in empty.strip).toBe(false);
+    });
+});
+
+describe('wave hatch kind', () => {
+    it('marks each background item with the hatch for its fill', async () => {
+        const src = EXAMPLE_3.replace(
+            'roadmap background',
+            'config\n\nstyle navy\n  bg: #172554\n\nroadmap background',
+        ).replace(
+            'item oncall "On-call rotation" duration:6w',
+            'item oncall "On-call rotation" duration:6w style:navy',
+        );
+        const items = itemsOf(await lay(src, { theme: 'light' }));
+        const byId = new Map(items.map((i) => [i.id, i]));
+        expect(byId.get('docs')?.waveRole).toBe('background');
+        expect(byId.get('docs')?.waveHatch).toBe('dark');
+        expect(byId.get('oncall')?.style.bg).toBe('#172554');
+        expect(byId.get('oncall')?.waveHatch).toBe('light');
+        expect(byId.get('schema')?.waveRole).toBe('member');
+        expect(Object.hasOwn(byId.get('schema') ?? {}, 'waveHatch')).toBe(false);
+    });
+
+    it('gives the legend background swatch the hatch of a default bar', async () => {
+        for (const theme of ['light', 'dark'] as const) {
+            const model = await lay(EXAMPLE_3, { theme });
+            const entries = model.waveLegend?.entries ?? [];
+            const background = entries.find((e) => e.kind === 'background');
+            expect(background?.hatch).toBe(waveHatchKind(model.palette.entities.item.bg));
+            for (const e of entries) {
+                if (e.kind !== 'background') expect('hatch' in e).toBe(false);
+            }
+        }
+    });
+
+    it('reads a transparent fill as light', () => {
+        expect(waveHatchKind('none')).toBe('dark');
+        expect(waveHatchKind('#ffffff')).toBe('dark');
+        expect(waveHatchKind('#000000')).toBe('light');
     });
 });

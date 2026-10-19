@@ -26,6 +26,7 @@ import { statusDotColor } from '../status-dot.js';
 import { estimateTextWidth } from '../text-measure.js';
 import { PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
+import { waveHatchKind } from '../wave-hatch.js';
 import { accumulateWaveMember, waveFloorX, waveRoleOf } from '../wave-layout.js';
 import { itemSpanPx } from '../working-span.js';
 import { buildLabelChip, type ItemMeasure, measureItem } from './item-measure.js';
@@ -396,6 +397,7 @@ export function sequenceItem(
     // undefined, so wave-free models keep their exact shape).
     const waveRole = waveRoleOf(node, ctx);
     if (waveRole !== undefined) result.waveRole = waveRole;
+    if (waveRole === 'background') result.waveHatch = waveHatchKind(style.bg);
     if (nonWorkingPin !== undefined) result.nonWorkingPin = nonWorkingPin;
     // The caption cap at the chart's end truncated a title line; the full
     // title stays the bar's tooltip.

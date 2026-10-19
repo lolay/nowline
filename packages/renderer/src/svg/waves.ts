@@ -16,11 +16,11 @@ import type {
     PositionedWaveLegend,
     ResolvedStyle,
     Theme,
+    WaveHatchKind,
 } from '@nowline/layout';
 import {
     CORNER_RADIUS_PX,
     estimateTextWidth,
-    fillLuminance,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     WAVE_BOUNDARY_WIDTH_PX,
     WAVE_CELL_INSET_PX,
@@ -44,31 +44,12 @@ import { escText, num, tag, textTag } from './xml.js';
 // Every wave layer is emitted only when it has content, so a roadmap without
 // waves renders byte-identically: no `wave-*` layers and no hatch `<defs>`.
 
-/**
- * Bar-fill luminance at or above which background work gets the dark hatch
- * (`wave.hatch`); below it, the light one (`wave.hatchOnDark`). The same
- * crossover the status dot picks its palette by (layout's `pickStatusDotPalette`), so
- * the hatch and the dot agree on which bars read as dark.
- */
-const WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE = 0.24;
-
 /** Strip label baseline below the strip's vertical centre (10 px text). */
 const WAVE_LABEL_BASELINE_BELOW_CENTER_PX = 4;
 
 /** Footnote superscripts in the strip: size and baseline below the strip top. */
 const WAVE_SUPERSCRIPT_FONT_SIZE_PX = 8;
 const WAVE_SUPERSCRIPT_BASELINE_OFFSET_PX = 10;
-
-type WaveHatchKind = 'dark' | 'light';
-
-/** The painted fill of a bar, as `rectFrame` paints it. */
-function barFill(style: ResolvedStyle): string {
-    return style.bg === 'none' ? 'transparent' : style.bg;
-}
-
-function waveHatchKind(fill: string): WaveHatchKind {
-    return fillLuminance(fill) >= WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE ? 'dark' : 'light';
-}
 
 function waveHatchUrl(idPrefix: string, kind: WaveHatchKind): string {
     return `url(#${idPrefix}-wave-hatch-${kind})`;
@@ -121,7 +102,8 @@ export function hasOverrunArrow(model: PositionedRoadmap): boolean {
 /**
  * The hatch patterns the SVG uses, in a fixed order: one per kind that a
  * background bar (main lanes or isolated regions) or the legend's hatch
- * swatch needs. Empty without waves.
+ * swatch needs, as layout resolved them (`waveHatch`, `hatch`). Empty
+ * without waves.
  */
 export function usedWaveHatchKinds(model: PositionedRoadmap): WaveHatchKind[] {
     if (!model.waves) return [];
@@ -129,7 +111,7 @@ export function usedWaveHatchKinds(model: PositionedRoadmap): WaveHatchKind[] {
     const walk = (children: PositionedTrackChild[]): void => {
         for (const c of children) {
             if (c.kind === 'item') {
-                if (c.waveRole === 'background') used.add(waveHatchKind(barFill(c.style)));
+                if (c.waveRole === 'background' && c.waveHatch) used.add(c.waveHatch);
             } else {
                 walk(c.children);
             }
@@ -143,8 +125,8 @@ export function usedWaveHatchKinds(model: PositionedRoadmap): WaveHatchKind[] {
     };
     walkLanes(model.swimlanes);
     for (const r of model.includes) walkLanes(r.nestedSwimlanes);
-    if (model.waveLegend?.entries.some((e) => e.kind === 'background')) {
-        used.add(waveHatchKind(legendSwatchFill(model.palette)));
+    for (const e of model.waveLegend?.entries ?? []) {
+        if (e.kind === 'background' && e.hatch) used.add(e.hatch);
     }
     return (['dark', 'light'] as const).filter((k) => used.has(k));
 }
@@ -152,8 +134,14 @@ export function usedWaveHatchKinds(model: PositionedRoadmap): WaveHatchKind[] {
 /**
  * The hatch overlay over a background bar: the bar's rect inset by half its
  * 1 px stroke, with the same corner radius, so it never covers the stroke.
+ * `kind` is the bar's hatch kind as layout resolved it.
  */
-export function hatchOverlay(box: BoundingBox, style: ResolvedStyle, idPrefix: string): string {
+export function hatchOverlay(
+    box: BoundingBox,
+    style: ResolvedStyle,
+    kind: WaveHatchKind,
+    idPrefix: string,
+): string {
     const inset = 0.5;
     const rx = Math.min(CORNER_RADIUS_PX[style.cornerRadius] ?? 4, box.height / 2);
     return tag('rect', {
@@ -163,7 +151,7 @@ export function hatchOverlay(box: BoundingBox, style: ResolvedStyle, idPrefix: s
         height: num(Math.max(0, box.height - 2 * inset)),
         rx: num(rx),
         ry: num(rx),
-        fill: waveHatchUrl(idPrefix, waveHatchKind(barFill(style))),
+        fill: waveHatchUrl(idPrefix, kind),
     });
 }
 
@@ -513,7 +501,7 @@ export function renderWaveLegend(
     const parts: string[] = [];
     for (const entry of legend.entries) {
         const s = entry.swatch;
-        if (s && entry.kind === 'background') {
+        if (s && entry.kind === 'background' && entry.hatch) {
             const fill = legendSwatchFill(palette);
             const geometry = {
                 x: num(s.x),
@@ -539,7 +527,7 @@ export function renderWaveLegend(
                     height: num(s.height - 1),
                     rx: 2,
                     ry: 2,
-                    fill: waveHatchUrl(idPrefix, waveHatchKind(fill)),
+                    fill: waveHatchUrl(idPrefix, entry.hatch),
                 }),
             );
         } else if (s && entry.kind === 'boundary') {

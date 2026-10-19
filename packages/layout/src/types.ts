@@ -19,6 +19,12 @@ export type HeaderPosition = 'beside' | 'above';
 //     either edge of the viewport
 export type TimelinePosition = 'top' | 'bottom' | 'both';
 export type StatusKind = 'planned' | 'in-progress' | 'done' | 'at-risk' | 'blocked' | 'neutral';
+/**
+ * Which hatch stroke marks background work on a fill (specs/waves.md §9.3):
+ * `dark` (`wave.hatch`) on a light fill, `light` (`wave.hatchOnDark`) on a
+ * dark one.
+ */
+export type WaveHatchKind = 'dark' | 'light';
 
 // The style properties from specs/dsl.md § Style Properties, including the
 // roadmap-only knobs (`header-height`, `header-position`, `timeline-position`,
@@ -510,6 +516,11 @@ export interface PositionedItem {
      * waves; omitted otherwise.
      */
     waveRole?: 'member' | 'background';
+    /**
+     * The hatch kind for the bar's fill (`waveHatchKind` in
+     * `wave-hatch.ts`). Set exactly on background items; omitted otherwise.
+     */
+    waveHatch?: WaveHatchKind;
     /**
      * The hover tooltip line wave membership adds to the bar, localized
      * (`Background (no wave)`; specs/waves.md §9.3). Set only on
@@ -1078,6 +1089,11 @@ export interface WaveLegendEntry {
      * line through its centre). Omitted for the wave list.
      */
     swatch?: BoundingBox;
+    /**
+     * The hatch kind of the `background` swatch, a default item bar's fill.
+     * Omitted for the other entries.
+     */
+    hatch?: WaveHatchKind;
     /**
      * The text, one run per legend line the entry occupies (the wave list
      * wraps between waves). `y` is the text baseline.

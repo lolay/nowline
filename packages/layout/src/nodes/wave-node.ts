@@ -49,6 +49,7 @@ import type {
     WaveLegendEntry,
 } from '../types.js';
 import { summarizeWaves } from '../wave-barrier.js';
+import { waveHatchKind } from '../wave-hatch.js';
 import {
     dateAtX,
     spanEndDateAtX,
@@ -606,6 +607,10 @@ export function buildWaveLegend(
                 width: WAVE_LEGEND_SWATCH_WIDTH_PX,
                 height: WAVE_LEGEND_SWATCH_HEIGHT_PX,
             },
+            // The hatched swatch is a default item bar.
+            ...(kind === 'background'
+                ? { hatch: waveHatchKind(ctx.styleCtx.theme.entities.item.bg) }
+                : {}),
             runs: [{ text, x: x + textX0, y }],
         });
     };

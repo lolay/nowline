@@ -216,7 +216,7 @@ export function capacityIconDx(
     fontSizePx: number,
     metaText?: string,
 ): number | undefined {
-    if (!icon || icon.kind !== 'builtin' || icon.name === 'multiplier') return undefined;
+    if (icon?.kind !== 'builtin' || icon.name === 'multiplier') return undefined;
     const gapPx = fontSizePx * CAPACITY_ICON_GAP_EM;
     if (metaText) {
         const tightWidth = (s: string) => s.length * fontSizePx * META_ICON_EM_PER_CHAR;

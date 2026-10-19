@@ -268,7 +268,9 @@ function renderItemBar(i: PositionedItem, idPrefix: string): string {
     // Background work's hatch overlay: a second rect right after the bar
     // rect (which stays the item group's first <rect>), under the progress
     // strip, the status dot and the text.
-    if (i.waveRole === 'background') parts.push(hatchOverlay(i.box, i.style, idPrefix));
+    if (i.waveRole === 'background' && i.waveHatch) {
+        parts.push(hatchOverlay(i.box, i.style, i.waveHatch, idPrefix));
+    }
     return parts.join('');
 }
 

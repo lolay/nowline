@@ -2,7 +2,7 @@
 
 Survey for [`plan-render-split-kestrel.md`](./plan-render-split-kestrel.md) m3. Read at `283bf38` (after the m2 split): every module under `packages/renderer/src/svg/`. Each entry lists where the renderer measures text or derives geometry instead of reading the positioned model, layout's counterpart, whether the two agree for every input the renderer can see, and the verdict. Tracked on the branch and removed with the plan.
 
-Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
+Line numbers are at `283bf38`. Each entry's "Status" says which m3 commit moved it, or why it stays. Every move rendered the parity matrix (`r5-parity.sh check`, 252 renders) byte-identical to the baseline.
 
 ## Entries
 
@@ -12,7 +12,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `text-measure.ts:14` `estimateTextWidth(text, fontSize)`, the same expression in the same operand order. Not exported from `@nowline/layout` at `283bf38`.
 - **Agree:** yes, for every input (identical expression, so identical doubles).
 - **Verdict:** move in s2: export `estimateTextWidth`, delete the copy.
-- **Status:** moved in m3.s2: `estimateTextWidth` exported from `@nowline/layout`, `estimateCaptionWidthPx` deleted.
+- **Status:** moved in m3.s2 (`02c9aba`): `estimateTextWidth` exported from `@nowline/layout`, `estimateCaptionWidthPx` deleted.
 
 ### E2. Wave strip label width (`waveTextWidth`, bold)
 
@@ -20,7 +20,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/wave-node.ts:257` (`fitStripLabel`) computes `estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) * MARKER_BOLD_WIDTH_FACTOR` for the candidate that won, but does not keep it.
 - **Agree:** yes, for every label (same expression; the renderer measures the label `fitStripLabel` returned).
 - **Verdict:** move in s2: carry the winning label's bold width on `PositionedWaveStrip`.
-- **Status:** moved in m3.s2: `estimateTextWidth` exported from `@nowline/layout`; `PositionedWaveStrip.labelWidth`.
+- **Status:** moved in m3.s2 (`02c9aba`): `estimateTextWidth` exported from `@nowline/layout`; `PositionedWaveStrip.labelWidth`.
 
 ### E3. Wave gap-label and placeholder halo widths (`waveTextWidth`, regular)
 
@@ -28,7 +28,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** the gap label's width is computed at `nodes/wave-node.ts:171` (`estimateTextWidth(span.floorRef, 10)`) for its fit test. The placeholder is built at `nodes/wave-node.ts:229` and copied onto `timeline.waveStrip.placeholder` by `phases/finalize.ts:911-912`; nothing measures it.
 - **Agree:** gap label yes (same expression). Placeholder: no layout value exists.
 - **Verdict:** gap label width: move in s2 (carry on `gapLabel`). Placeholder width: leave (see F1).
-- **Status:** gap label moved in m3.s2 (`gapLabel.width`); placeholder left (F1): the renderer measures it with layout's `estimateTextWidth`.
+- **Status:** gap label moved in m3.s2 (`02c9aba`) (`gapLabel.width`); placeholder left (F1): the renderer measures it with layout's `estimateTextWidth`.
 
 ### E4. Wave label halo boxes and superscript offsets
 
@@ -36,7 +36,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/wave-node.ts:120-137` computes the visible cell span (`cellLeft..cellRight`, unclipped by the half-pixel inset) and the superscript width for the fit; the boxes themselves are not kept. Timeline box and strip y are final when `buildWaves` runs (`phases/finalize.ts:897-916`, step f9, after `extendTimeline` and `fitWidths`).
 - **Agree:** the inputs layout sees (`ctx.timeline.box`, `strip`, the label width from E2) are the objects the renderer reads, so the same expressions over them give the same doubles.
 - **Verdict:** move in s5: carry the painted cell box, the label's drawn x and halo, the superscript halo and first superscript x, and the gap label's halo on the positioned wave. The placeholder halo stays with F1.
-- **Status:** moved in m3.s5: `PositionedWaveStrip.cell` (from `stripCellBox`, the renderer's `waveCellBox` arithmetic), `labelDraw` (`x`, `halo`), `superscripts` (`rightX`, `halo`) and `gapLabel.halo`; `WAVE_LABEL_HALO_PAD_PX`, `WAVE_LABEL_HALO_INSET_Y_PX` and `WAVE_CELL_INSET_PX` moved to layout's `themes/shared.ts` (exported; the renderer still needs the inset for the cell corners and the halo constants for F1). The matrix has no wave superscripts, so a scratch roadmap (Example 1 with footnotes on two waves) was also rendered on both sides: identical. The placeholder halo stays in the renderer (F1).
+- **Status:** moved in m3.s5 (`781c7a0`): `PositionedWaveStrip.cell` (from `stripCellBox`, the renderer's `waveCellBox` arithmetic), `labelDraw` (`x`, `halo`), `superscripts` (`rightX`, `halo`) and `gapLabel.halo`; `WAVE_LABEL_HALO_PAD_PX`, `WAVE_LABEL_HALO_INSET_Y_PX` and `WAVE_CELL_INSET_PX` moved to layout's `themes/shared.ts` (exported; the renderer still needs the inset for the cell corners and the halo constants for F1). The matrix has no wave superscripts, so a scratch roadmap (Example 1 with footnotes on two waves) was also rendered on both sides: identical. The placeholder halo stays in the renderer (F1).
 
 ### E5. Status-key table and `pickStatusDotPalette`
 
@@ -44,7 +44,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** none. The theme tokens are `Theme.statusDot` (`themes/shape.ts:228`, `themes/light.ts:252`); `item.style.bg` is final once `measureItem` applies the status tint (`nodes/item-measure.ts:386`), before `sequenceItem` builds the item (`nodes/sequence-item.ts:354`). `PositionedRoadmap.palette` is the same theme object as `ctx.styleCtx.theme` (`phases/finalize.ts:1195`, `layout-context.ts:253`).
 - **Agree:** n/a (no counterpart); the move keeps the renderer's code verbatim.
 - **Verdict:** move in s3: layout resolves the dot colour and carries it on `PositionedItem`.
-- **Status:** moved in m3.s3: `status-dot.ts` in layout (`statusDotColor`, `pickStatusDotPalette`, verbatim); `PositionedItem.statusDotColor`, set in `sequenceItem`.
+- **Status:** moved in m3.s3 (`571f124`): `status-dot.ts` in layout (`statusDotColor`, `pickStatusDotPalette`, verbatim); `PositionedItem.statusDotColor`, set in `sequenceItem`.
 
 ### E6. Two `relativeLuminance` copies
 
@@ -52,7 +52,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `themes/contrast.ts:22` (exported as `relativeLuminance`) goes through `hexToRgb`, which throws on anything that is not 3- or 6-digit hex.
 - **Agree:** for `#rgb` / `#rrggbb` yes (same channel maths, same coefficients, same order). For `none`, `transparent` (the painted fill of a `bg:none` bar, `waves.ts:68-70`) and any non-hex string the renderer's returns a value and layout's throws. `style.bg` can be `none` for every item with `bg:none`.
 - **Verdict:** move in s3, keeping the renderer's semantics in the moved code under a distinct name (layout's `relativeLuminance` keeps its throwing contract for the contrast tests and wave labels). Not reconciled.
-- **Status:** moved in m3.s3, not reconciled: the renderer's copy is layout's `fillLuminance` (exported; `waves.ts` hatch kind reads it until E7), with its semantics kept and a unit test for the non-hex cases.
+- **Status:** moved in m3.s3 (`571f124`), not reconciled: the renderer's copy is layout's `fillLuminance` (exported in m3.s3 for the `waves.ts` hatch kind), with its semantics kept and a unit test for the non-hex cases. m3.s6 made it layout-internal again once E7 moved.
 
 ### E7. Wave hatch kind from bar luminance
 
@@ -60,7 +60,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** none.
 - **Agree:** n/a.
 - **Verdict:** candidate for s6 (not covered by s2-s5): layout resolves each background item's hatch kind and the legend swatch's.
-- **Status:** pending (s6).
+- **Status:** moved in m3.s6: layout's `wave-hatch.ts` (`waveHatchKind`, with the 0.24 threshold and `barFill`, verbatim), `PositionedItem.waveHatch` on background items, `WaveLegendEntry.hatch` on the background swatch, and the `WaveHatchKind` type. `hatchOverlay` takes the kind; the renderer no longer computes any luminance, so `fillLuminance` is no longer exported.
 
 ### E8. Capacity suffix x positions (`renderCapacitySuffix`)
 
@@ -68,7 +68,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `capacity.ts:156` `estimateCapacitySuffixWidth` estimates the whole suffix for the item caption fit (`nodes/item-measure.ts:304-319`) and the lane badge (`nodes/swimlane-node.ts:51-66`); the icon offset inside it is not kept.
 - **Agree:** the offset is the same expression over the same values. Carried as an offset from the run's start, the renderer adds it once (`x0 + dx`) where it used to add two terms in turn; the sum can differ in the last bit of a double, which `num()` (2 decimals) only shows at an exact rounding tie. Parity decides.
 - **Verdict:** move in s4: carry the built-in icon's offset on `PositionedCapacity`; drop the dead `precedingText` path.
-- **Status:** moved in m3.s4: `capacityIconDx` and `META_SUFFIX_DX_EM` in layout's `capacity.ts` (exported); `PositionedCapacity.iconDx` on items and lanes; `renderCapacitySuffix` takes the run start and reads `iconDx`, its unused `precedingText` parameter removed. Parity byte-identical.
+- **Status:** moved in m3.s4 (`fe92575`): `capacityIconDx` and `META_SUFFIX_DX_EM` in layout's `capacity.ts` (exported); `PositionedCapacity.iconDx` on items and lanes; `renderCapacitySuffix` takes the run start and reads `iconDx`, its unused `precedingText` parameter removed. Parity byte-identical. (m3.s6 rewrote the guard in `capacityIconDx` as an optional chain to clear a biome `useOptionalChain` warning s4 added.)
 
 ### E9. Meta-line icon x (`renderItemMetaLine`, tight width)
 
@@ -76,7 +76,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** none; layout reserves `0.58 em` per char for the fit (`nodes/item-measure.ts:315-318`).
 - **Agree:** same caveat as E8.
 - **Verdict:** move in s4, with E8 (the same `PositionedCapacity` field: for an item with meta text it holds this offset).
-- **Status:** moved in m3.s4 with E8: `META_ICON_EM_PER_CHAR` lives in `capacity.ts`; `renderItemMetaLine` reads `capacity.iconDx`. The `<tspan dx>` separators stay em constants in the renderer.
+- **Status:** moved in m3.s4 (`fe92575`) with E8: `META_ICON_EM_PER_CHAR` lives in `capacity.ts`; `renderItemMetaLine` reads `capacity.iconDx`. The `<tspan dx>` separators stay em constants in the renderer.
 
 ### E10. Lane frame-tab badge widths (`renderSwimlane`)
 
@@ -84,7 +84,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/swimlane-node.ts:61` (`badgeWidthPx`, same call) and `:196-199` (`footnoteIndicatorWidthPx`, same expression), both at `LANE_CAPACITY_BADGE_FONT_SIZE_PX = 10`; used for the tab collision, not kept.
 - **Agree:** yes, for every lane (same expressions over the same inputs).
 - **Verdict:** move in s5: carry both widths on `PositionedSwimlane`. The tab geometry itself stays a renderer call to layout's `frameTabGeometry` (see F2).
-- **Status:** moved in m3.s5: `PositionedSwimlane.capacityBadgeWidth` and `footnoteIndicatorWidth`, the values layout already sized the tab collision with; `renderSwimlane` passes them to `frameTabGeometry`.
+- **Status:** moved in m3.s5 (`781c7a0`): `PositionedSwimlane.capacityBadgeWidth` and `footnoteIndicatorWidth`, the values layout already sized the tab collision with; `renderSwimlane` passes them to `frameTabGeometry`.
 
 ### E11. Item caption x (`itemCaptionX`)
 
@@ -92,6 +92,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `item-bar-geometry.ts:279-311` `layoutSpillCluster` returns `captionX` for the spilled case, adding the tile and the gap as two steps where the renderer adds their sum once.
 - **Agree:** spilled case equal up to float association; in-bar case depends on a render option layout never sees.
 - **Verdict:** leave: the in-bar branch reads `noLinks`, a renderer option, so the function cannot leave the renderer; the inset itself is already layout's helper (`itemCaptionInsetX`). No text is measured here.
+- **Status:** left (reason above).
 
 ### E12. Include-region chrome
 
@@ -99,6 +100,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/include-node.ts:162` calls the same helper on the same inputs to size the region.
 - **Agree:** yes (one helper, same inputs).
 - **Verdict:** leave: the measurement already lives in layout's helper; the renderer only calls it. Carrying the chrome would mean a write in finalize (out of scope).
+- **Status:** left (reason above).
 
 ### E13. Drawing-only derivations (no measurement)
 
@@ -110,3 +112,5 @@ Read and judged drawing, not layout: the capacity icon's vertical lift `baseline
 
 - **F1. Wave placeholder halo width.** The all-empty placeholder's halo (`waves.ts:418`) is sized from its text in the renderer. Layout builds the placeholder in `buildWaves` but `phases/finalize.ts:911-912` copies only the string onto `timeline.waveStrip`, and finalize is out of scope for R5. Fixture: none under `tests/` or `examples/` draws the placeholder; a roadmap whose every wave has no members does (`wave w1` with no `wave:w1` item). Carry the width (or the halo box) on `timeline.waveStrip` when finalize is next touched.
 - **F2. Frame-tab owner text differs between layout and renderer.** Layout sizes the tab collision with the raw `owner:` value at `box.x = 0` (`nodes/swimlane-node.ts:105-114`); the renderer draws the tab with the resolved display owner (`s.owner`) at `s.box.x` (`swimlanes.ts:237-243`). For an owner whose id and title differ, the drawn tab is wider or narrower than the box layout reserved. Unifying them changes bytes (behaviour), so R5 keeps both calls.
+- **Status:** left (reason above).
+
