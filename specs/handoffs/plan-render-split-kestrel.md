@@ -191,5 +191,6 @@ review wave-1 (nowline m1 s1-s7) 831468b..8938c21: PASS - pure moves verbatim in
 tokens orchestrator-kickoff plan-render-split-kestrel (claude-opus-5-5): input ~70 / cache read ~6M / cache write ~0 5m + ~180k 1h / output ~35k | ~$3.33 API-equiv
 tokens wave-1 nowline-m1-s1-s7 (claude-sonnet-5-5): input ~92 / cache read ~4.5M / cache write ~130k / output ~27k | ~$1.50 API-equiv (output est.) session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef
 tokens review-wave-1 nowline-m1-s1-s7 (claude-opus-5-5): input ~32 / cache read ~470k / cache write ~39k / output ~10k | ~$0.50 API-equiv (output est.) session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef
-tokens orchestrator-wave-1 nowline-m1-s1-s7 (claude-opus-5-5): input ~20 / cache read ~2.2M / cache write ~0 5m + ~30k 1h / output ~7.8k | ~$0.82 API-equiv
+tokens orchestrator-wave-1 nowline-m1-s1-s7 (claude-opus-5-5): input ~12 / cache read ~1.2M / cache write ~0 5m + ~12k 1h / output ~5.9k | ~$0.45 API-equiv
 tokens wave-1 nowline-m2-s1-s7 (claude-sonnet-5-5): input ~56 / cache read ~2.9M / cache write ~84k / output ~19k | ~$0.98 API-equiv (output est.) session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef
+tokens orchestrator-wave-1 nowline-m2-s1-s7 (claude-opus-5-5): input ~24 / cache read ~3.2M / cache write ~0 5m + ~43k 1h / output ~12k | ~$1.21 API-equiv

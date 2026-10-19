@@ -4,7 +4,7 @@
 - **Plan:** [`plan-render-split-kestrel.md`](./plan-render-split-kestrel.md).
 - **Mode:** unattended, confirmed 2026-10-19 in session `fc39e88b` (dialog: Unattended; session: This session).
 - **Done:** wave 1 unit m1 s1-s7, `831468b..8938c21`, review PASS (parity harness; primitives, waves, timeline, nowline, markers, edges moved; `render.ts` 3192 -> 1730 lines). Plan tagged into 3 waves: 1 [exec] m1 s1-s7 + m2 s1-s7 (two units, one per milestone), 2 [deep] m3 s1-s6, 3 [exec] m4 s1.
-- **Spend:** ~$7.14 of ~$15 expected (Cost table in the plan); guard 3x min $50.
+- **Spend:** ~$8.0 of ~$15 expected (Cost table in the plan); guard 3x min $50.
 - **Next unit:** wave 1, m2 s1-s7 [exec] (`nowline m2 s1-s7`), relaunched from `8307d3e`; the worker skips steps that already have commits once they meet acceptance. Gate 4 passed unattended.
 - **Resume:** paste the plan's Kickoff prompt into a new session, or answer the pending question here.
 
@@ -18,7 +18,7 @@ The container restarted while run `wf_2dad70a4-aba` (m2 s1-s7) was working, so t
 
 Gary answered "just run it here". The relaunch in session `fc39e88b` was denied by the gate hook, verbatim: "personal-plan-orchestrate gate: run wf_2dad70a4-aba has not finished; wait for it (a run with no record after a crash means: start a new session)". m2 has to run from a new session: paste the plan's Kickoff prompt (it confirms unattended once), and the worker re-verifies the partial m2.s5 commit before s6 and s7.
 
-Question to Gary (verbatim): "The hook won't relaunch in this session after the crash. Start a new cloud session on this branch from the Kickoff prompt?"
+Gary said yes to a new session ("yes, start the new session"); session `fc39e88b` started a cloud session on `claude/lucid-cannon-6tq5ly` with the Kickoff prompt and stops orchestrating. The new session confirms unattended with Gary once, then launches m2.
 
 ## After the run, before the PR
 
