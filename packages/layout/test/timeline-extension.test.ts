@@ -142,6 +142,23 @@ swimlane a "A"
         ).toEqual(['caption']);
     });
 
+    it('gives a caption a hair past the axis end its full column', async () => {
+        // `downstream`'s caption ends 0.4 px past the `length:14w` axis end
+        // (Mon 2026-04-13), well inside the right gutter, and still earns
+        // the one column: any overhang counts (specs/rendering.md § "Caption
+        // cap at the chart's end").
+        const abs = path.join(REPO, 'tests/inline-date-corners.nowline');
+        const { file, resolved } = await parseAndResolve(await readFile(abs, 'utf8'), abs, (p) =>
+            readFile(p, 'utf8'),
+        );
+        let model: ReturnType<typeof layoutRoadmap> | undefined;
+        const causes = causesOf(() => {
+            model = layoutRoadmap(file, resolved, { today: TODAY });
+        });
+        expect(causes).toEqual(['caption']);
+        expect(model!.timeline.endDate).toEqual(new Date(Date.UTC(2026, 3, 20)));
+    });
+
     it('names a dated anchor on the last day', async () => {
         expect(
             await causesOfSource(`nowline v1
