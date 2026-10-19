@@ -12,7 +12,7 @@
 import type { EntityProperty, ItemDeclaration, LabelDeclaration } from '@nowline/core';
 import { deriveTotalEffortDays, resolveDuration } from '../calendar.js';
 import {
-    capacityIconDx,
+    capacityIconDxTerms,
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
     parseCapacityValue,
@@ -308,7 +308,7 @@ export function resolveItemMeta(
         const capacityText = formatCapacityNumber(capacityValue);
         const capacityIcon = resolveCapacityIcon(capacityIconName, ctx.symbols);
         const META_FONT_SIZE_PX_LOCAL = 11;
-        const iconDx = capacityIconDx(
+        const iconDxTerms = capacityIconDxTerms(
             capacityText,
             capacityIcon,
             META_FONT_SIZE_PX_LOCAL,
@@ -318,7 +318,7 @@ export function resolveItemMeta(
             value: capacityValue,
             text: capacityText,
             icon: capacityIcon,
-            ...(iconDx !== undefined ? { iconDx } : {}),
+            ...(iconDxTerms !== undefined ? { iconDxTerms } : {}),
         };
         // Add a small leading separator (a single space's worth) only when
         // the suffix sits next to existing meta text, so `m 5×` has air

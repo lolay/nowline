@@ -183,7 +183,6 @@ export function buildWaves(
                 gapLabel = {
                     text: span.floorRef,
                     x,
-                    width: textWidth,
                     halo: { x: x - haloWidth / 2, y: haloY, width: haloWidth, height: haloHeight },
                 };
             }
@@ -260,7 +259,7 @@ export function buildWaves(
                     width: span.end - span.start,
                     height: strip.height,
                 },
-                ...(fit ? { label: fit.label, labelWidth: stripLabelWidth(fit.label) } : {}),
+                ...(fit ? { label: fit.label } : {}),
                 labelKind: fit?.kind ?? 'none',
                 labelX,
                 ...(cell ? { cell } : {}),

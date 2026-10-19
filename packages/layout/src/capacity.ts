@@ -199,29 +199,33 @@ const CAPACITY_ICON_GAP_EM = 0.1;
 
 /**
  * Where a built-in SVG capacity icon (person, people, points, time) sits:
- * its x offset (px) from the start of the text run the suffix is painted
- * in, at `fontSizePx`. Undefined for every other glyph (`null`, the
- * multiplier, a literal), which the renderer paints inside the `<text>`.
+ * the px terms that, added in order to the start x of the text run the
+ * suffix is painted in, give the icon's x, at `fontSizePx`. Undefined for
+ * every other glyph (`null`, the multiplier, a literal), which the
+ * renderer paints inside the `<text>`.
  *
- * With `metaText`, the run is the item meta line: the number follows the
- * meta text after a `META_SUFFIX_DX_EM` separator, and the icon follows
- * the number, both measured at the tighter `META_ICON_EM_PER_CHAR` so the
- * icon hugs the number. Without it, the number starts the run (an item
- * with no meta text, or a lane badge) and the icon follows its
- * `estimateTextWidth` width. Either way a 0.1 em gap precedes the icon.
+ * The terms are kept apart rather than summed so the renderer adds them to
+ * its x one at a time, in this order, exactly as it did when it measured
+ * them itself; a pre-summed offset can round differently at the last bit.
+ *
+ * With `metaText`, the run is the item meta line: the meta text's width,
+ * the `META_SUFFIX_DX_EM` separator, the number's width (both widths at
+ * the tighter `META_ICON_EM_PER_CHAR` so the icon hugs the number), then
+ * the gap. Without it, the number starts the run (an item with no meta
+ * text, or a lane badge): its `estimateTextWidth` width, then the gap.
+ * The gap is always 0.1 em.
  */
-export function capacityIconDx(
+export function capacityIconDxTerms(
     text: string,
     icon: ResolvedCapacityIcon | null,
     fontSizePx: number,
     metaText?: string,
-): number | undefined {
+): readonly number[] | undefined {
     if (icon?.kind !== 'builtin' || icon.name === 'multiplier') return undefined;
     const gapPx = fontSizePx * CAPACITY_ICON_GAP_EM;
     if (metaText) {
         const tightWidth = (s: string) => s.length * fontSizePx * META_ICON_EM_PER_CHAR;
-        const numberStartDx = tightWidth(metaText) + fontSizePx * META_SUFFIX_DX_EM;
-        return numberStartDx + tightWidth(text) + gapPx;
+        return [tightWidth(metaText), fontSizePx * META_SUFFIX_DX_EM, tightWidth(text), gapPx];
     }
-    return estimateTextWidth(text, fontSizePx) + gapPx;
+    return [estimateTextWidth(text, fontSizePx), gapPx];
 }

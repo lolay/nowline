@@ -4,7 +4,7 @@
 
 import type { NowlineFile } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { capacityIconDx, estimateCapacitySuffixWidth } from '../src/capacity.js';
+import { capacityIconDxTerms, estimateCapacitySuffixWidth } from '../src/capacity.js';
 import { estimateTextWidth as estimateTextWidthFromIndex } from '../src/index.js';
 import { ITEM_FOOTNOTE_INDICATOR_STEP_PX } from '../src/item-bar-geometry.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
@@ -21,6 +21,11 @@ import type {
 import { waveHatchKind } from '../src/wave-hatch.js';
 import { parseAndResolve } from './helpers.js';
 import { EXAMPLE_1, EXAMPLE_3, EXAMPLE_11 } from './wave-examples.js';
+
+/** A strip label's width at the strip's 10 px bold weight. */
+function boldWidth(text: string): number {
+    return estimateTextWidth(text, 10) * MARKER_BOLD_WIDTH_FACTOR;
+}
 
 function errorsOf(file: NowlineFile): string[] {
     return (file.$document?.diagnostics ?? [])
@@ -55,43 +60,6 @@ describe('text width estimator', () => {
     it('is exported from the package entry point', () => {
         expect(estimateTextWidthFromIndex).toBe(estimateTextWidth);
         expect(estimateTextWidthFromIndex('abcd', 10)).toBeCloseTo(23.2, 10);
-    });
-});
-
-describe('wave strip label widths', () => {
-    it('carry the bold 10 px width of each strip label', async () => {
-        const waves = wavesOf(await lay(EXAMPLE_1));
-        expect(waves.map((w) => w.strip.label)).toEqual(['Discover', 'Build', 'Launch']);
-        for (const w of waves) {
-            expect(w.strip.labelWidth).toBe(
-                estimateTextWidth(w.strip.label ?? '', 10) * MARKER_BOLD_WIDTH_FACTOR,
-            );
-        }
-        // 'Discover': 8 chars at 0.58 em of 10 px, widened 5 % for bold.
-        expect(waves[0].strip.labelWidth).toBeCloseTo(48.72, 10);
-    });
-
-    it('omit the width when the strip has no label', async () => {
-        const model = await lay(`nowline v1
-
-roadmap r "R" start:2026-01-05 scale:1w
-
-wave w1 "One"
-wave w2 "Two"
-
-swimlane a
-  item a1 duration:2w wave:w1
-`);
-        const empty = wavesOf(model)[1];
-        expect(empty.strip.labelKind).toBe('none');
-        expect('labelWidth' in empty.strip).toBe(false);
-    });
-
-    it('carry the regular 10 px width of a gap floor label', async () => {
-        const model = await lay(EXAMPLE_11.replace('date:2026-02-02', 'date:2026-02-16'));
-        const gap = wavesOf(model)[1].strip.gapLabel;
-        expect(gap?.text).toBe('fy-budget');
-        expect(gap?.width).toBe(estimateTextWidth('fy-budget', 10));
     });
 });
 
@@ -182,29 +150,35 @@ describe('capacity icon offset', () => {
         const model = await lay(CAPACITY_SRC, { theme: 'light' });
         const a = itemsOf(model).find((i) => i.id === 'a');
         expect(a?.metaText).toBe('2w');
-        // 0.5 em per char of `2w` and `3`, the 0.6 em separator and the
-        // 0.1 em gap, all at the 11 px meta size.
-        expect(a?.capacity?.iconDx).toBeCloseTo(2 * 5.5 + 6.6 + 5.5 + 1.1, 10);
-        expect(a?.capacity?.iconDx).toBe(capacityIconDx('3', a?.capacity?.icon ?? null, 11, '2w'));
+        // 0.5 em per char of `2w`, the 0.6 em separator, 0.5 em per char
+        // of `3` and the 0.1 em gap, all at the 11 px meta size, in the
+        // order the renderer adds them to the caption x.
+        expect(a?.capacity?.iconDxTerms).toEqual([2 * 11 * 0.5, 11 * 0.6, 11 * 0.5, 11 * 0.1]);
+        expect(a?.capacity?.iconDxTerms).toEqual(
+            capacityIconDxTerms('3', a?.capacity?.icon ?? null, 11, '2w'),
+        );
     });
 
     it('places a lane badge icon past the number at the badge size', async () => {
         const lane = (await lay(CAPACITY_SRC, { theme: 'light' })).swimlanes[0];
         expect(lane.capacity?.icon).toEqual({ kind: 'builtin', name: 'person' });
-        expect(lane.capacity?.iconDx).toBe(estimateTextWidth('8', 10) + 10 * 0.1);
+        expect(lane.capacity?.iconDxTerms).toEqual([estimateTextWidth('8', 10), 10 * 0.1]);
     });
 
     it('is omitted for a glyph painted inside the text', async () => {
         const c = itemsOf(await lay(CAPACITY_SRC, { theme: 'light' })).find((i) => i.id === 'c');
         expect(c?.capacity?.icon).toEqual({ kind: 'builtin', name: 'multiplier' });
-        expect(c?.capacity && 'iconDx' in c.capacity).toBe(false);
-        expect(capacityIconDx('4', null, 11)).toBeUndefined();
-        expect(capacityIconDx('4', { kind: 'literal', text: '*' }, 11, 'm')).toBeUndefined();
+        expect(c?.capacity && 'iconDxTerms' in c.capacity).toBe(false);
+        expect(capacityIconDxTerms('4', null, 11)).toBeUndefined();
+        expect(capacityIconDxTerms('4', { kind: 'literal', text: '*' }, 11, 'm')).toBeUndefined();
     });
 
     it('starts the run at the number when there is no meta text', () => {
         const icon = { kind: 'builtin', name: 'time' } as const;
-        expect(capacityIconDx('12', icon, 11)).toBe(estimateTextWidth('12', 11) + 11 * 0.1);
+        expect(capacityIconDxTerms('12', icon, 11)).toEqual([
+            estimateTextWidth('12', 11),
+            11 * 0.1,
+        ]);
     });
 });
 
@@ -252,7 +226,7 @@ describe('wave strip label geometry', () => {
                 Math.min(w.strip.box.x + w.strip.box.width, t.box.x + t.box.width - 0.5),
                 10,
             );
-            const haloWidth = (w.strip.labelWidth ?? 0) + 4;
+            const haloWidth = boldWidth(w.strip.label ?? '') + 4;
             expect(w.strip.labelDraw).toEqual({
                 x: w.strip.labelX,
                 halo: {
@@ -281,7 +255,7 @@ describe('wave strip label geometry', () => {
         expect(build.strip.superscripts?.rightX).toBe(cellRight - 6);
         expect(build.strip.superscripts?.halo.x).toBe(cellRight - 6 - width - 2);
         expect(build.strip.superscripts?.halo.width).toBeCloseTo(width + 4, 10);
-        const labelWidth = build.strip.labelWidth ?? 0;
+        const labelWidth = boldWidth(build.strip.label ?? '');
         expect(build.strip.labelDraw?.x).toBe(
             Math.min(build.strip.labelX, cellRight - 6 - width - labelWidth / 2),
         );
@@ -293,10 +267,11 @@ describe('wave strip label geometry', () => {
         const gap = wavesOf(model)[1].strip.gapLabel;
         expect(gap && strip).toBeTruthy();
         if (!gap || !strip) return;
+        const width = estimateTextWidth('fy-budget', 10);
         expect(gap.halo).toEqual({
-            x: gap.x - (gap.width + 4) / 2,
+            x: gap.x - (width + 4) / 2,
             y: strip.y + 3,
-            width: gap.width + 4,
+            width: width + 4,
             height: strip.height - 6,
         });
         const empty = wavesOf(

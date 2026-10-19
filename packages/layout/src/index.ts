@@ -6,7 +6,7 @@ export {
     MIN_PIXELS_PER_DAY,
 } from './canvas-width.js';
 export {
-    capacityIconDx,
+    capacityIconDxTerms,
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
     META_SUFFIX_DX_EM,

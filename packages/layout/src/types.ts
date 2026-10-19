@@ -553,12 +553,14 @@ export interface PositionedCapacity {
     /** Resolved glyph instruction, or `null` when the icon is `'none'`. */
     icon: ResolvedCapacityIconRef | null;
     /**
-     * For a built-in SVG icon (person, people, points, time): the icon's x
-     * offset from the start of the text run the suffix is painted in (the
-     * item caption x, or the lane badge x), from `capacityIconDx`. Omitted
-     * for every other glyph, which paints inside the `<text>`.
+     * For a built-in SVG icon (person, people, points, time): the px terms
+     * that, added in order to the start x of the text run the suffix is
+     * painted in (the item caption x, or the lane badge x), give the icon's
+     * x, from `capacityIconDxTerms`. Kept apart so the sum rounds the same
+     * as adding each width to x in turn. Omitted for every other glyph,
+     * which paints inside the `<text>`.
      */
-    iconDx?: number;
+    iconDxTerms?: readonly number[];
 }
 
 /**
@@ -975,11 +977,6 @@ export interface PositionedWaveStrip {
     /** The label text; omitted when `labelKind` is `none`. */
     label?: string;
     /**
-     * The label's estimated width at the strip's 10 px bold weight (the
-     * width `fitStripLabel` tested it at); present exactly when `label` is.
-     */
-    labelWidth?: number;
-    /**
      * The painted cell: `box` clipped to the timeline's backing panel and
      * inset by `WAVE_CELL_INSET_PX` (half the panel's stroke) so it never
      * covers the panel border. Omitted for an empty wave and for one that
@@ -1033,11 +1030,11 @@ export interface PositionedWaveStrip {
     /**
      * The floor reference (`fy-budget`, `2026-02-02`) centred in the gap
      * this wave's start floor opened before it (`S_k > E_{k-1}`, k >= 2),
-     * when it fits; drawn in muted italics. `width` is the text's estimated
-     * width at 10 px, the one its fit was tested at, and `halo` its backing
-     * box in the panel's fill. Omitted otherwise.
+     * when it fits; drawn in muted italics. `halo` is its backing box in the
+     * panel's fill, sized from the text's estimated width at 10 px (the one
+     * its fit was tested at). Omitted otherwise.
      */
-    gapLabel?: { text: string; x: number; width: number; halo: BoundingBox };
+    gapLabel?: { text: string; x: number; halo: BoundingBox };
 }
 
 /** A wave's resolved colours (specs/waves.md §9.4). */

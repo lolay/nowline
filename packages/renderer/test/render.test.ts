@@ -255,6 +255,41 @@ describe('renderSvg — item capacity suffix', () => {
         expect(fragment).not.toMatch(/<svg [^>]*viewBox="0 0 24 24"/);
     });
 
+    it('places a meta-line icon by adding each width to the caption x in turn', async () => {
+        // Bars ending at fractional x put each icon's x on a 2-decimal
+        // rounding tie, where adding one pre-summed offset to the caption
+        // x rounds 0.01 px away from adding the meta width, separator,
+        // number width and gap one at a time (1210.85, 1251.1, 1302.35).
+        const dsl = [
+            'nowline v1',
+            '',
+            'config',
+            '',
+            'style fte',
+            '  capacity-icon: person',
+            '',
+            'roadmap r "Far probe" start:2026-01-05 scale:1w calendar:business',
+            '',
+            'swimlane l1 "L1"',
+            '  item a1 "A" duration:130.015625d',
+            '  item b1 "B" duration:3w capacity:2 style:fte',
+            '',
+            'swimlane l2 "L2"',
+            '  item a2 "A" duration:135.046875d',
+            '  item b2 "B" duration:4w capacity:3 style:fte',
+            '',
+            'swimlane l3 "L3"',
+            '  item a3 "A" duration:140.078125d',
+            '  item b3 "B" duration:10d capacity:12 style:fte',
+            '',
+        ].join('\n');
+        const svg = await renderSvg(await parseToModel(dsl));
+        const iconXs = [...svg.matchAll(/<svg x="([^"]+)"[^>]*viewBox="0 0 24 24"/g)].map(
+            (m) => m[1],
+        );
+        expect(iconXs).toEqual(['1210.84', '1251.09', '1302.34']);
+    });
+
     it('omits the entire suffix when no capacity is declared', async () => {
         const dsl = `nowline v1\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w\n`;
         const model = await parseToModel(dsl);

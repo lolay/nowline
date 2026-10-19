@@ -35,10 +35,21 @@ import { hatchOverlay } from './waves.js';
 import { escAttr, escText, num, tag, textTag } from './xml.js';
 
 /**
+ * A built-in capacity icon's x: the run start plus layout's
+ * `iconDxTerms`, added one at a time in order so the double is the same
+ * as summing the widths onto x in turn.
+ */
+function iconXFrom(x0: number, capacity: PositionedCapacity): number {
+    let x = x0;
+    for (const term of capacity.iconDxTerms ?? []) x += term;
+    return x;
+}
+
+/**
  * Paint an item / lane capacity suffix starting at `(x0, baselineY)`. The
  * capacity model arrives pre-resolved from layout (`PositionedCapacity`):
  * `text` is the formatted number, `icon` is either `null` (no glyph), a
- * built-in name, or an inline literal string, and `iconDx` places a
+ * built-in name, or an inline literal string, and `iconDxTerms` places a
  * built-in SVG icon.
  *
  * Three rendering paths:
@@ -51,8 +62,8 @@ import { escAttr, escText, num, tag, textTag } from './xml.js';
  *      fonts and built-in side bearing, so no `<tspan dx>` separator.
  *   3. `icon.kind === 'builtin'` and `name` ∈ {person, people, points,
  *      time}: paint the number as `<text>`, then drop the curated SVG
- *      icon at `x0 + iconDx` (layout's `capacityIconDx`: past the
- *      number's estimated width and a `0.1em` gap, sized to one em). The
+ *      icon at `x0` plus `iconDxTerms` (layout's `capacityIconDxTerms`:
+ *      the number's estimated width and a `0.1em` gap, sized to one em). The
  *      icon's `style="color:..."` propagates through the
  *      `currentColor`-bound paths in the icon library.
  *   4. `icon.kind === 'literal'` (inline Unicode literal or
@@ -97,7 +108,7 @@ export function renderCapacitySuffix(
         // outline icons read in inline text.
         const numberSvg = textTag({ x: num(numberX), y: num(baselineY), ...baseAttrs }, numberStr);
         const iconSize = fontSize;
-        const iconX = x0 + (capacity.iconDx ?? 0);
+        const iconX = iconXFrom(x0, capacity);
         const iconY = baselineY - fontSize * 0.85;
         const iconSvg = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
         return numberSvg + iconSvg;
@@ -129,8 +140,8 @@ export function renderCapacitySuffix(
  * regardless of how wide metaText actually rendered.
  *
  * Built-in SVG icons (person/people/points/time) still need an `<svg>`
- * sibling outside `<text>`; layout places the icon (`capacity.iconDx`,
- * from `capacityIconDx` at its tighter `META_ICON_EM_PER_CHAR` estimate),
+ * sibling outside `<text>`; layout places the icon (`capacity.iconDxTerms`,
+ * from `capacityIconDxTerms` at its tighter `META_ICON_EM_PER_CHAR` estimate),
  * which still lands inside its own pessimistic spill reservation.
  */
 function renderItemMetaLine(opts: {
@@ -192,7 +203,7 @@ function renderItemMetaLine(opts: {
     // hugs the number.
     const def = CAPACITY_ICON_SVG[icon.name];
     const iconSize = fontSize;
-    const iconX = x + (capacity.iconDx ?? 0);
+    const iconX = iconXFrom(x, capacity);
     const iconY = baselineY - fontSize * 0.85;
     const textPart =
         openText +
