@@ -22,6 +22,7 @@ import {
 } from '../item-bar-geometry.js';
 import type { LayoutContext, TrackCursor } from '../layout-context.js';
 import { nonWorkingPinOf, resolvePinnedOrSequentialStart } from '../start-rules.js';
+import { statusDotColor } from '../status-dot.js';
 import { estimateTextWidth } from '../text-measure.js';
 import { PROGRESS_STRIP_HEIGHT_PX } from '../themes/shared.js';
 import type { BoundingBox, PositionedItem, PositionedLabelChip } from '../types.js';
@@ -364,6 +365,7 @@ export function sequenceItem(
         box: itemBox,
         dateSpan: { startX: logicalLeft, endX: logicalRight },
         status,
+        statusDotColor: statusDotColor(status, style.bg, ctx.styleCtx.theme),
         progressFraction: progress,
         footnoteIndicators,
         labelChips,

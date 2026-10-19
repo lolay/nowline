@@ -406,6 +406,12 @@ export interface PositionedItem {
      */
     dateSpan: { startX: number; endX: number };
     status: StatusKind;
+    /**
+     * The status dot's resolved colour: the theme's `statusDot.onLight` or
+     * `onDark` entry for `status`, picked by the luminance of `style.bg`
+     * (`statusDotColor` in `status-dot.ts`).
+     */
+    statusDotColor: string;
     progressFraction: number; // 0..1; 1 == fully filled
     footnoteIndicators: number[]; // 1-based superscript numbers, empty when no footnotes
     labelChips: PositionedLabelChip[];

@@ -28,7 +28,7 @@ import {
     TEXT_SIZE_PX,
 } from '@nowline/layout';
 import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
-import { fontAttrs, pickStatusDotPalette, rectFrame } from './primitives.js';
+import { fontAttrs, rectFrame } from './primitives.js';
 import type { FontFamilies, RenderOptions } from './render.js';
 import { shadowFilterUrl } from './shadow.js';
 import { hatchOverlay } from './waves.js';
@@ -320,25 +320,11 @@ function renderItemProgress(i: PositionedItem): string {
     return '';
 }
 
-function renderItemStatusDot(i: PositionedItem, palette: Theme): string {
-    // Status-dot color — the dot communicates status via hue, but
-    // the bar bg can range from pale status tints (`#eff6ff`) to
-    // saturated mid-tones (`#1e88e5` from `bg:blue` labels) to
-    // dark navies (`#172554` in dark theme), so a single palette
-    // can't keep contrast across all bars. Two palettes — `onLight`
-    // (deep tints, for pale bars) and `onDark` (pale tints, for
-    // saturated/dark bars) — are picked from based on the bar
-    // bg's relative luminance.
-    const dotPalette = pickStatusDotPalette(i.style.bg, palette);
-    const statusColors: Record<string, string> = {
-        done: dotPalette.done,
-        'in-progress': dotPalette.inProgress,
-        'at-risk': dotPalette.atRisk,
-        blocked: dotPalette.blocked,
-        planned: dotPalette.planned,
-        neutral: dotPalette.neutral,
-    };
-    const dotColor = statusColors[i.status] ?? statusColors.neutral;
+function renderItemStatusDot(i: PositionedItem): string {
+    // Status-dot color — layout resolves it from the bar bg's relative
+    // luminance and the item's status (`statusDotColor`, layout's
+    // `status-dot.ts`), so the dot reads on pale and dark bars alike.
+    //
     // Status dot — upper-right inset inside the bar, OR pushed into
     // the spill column when the bar is too narrow to host the dot's
     // full inset (`dotSpills`). Layout pre-computes `dotSpillCx` for
@@ -351,7 +337,7 @@ function renderItemStatusDot(i: PositionedItem, palette: Theme): string {
         cx: num(dotCx),
         cy: num(i.box.y + ITEM_STATUS_DOT_INSET_TOP_PX),
         r: ITEM_STATUS_DOT_RADIUS_PX,
-        fill: dotColor,
+        fill: i.statusDotColor,
     });
 }
 
@@ -682,7 +668,7 @@ export function renderItem(
     parts.push(renderItemTooltip(i));
     parts.push(renderItemBar(i, idPrefix));
     parts.push(renderItemProgress(i));
-    parts.push(renderItemStatusDot(i, palette));
+    parts.push(renderItemStatusDot(i));
     // Inline-date pins (after:DATE / before:DATE). Same z-order family as
     // the status dot and footnote indicators — small badge in the top
     // decoration row. Color matches the bar's resolved meta (`fg`) so the

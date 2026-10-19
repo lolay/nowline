@@ -20,6 +20,7 @@ import type {
 import {
     CORNER_RADIUS_PX,
     estimateTextWidth,
+    fillLuminance,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     WAVE_BOUNDARY_WIDTH_PX,
     WAVE_CROSS_DASH,
@@ -32,7 +33,7 @@ import {
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
-import { intersectBox, relativeLuminance } from './primitives.js';
+import { intersectBox } from './primitives.js';
 import type { FontFamilies } from './render.js';
 import { escText, num, tag, textTag } from './xml.js';
 
@@ -44,7 +45,7 @@ import { escText, num, tag, textTag } from './xml.js';
 /**
  * Bar-fill luminance at or above which background work gets the dark hatch
  * (`wave.hatch`); below it, the light one (`wave.hatchOnDark`). The same
- * crossover the status dot picks its palette by (`pickStatusDotPalette`), so
+ * crossover the status dot picks its palette by (layout's `pickStatusDotPalette`), so
  * the hatch and the dot agree on which bars read as dark.
  */
 const WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE = 0.24;
@@ -70,7 +71,7 @@ function barFill(style: ResolvedStyle): string {
 }
 
 function waveHatchKind(fill: string): WaveHatchKind {
-    return relativeLuminance(fill) >= WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE ? 'dark' : 'light';
+    return fillLuminance(fill) >= WAVE_HATCH_LIGHT_FILL_MIN_LUMINANCE ? 'dark' : 'light';
 }
 
 function waveHatchUrl(idPrefix: string, kind: WaveHatchKind): string {

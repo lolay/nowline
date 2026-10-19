@@ -1,9 +1,9 @@
-// Shared drawing primitives: the typography, stroke and colour helpers every
-// layer of the SVG renderer draws with, plus the rectangle frame and the box
+// Shared drawing primitives: the typography and stroke helpers every layer of
+// the SVG renderer draws with, plus the rectangle frame and the box
 // intersection the item, wave and non-working-band layers share. Nothing here
 // knows about a particular roadmap element.
 
-import type { BoundingBox, ResolvedStyle, Theme } from '@nowline/layout';
+import type { BoundingBox, ResolvedStyle } from '@nowline/layout';
 import { CORNER_RADIUS_PX, TEXT_SIZE_PX } from '@nowline/layout';
 import type { FontFamilies } from './render.js';
 import { num, tag } from './xml.js';
@@ -47,50 +47,6 @@ function strokeDash(style: ResolvedStyle): string | undefined {
     if (style.border === 'dashed') return '4 3';
     if (style.border === 'dotted') return '1 3';
     return undefined;
-}
-
-/**
- * sRGB → relative luminance per WCAG 2.x. Input may be `#rrggbb`,
- * `#rgb`, or a non-hex token like `none` / `transparent`. Non-hex
- * inputs return 1 (treated as light) so a transparent bar reuses
- * the chart's light bg. Mostly used to choose between two
- * status-dot palettes (`onLight` vs `onDark`) so the dot reads on
- * any bar fill — see `pickStatusDotPalette` and
- * `specs/rendering.md`'s status-dot section.
- */
-export function relativeLuminance(hex: string): number {
-    if (!hex || hex === 'none' || hex === 'transparent') return 1;
-    let h = hex.startsWith('#') ? hex.slice(1) : hex;
-    if (h.length === 3) {
-        h = h
-            .split('')
-            .map((c) => c + c)
-            .join('');
-    }
-    if (h.length !== 6) return 1;
-    const r = parseInt(h.slice(0, 2), 16) / 255;
-    const g = parseInt(h.slice(2, 4), 16) / 255;
-    const b = parseInt(h.slice(4, 6), 16) / 255;
-    const lin = (c: number): number => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/**
- * Pick the status-dot palette whose tone contrasts best with the
- * given bar bg.
- *
- * The crossover threshold is the bar luminance at which a deep dot
- * (avg luminance ≈ 0.045 across `onLight` palette entries) and a
- * pale dot (avg ≈ 0.85 across `onDark` entries) give equal WCAG
- * contrast. Solving `(L_bar + 0.05)² ≈ 0.86 × 0.095` gives
- * `L_bar ≈ 0.24`, so:
- *   - bars with luminance ≥ 0.24 (most label-driven mid-tones AND
- *     all pale status-tint bars) → `onLight` deep dot
- *   - bars with luminance < 0.24 (dark status-tint bars in dark
- *     theme, e.g. `#172554`) → `onDark` pale dot
- */
-export function pickStatusDotPalette(bg: string, palette: Theme): Theme['statusDot']['onLight'] {
-    return relativeLuminance(bg) >= 0.24 ? palette.statusDot.onLight : palette.statusDot.onDark;
 }
 
 export function rectFrame(

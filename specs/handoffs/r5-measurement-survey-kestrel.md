@@ -44,7 +44,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** none. The theme tokens are `Theme.statusDot` (`themes/shape.ts:228`, `themes/light.ts:252`); `item.style.bg` is final once `measureItem` applies the status tint (`nodes/item-measure.ts:386`), before `sequenceItem` builds the item (`nodes/sequence-item.ts:354`). `PositionedRoadmap.palette` is the same theme object as `ctx.styleCtx.theme` (`phases/finalize.ts:1195`, `layout-context.ts:253`).
 - **Agree:** n/a (no counterpart); the move keeps the renderer's code verbatim.
 - **Verdict:** move in s3: layout resolves the dot colour and carries it on `PositionedItem`.
-- **Status:** pending (s3).
+- **Status:** moved in m3.s3: `status-dot.ts` in layout (`statusDotColor`, `pickStatusDotPalette`, verbatim); `PositionedItem.statusDotColor`, set in `sequenceItem`.
 
 ### E6. Two `relativeLuminance` copies
 
@@ -52,7 +52,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `themes/contrast.ts:22` (exported as `relativeLuminance`) goes through `hexToRgb`, which throws on anything that is not 3- or 6-digit hex.
 - **Agree:** for `#rgb` / `#rrggbb` yes (same channel maths, same coefficients, same order). For `none`, `transparent` (the painted fill of a `bg:none` bar, `waves.ts:68-70`) and any non-hex string the renderer's returns a value and layout's throws. `style.bg` can be `none` for every item with `bg:none`.
 - **Verdict:** move in s3, keeping the renderer's semantics in the moved code under a distinct name (layout's `relativeLuminance` keeps its throwing contract for the contrast tests and wave labels). Not reconciled.
-- **Status:** pending (s3).
+- **Status:** moved in m3.s3, not reconciled: the renderer's copy is layout's `fillLuminance` (exported; `waves.ts` hatch kind reads it until E7), with its semantics kept and a unit test for the non-hex cases.
 
 ### E7. Wave hatch kind from bar luminance
 
