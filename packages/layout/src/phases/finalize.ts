@@ -35,6 +35,7 @@ import {
     calendarMarkerEntries,
     type MarkerBand,
     type MarkerEntity,
+    markerArrows,
     markerLabelsRightX,
     markerRowPlacements,
     nonWorkingRunMarkerId,
@@ -740,7 +741,8 @@ function fitWidths(fx: FinalizeContext): boolean {
 /**
  * f5 (was P10): pack every marker once, against the final canvas, so
  * `packMarkerRow` can sort by tick and assign rows and label sides
- * bottom-first. This is the single source of the context's marker
+ * bottom-first, keeping the milestones' marker-to-marker arrows clear
+ * (`markerArrows`, from the placements). This is the single source of the context's marker
  * placements from here on; the measure phase's pre-pack only sized the
  * band before the lanes ran. The band sits at its final top: below a
  * now-pill row that f7 reserves when f2 brought `today` into the axis.
@@ -752,6 +754,7 @@ function packMarkers(fx: FinalizeContext): boolean {
         fx.measured.header.chartLeftX,
         fx.canvas.final,
         estimateTextWidth,
+        markerArrows(fx.chart.milestones),
     );
     const placements = markerRowPlacements(repacked.placements, fx.headerRowsTop().markerRowY);
     const rowCount =
@@ -770,9 +773,10 @@ function packMarkers(fx: FinalizeContext): boolean {
 
 /**
  * f6 (was P11, N7): build the positioned milestones from their placements
- * and the final pack, then push the final placements onto the titled runs,
- * the working exceptions and every marker's entity midpoint (used by edge
- * routing and slack-arrow geometry).
+ * and the final pack (a slack or overrun arrow from an anchor or milestone
+ * starts on that marker's final row), then push the final placements onto
+ * the titled runs, the working exceptions and every marker's entity
+ * midpoint (used by edge routing).
  */
 function placeMarkers(fx: FinalizeContext): boolean {
     const band = fx.markerBand();
@@ -843,7 +847,7 @@ function growHeaderRows(fx: FinalizeContext): boolean {
     }
     // The beside card hugs this bottom (f15).
     fx.setHeaderRowsBottom(rowsTop.markerRowY + timeline.markerRow.height);
-    const topY = ctx.estimatedChartTopY + deltaY;
+    const topY = bands.chartTopY + deltaY;
     fx.chartY.top = topY;
     fx.chartY.bottom += topY;
     fx.chartY.swimlaneBottom += topY;
@@ -854,10 +858,15 @@ function growHeaderRows(fx: FinalizeContext): boolean {
     // `placedItems` when edges are built (f11), the edge maps hold x only,
     // itemFlowKey holds strings, marker midpoints and markerRowPlacements
     // sit in the header, and slackCorridors are pass-2 inputs consumed
-    // during placement.
+    // during placement. A milestone's arrow from a marker sits in the
+    // header too, on the row f6 gave it, so only its item arrows move.
     for (const lane of fx.chart.swimlanes) translateSwimlaneY(lane, topY);
     for (const inc of fx.chart.includes) translateIncludeY(inc, topY);
-    for (const m of need(fx.draft.milestones, 'the milestones')) translateMilestoneChartY(m, topY);
+    const placements = fx.chart.milestones;
+    const milestones = need(fx.draft.milestones, 'the milestones');
+    for (let i = 0; i < milestones.length; i++) {
+        translateMilestoneChartY(milestones[i], placements[i], topY);
+    }
     return changed;
 }
 
@@ -1072,7 +1081,7 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'packMarkers',
-        reads: ['canvas', 'markerEntries', 'headerBands', 'scale'],
+        reads: ['placement', 'canvas', 'markerEntries', 'headerBands', 'scale'],
         writes: ['markerBand'],
         run: packMarkers,
     },
@@ -1084,7 +1093,15 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'growHeaderRows',
-        reads: ['markerBand', 'headerBands', 'scale', 'milestones', 'chartTop', 'laneBottom'],
+        reads: [
+            'placement',
+            'markerBand',
+            'headerBands',
+            'scale',
+            'milestones',
+            'chartTop',
+            'laneBottom',
+        ],
         writes: [
             'chartTop',
             'rowsBottom',

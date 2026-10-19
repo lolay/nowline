@@ -25,6 +25,7 @@ import {
     MARKER_ROW_CENTER_OFFSET_PX,
     MARKER_ROW_PITCH_PX,
 } from './marker-geometry.js';
+import type { MilestonePlacement } from './milestone-node.js';
 
 /** A packed marker band: its rows and each marker's placement at the band's y. */
 export interface MarkerBand {
@@ -201,6 +202,28 @@ export interface PackedPlacement {
 }
 
 /**
+ * A slack or overrun arrow between two markers, drawn on `from`'s row
+ * between the two diamonds (specs/rendering.md, Milestones, "Marker
+ * predecessors"). A milestone's arrow from a group or parallel starts on
+ * the milestone's own row and is not one.
+ */
+export interface MarkerArrow {
+    from: string;
+    to: string;
+}
+
+/** The arrows between markers that `placements` draw, source to target. */
+export function markerArrows(placements: readonly MilestonePlacement[]): MarkerArrow[] {
+    const out: MarkerArrow[] = [];
+    for (const p of placements) {
+        for (const a of p.slackArrows ?? []) {
+            if ('marker' in a && a.marker !== p.id) out.push({ from: a.marker, to: p.id });
+        }
+    }
+    return out;
+}
+
+/**
  * Pack anchors + milestones into marker rows using a bottom-first
  * tick-order strategy. Markers default to the row CLOSEST to the
  * chart; conflicts push them UP toward the date ticks (the inverse of
@@ -215,6 +238,20 @@ export interface PackedPlacement {
  *      `rowIndex` incremented by 1 so the bottom corridor stays
  *      stable as the band expands upward toward the ticks.
  *
+ * `arrows` (the marker-to-marker arrows, `markerArrows`) add three rules,
+ * so an arrow crosses no other marker and ends on its target's line:
+ *   - An arrow's run, on its source's row between the two diamonds, is
+ *     reserved on that row like a label: no other diamond, label or run
+ *     may overlap it.
+ *   - A target sits at or above each source's row (cut lines run down
+ *     from a diamond). A source whose target is placed and that fits no
+ *     allowed row grows a fresh row right below the target instead of
+ *     at the top; when the rules contradict (a marker both a source and
+ *     a target on one row), it grows at the top.
+ *   - A label takes a side its own arrows do not run along, when that
+ *     side fits; otherwise it keeps the usual right-then-left order.
+ * With no arrows the pack is unchanged.
+ *
  * Returns row-relative placements (no centerY yet — caller fills that
  * in once `markerRowY` is known). Row indices follow the existing
  * convention: 0 = top of band (closest to ticks), `rowCount - 1` =
@@ -227,11 +264,14 @@ export function packMarkerRow(
     chartLeftX: number,
     chartRightX: number,
     estimateTextWidth: (text: string, fontSize: number) => number,
+    arrows: readonly MarkerArrow[] = [],
 ): { placements: Map<string, PackedPlacement>; rowCount: number } {
     const sorted = [...entries].sort((a, b) => a.centerX - b.centerX);
     const placements = new Map<string, PackedPlacement>();
     type Span = { left: number; right: number };
     let rowSpans: Span[][] = [];
+    const byId = new Map(entries.map((e) => [e.id, e]));
+    const knownArrows = arrows.filter((a) => byId.has(a.from) && byId.has(a.to));
 
     type Side = 'left' | 'right';
     for (const e of sorted) {
@@ -246,10 +286,49 @@ export function packMarkerRow(
         const sideXLeft = (s: Side): number => (s === 'right' ? naturalRightX : naturalLeftX);
         const sideFitsCanvas = (s: Side): boolean =>
             s === 'right' ? fitsRightCanvas : fitsLeftCanvas;
+        // The runs of e's own arrows, on e's row between the two diamonds.
+        const runs: Span[] = knownArrows
+            .filter((a) => a.from === e.id)
+            .map((a) => {
+                const to = byId.get(a.to) as MarkerEntity;
+                return {
+                    left: Math.min(e.centerX, to.centerX) + e.radius,
+                    right: Math.max(e.centerX, to.centerX) - to.radius,
+                };
+            })
+            .filter((r) => r.right > r.left);
+        // An arrow meets its target's line only when the target sits at or
+        // above the source's row (cut lines run down from a diamond).
+        let minRow = -1;
+        let maxRow = Number.POSITIVE_INFINITY;
+        for (const a of knownArrows) {
+            if (a.to === e.id) {
+                const from = placements.get(a.from);
+                if (from) maxRow = Math.min(maxRow, from.rowIndex);
+            }
+            if (a.from === e.id) {
+                const to = placements.get(a.to);
+                if (to) minRow = Math.max(minRow, to.rowIndex);
+            }
+        }
+        // A label on the side its own arrow leaves would sit on the arrow.
+        const crossesOwnRun = (s: Side): boolean => {
+            const xLeft = sideXLeft(s);
+            return runs.some((r) => r.left < xLeft + labelWidth && r.right > xLeft);
+        };
+        const freeSide = (s: Side): boolean => sideFitsCanvas(s) && !crossesOwnRun(s);
+        const growSide: Side = freeSide('right')
+            ? 'right'
+            : freeSide('left')
+              ? 'left'
+              : fitsRightCanvas
+                ? 'right'
+                : 'left';
         const collidesAt = (xLeft: number, row: number): boolean => {
             const extLeft = Math.min(diamondLeft, xLeft);
             const extRight = Math.max(diamondRight, xLeft + labelWidth);
-            return rowSpans[row].some((s) => s.left < extRight && s.right > extLeft);
+            const own = [{ left: extLeft, right: extRight }, ...runs];
+            return rowSpans[row].some((s) => own.some((o) => s.left < o.right && s.right > o.left));
         };
 
         let placedRow = -1;
@@ -259,8 +338,9 @@ export function packMarkerRow(
         // Bottom-first: try the highest existing row first, working up
         // toward row 0 (closest to the ticks).
         outer: for (let row = rowSpans.length - 1; row >= 0; row--) {
+            if (row < minRow || row > maxRow) continue;
             for (const side of ['right', 'left'] as const) {
-                if (!sideFitsCanvas(side)) continue;
+                if (!freeSide(side)) continue;
                 const xLeft = sideXLeft(side);
                 if (collidesAt(xLeft, row)) continue;
                 placedRow = row;
@@ -270,7 +350,19 @@ export function packMarkerRow(
             }
         }
 
-        if (placedRow === -1) {
+        if (placedRow === -1 && minRow >= 0 && minRow < maxRow) {
+            // An arrow source that must stay at or below its target and fits
+            // no row there: a fresh row right below the target, which keeps
+            // every placed arrow's source at or below its target.
+            const at = minRow + 1;
+            for (const [id, p] of placements) {
+                if (p.rowIndex >= at) placements.set(id, { ...p, rowIndex: p.rowIndex + 1 });
+            }
+            rowSpans.splice(at, 0, []);
+            placedRow = at;
+            placedSide = growSide;
+            placedXLeft = sideXLeft(placedSide);
+        } else if (placedRow === -1) {
             // No existing row fits — prepend a fresh top row and shift
             // every previous placement DOWN by one slot (rowIndex += 1)
             // so the bottom corridor stays stable.
@@ -279,13 +371,13 @@ export function packMarkerRow(
             }
             rowSpans = [[], ...rowSpans];
             placedRow = 0;
-            placedSide = fitsRightCanvas ? 'right' : 'left';
+            placedSide = growSide;
             placedXLeft = sideXLeft(placedSide);
         }
 
         const extLeft = Math.min(diamondLeft, placedXLeft);
         const extRight = Math.max(diamondRight, placedXLeft + labelWidth);
-        rowSpans[placedRow].push({ left: extLeft, right: extRight });
+        rowSpans[placedRow].push({ left: extLeft, right: extRight }, ...runs);
         placements.set(e.id, {
             rowIndex: placedRow,
             labelBox: { x: placedXLeft, y: 0, width: labelWidth, height: MARKER_LABEL_HEIGHT_PX },

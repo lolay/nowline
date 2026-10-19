@@ -13,6 +13,7 @@ import { buildAnchors } from './anchor-node.js';
 import {
     datePinnedMarkerEntries,
     type MarkerEntity,
+    markerArrows,
     markerLabelsRightX,
     markerRowPlacements,
     packMarkerRow,
@@ -77,6 +78,7 @@ export function placeRegionMarkers(
             estimateTextWidth,
         ),
         estimateTextWidth,
+        markerArrows(placements),
     );
     const bandTopY = regionTopY + REGION_MARKER_BAND_TOP_PX;
     const laneShift =
@@ -88,13 +90,14 @@ export function placeRegionMarkers(
     ctx.chartTopY = lanesTopY + laneShift;
     ctx.swimlaneBottomY = cutBottomY;
     const anchors = buildAnchors(region.content.anchors, ctx, new Set());
-    // Placement read each predecessor's y before the lanes moved.
+    // Placement read each item predecessor's y before the lanes moved; an
+    // arrow from a region marker starts on its row in `rows`.
     const milestones = positionMilestones(
         placements.map((p) => ({
             ...p,
             cutTopY: ctx.chartTopY,
             cutBottomY,
-            slackArrows: p.slackArrows?.map((a) => ({ x: a.x, y: a.y + laneShift })),
+            slackArrows: p.slackArrows?.map((a) => ('y' in a ? { x: a.x, y: a.y + laneShift } : a)),
         })),
         rows,
     );

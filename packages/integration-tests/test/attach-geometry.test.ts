@@ -1,5 +1,6 @@
 // Gate-level regression check for geometry attached to an item bar:
-// dependency-arrow ends, milestone slack arrows, and inline-date glyphs.
+// dependency-arrow ends, milestone slack arrows (from a bar or a marker), and
+// inline-date glyphs.
 //
 // Layout places the chart with its top at 0 and translates every bar to
 // its top on the canvas AFTER placing it, once the header rows above stop
@@ -31,6 +32,11 @@
 //   arrow source (marker) starts on its cut line, on the target's y + 28
 //   slack arrow         = (end, box.y + 28), or (end, box.bottom - 2) when
 //                         the caption spilled
+//   slack arrow (marker) = (marker x, marker centre y): an arrow from an
+//                         anchor or milestone starts on that marker's own
+//                         row, in the host band or the region's band; its
+//                         target sits at or above that row, and no other
+//                         marker's diamond or label sits on its run
 //   item glyph          = top at box.y + 5, inside the bar's top half
 //   container glyph     = inside the header's title row, above the bracket
 //                         line (box.y .. box.y + 13)
@@ -44,7 +50,9 @@ import * as path from 'node:path';
 import { createNowlineServices, type NowlineFile, resolveIncludes } from '@nowline/core';
 import {
     layoutRoadmap,
+    type PositionedAnchor,
     type PositionedItem,
+    type PositionedMilestone,
     type PositionedRoadmap,
     type PositionedSwimlane,
     type PositionedTrackChild,
@@ -133,6 +141,7 @@ interface FileScan {
     itemArrows: number;
     markerArrows: number;
     slackArrows: number;
+    markerSlackArrows: number;
     itemGlyphs: number;
     headerGlyphs: number;
     arrowFailures: string[];
@@ -145,6 +154,7 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
         itemArrows: 0,
         markerArrows: 0,
         slackArrows: 0,
+        markerSlackArrows: 0,
         itemGlyphs: 0,
         headerGlyphs: 0,
         arrowFailures: [],
@@ -193,18 +203,37 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
         }
     }
 
-    for (const m of model.milestones) {
-        for (const arrow of m.slackArrows ?? []) {
-            // The model does not name a slack arrow's source; an item one
-            // leaves its end date, a marker one does not.
-            const sources = hostItems.filter((i) => near(i.dateSpan.endX, arrow.x));
-            if (sources.length === 0) continue;
-            out.slackArrows++;
-            if (!sources.some((i) => near(slackY(i), arrow.y))) {
-                fail(
-                    `milestone ${m.id} slack arrow at (${arrow.x}, ${arrow.y}) is on no ` +
-                        `bar ending there (attach y ${sources.map(slackY).join(', ')})`,
-                );
+    // The host and each isolated region are their own scope: a region's
+    // milestones name only its own items and markers.
+    const scopes = [
+        { items: hostItems, markers: [...model.anchors, ...model.milestones] },
+        ...model.includes.map((inc) => ({
+            items: [...laneEntities(inc.nestedSwimlanes)].filter(
+                (e): e is PositionedItem => e.kind === 'item',
+            ),
+            markers: [...(inc.anchors ?? []), ...(inc.milestones ?? [])],
+        })),
+    ];
+    for (const { items, markers } of scopes) {
+        for (const m of markers) {
+            if (!('slackArrows' in m)) continue;
+            for (const arrow of m.slackArrows ?? []) {
+                // The model does not name a slack arrow's source; an item
+                // one leaves its end date, a marker one its cut line.
+                const sources = items.filter((i) => near(i.dateSpan.endX, arrow.x));
+                const markerSources = markers.filter((k) => k !== m && near(k.center.x, arrow.x));
+                if (sources.length === 0 && markerSources.length === 0) continue;
+                if (sources.length > 0) out.slackArrows++;
+                if (markerSources.length > 0) out.markerSlackArrows++;
+                const ys = [...sources.map(slackY), ...markerSources.map((k) => k.center.y)];
+                if (!ys.some((y) => near(y, arrow.y))) {
+                    fail(
+                        `milestone ${m.id} slack arrow at (${arrow.x}, ${arrow.y}) is on no ` +
+                            `bar or marker ending there (attach y ${ys.join(', ')})`,
+                    );
+                }
+                const source = markerSources.find((k) => near(k.center.y, arrow.y));
+                if (source) checkMarkerRun(m, source, markers, arrow.y, fail);
             }
         }
     }
@@ -235,6 +264,36 @@ function scan(name: string, model: PositionedRoadmap): FileScan {
     return out;
 }
 
+/**
+ * A marker-to-marker arrow ends on its target's line (the target sits at
+ * or above the arrow's row) and its run, between the two diamonds, crosses
+ * no other marker's diamond or label on that row.
+ */
+function checkMarkerRun(
+    target: PositionedMilestone,
+    source: PositionedAnchor | PositionedMilestone,
+    markers: (PositionedAnchor | PositionedMilestone)[],
+    y: number,
+    fail: (msg: string) => void,
+): void {
+    const label = `milestone ${target.id} arrow from ${source.id}`;
+    if (target.center.y > y + EPSILON_PX) {
+        fail(`${label} at y=${y} ends below its target's diamond (y=${target.center.y})`);
+    }
+    const left = Math.min(source.center.x, target.center.x) + source.radius;
+    const right = Math.max(source.center.x, target.center.x) - target.radius;
+    for (const k of markers) {
+        if (k === source || k === target || !near(k.center.y, y)) continue;
+        const spans = [
+            [k.center.x - k.radius, k.center.x + k.radius],
+            [k.labelBox.x, k.labelBox.x + k.labelBox.width],
+        ];
+        if (spans.some(([l, r]) => l < right - EPSILON_PX && r > left + EPSILON_PX)) {
+            fail(`${label} crosses ${k.id} on its row (y=${y})`);
+        }
+    }
+}
+
 const scans: FileScan[] = [];
 for (const dir of SOURCE_DIRS) {
     const names = (await fs.readdir(path.join(REPO_ROOT, dir)))
@@ -259,11 +318,12 @@ describe('geometry attached to an item bar sits on its final box', () => {
         expect(total('itemArrows')).toBeGreaterThan(10);
         expect(total('markerArrows')).toBeGreaterThan(0);
         expect(total('slackArrows')).toBeGreaterThan(0);
+        expect(total('markerSlackArrows')).toBeGreaterThan(0);
         expect(total('itemGlyphs')).toBeGreaterThan(5);
         expect(total('headerGlyphs')).toBeGreaterThan(0);
     });
 
-    it('ends every dependency arrow on its bars, and every slack arrow on its source bar', () => {
+    it('ends every dependency arrow on its bars, and every slack arrow on its source', () => {
         expect(scans.flatMap((s) => s.arrowFailures)).toEqual([]);
     });
 

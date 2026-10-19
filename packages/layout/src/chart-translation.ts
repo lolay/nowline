@@ -17,6 +17,7 @@
 // translating: they are derived from each item's final box when the
 // arrows are built (see `item-port-geometry.ts`).
 
+import type { MilestonePlacement } from './nodes/milestone-node.js';
 import type {
     PositionedIncludeRegion,
     PositionedMilestone,
@@ -67,11 +68,21 @@ export function translateIncludeY(region: PositionedIncludeRegion, dy: number): 
 
 /**
  * Move the chart part of a host milestone down by `dy`: its cut line and
- * its slack arrows. Its diamond and label sit in the header's marker band,
- * outside the chart, and stay.
+ * the slack arrows that start on an item. Its diamond and label sit in the
+ * header's marker band, outside the chart, and stay; so do the arrows that
+ * start on a marker row, which `positionMilestones` read from the final
+ * pack. `placement` is the milestone's placement, whose arrows are in the
+ * same order as the positioned ones.
  */
-export function translateMilestoneChartY(milestone: PositionedMilestone, dy: number): void {
+export function translateMilestoneChartY(
+    milestone: PositionedMilestone,
+    placement: MilestonePlacement,
+    dy: number,
+): void {
     milestone.cutTopY += dy;
     milestone.cutBottomY += dy;
-    for (const arrow of milestone.slackArrows ?? []) arrow.y += dy;
+    milestone.slackArrows?.forEach((arrow, i) => {
+        const start = placement.slackArrows?.[i];
+        if (start && 'y' in start) arrow.y += dy;
+    });
 }

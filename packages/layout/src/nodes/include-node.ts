@@ -65,7 +65,6 @@ export function buildIncludeRegions(
             },
             {
                 chartTopY: innerStartY,
-                estimatedChartTopY: ctx.estimatedChartTopY,
                 chartBottomY: innerStartY,
                 swimlaneBottomY: innerStartY,
             },
