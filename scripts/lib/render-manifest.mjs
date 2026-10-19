@@ -151,6 +151,7 @@ export const TESTS = [
     { slug: 'header-height-none', theme: 'light', now: NOW },
     { slug: 'inline-date-corners', theme: 'light', now: NOW },
     { slug: 'late-row-shifts', theme: 'light', now: NOW },
+    { slug: 'milestone-overrun', theme: 'light', now: NOW },
     { slug: 'waves-empty', theme: 'light', now: NOW },
     { slug: 'waves-parallel-group', theme: 'light', now: NOW },
     { slug: 'waves-gap-deadline', theme: 'light', now: NOW },

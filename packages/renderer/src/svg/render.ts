@@ -1754,14 +1754,20 @@ function renderMilestone(m: PositionedMilestone, palette: Theme, fonts: FontFami
     const cx = m.center.x;
     const cy = m.center.y;
     const r = m.radius;
-    const fill = palette.milestoneDiamond.fill;
+    // An overrun dated milestone paints its diamond and label in the cut
+    // line's overrun colour too (specs/rendering.md, Milestones).
+    const fill = m.isOverrun
+        ? palette.milestoneDiamond.cutLineOverrun
+        : palette.milestoneDiamond.fill;
     const flag = tag('path', {
         d: `M${num(cx)} ${num(cy - r)} L${num(cx + r)} ${num(cy)} L${num(cx)} ${num(cy + r)} L${num(cx - r)} ${num(cy)} Z`,
         fill,
         stroke: fill,
         'stroke-width': 1,
     });
-    const labelColor = palette.milestoneDiamond.label;
+    const labelColor = m.isOverrun
+        ? palette.milestoneDiamond.cutLineOverrun
+        : palette.milestoneDiamond.label;
     // See renderAnchor — left-flipped labels use `text-anchor: end` so
     // the visual right edge sits at `diamondLeft - 6`, matching the
     // 6 px rhythm of right-side labels.
@@ -1815,7 +1821,12 @@ function renderMilestoneCutLine(m: PositionedMilestone, idPrefix: string, palett
         );
     }
     if (m.slackArrows && m.slackArrows.length > 0) {
-        const slackColor = palette.milestoneDiamond.slack;
+        // A dated milestone's only arrow is its overrun arrow, red like the
+        // line; a floating milestone's are slack arrows in ink.
+        const slackColor = m.isOverrun
+            ? palette.milestoneDiamond.cutLineOverrun
+            : palette.milestoneDiamond.slack;
+        const marker = m.isOverrun ? 'arrow-overrun' : 'arrow-dark';
         for (const arrow of m.slackArrows) {
             parts.push(
                 tag('path', {
@@ -1825,7 +1836,7 @@ function renderMilestoneCutLine(m: PositionedMilestone, idPrefix: string, palett
                     'stroke-width': 1.1,
                     'stroke-dasharray': '3 3',
                     'stroke-linecap': 'round',
-                    'marker-end': `url(#${idPrefix}-arrow-dark)`,
+                    'marker-end': `url(#${idPrefix}-${marker})`,
                 }),
             );
         }
@@ -2512,6 +2523,15 @@ function waveHatchPatternDef(idPrefix: string, kind: WaveHatchKind, palette: The
     );
 }
 
+/** True when a dated milestone, on the host or in a region, draws an overrun arrow. */
+function hasOverrunArrow(model: PositionedRoadmap): boolean {
+    const draws = (m: PositionedMilestone): boolean =>
+        m.isOverrun && (m.slackArrows?.length ?? 0) > 0;
+    return (
+        model.milestones.some(draws) || model.includes.some((r) => (r.milestones ?? []).some(draws))
+    );
+}
+
 /**
  * The hatch patterns the SVG uses, in a fixed order: one per kind that a
  * background bar (main lanes or isolated regions) or the legend's hatch
@@ -3030,17 +3050,22 @@ export async function renderSvg(
     const fonts: FontFamilies = options.fontFamilies ?? FONT_STACK;
     const parts: string[] = [];
 
-    // <defs> — shadows + the slack-arrow marker (palette-driven fill baked
-    // in). Dependency arrows draw their own heads (`renderEdge`), so the
-    // milestone slack line's dark marker is the only one. Its id carries the
-    // per-render prefix: several SVGs inlined in one HTML page share an id
-    // namespace and `url(#id)` resolves to the first match, so a global id
-    // would paint one diagram's arrowheads (and theme) onto another.
+    // <defs> — shadows + the milestone arrow markers (palette-driven fill
+    // baked in). Dependency arrows draw their own heads (`renderEdge`), so
+    // the milestone slack line's dark marker and the overrun arrow's red one
+    // are the only ones. Their ids carry the per-render prefix: several SVGs
+    // inlined in one HTML page share an id namespace and `url(#id)` resolves
+    // to the first match, so a global id would paint one diagram's
+    // arrowheads (and theme) onto another.
     const arrowDef = (id: string, fill: string): string =>
         `<marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="${fill}"/></marker>`;
     const defs =
         `<defs>${allShadowDefs(idPrefix)}` +
         arrowDef(`${idPrefix}-arrow-dark`, palette.arrowhead.dark) +
+        // The overrun arrow's red head, only when a milestone draws one.
+        (hasOverrunArrow(model)
+            ? arrowDef(`${idPrefix}-arrow-overrun`, palette.milestoneDiamond.cutLineOverrun)
+            : '') +
         // Wave hatch patterns, only those a bar or the legend uses.
         usedWaveHatchKinds(model)
             .map((k) => waveHatchPatternDef(idPrefix, k, palette))
