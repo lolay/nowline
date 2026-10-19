@@ -16,7 +16,7 @@ The container restarted while run `wf_2dad70a4-aba` (m2 s1-s7) was working, so t
 - `22db375` m2.s5 include-region.ts (partial): the move was in the tree, uncommitted; the parent committed it as found so it survives. Its `make pre-commit` and parity check were not confirmed.
 - m2.s6 and m2.s7 not started.
 
-Question to Gary (verbatim): "The container restart killed the m2 run after s1-s4 were committed and s5 was mid-flight. Relaunch m2 (the worker re-checks s5 and does s6-s7; the review covers all of m2), or stop here?" The Claude Code gate hook refuses a launch in a session whose last run left no record, so a relaunch may need a new session from the Kickoff prompt.
+Gary answered "just run it here": m2 relaunches in session `fc39e88b` from `8307d3e`, with the worker re-verifying the partial m2.s5 commit before s6 and s7.
 
 ## After the run, before the PR
 
