@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 1/4 groups done | last review: wave-1 PASS | current: nowline m2 s1-s7 [exec] | updated 2026-10-19 | UNREVIEWED ab7a1d2 7e82fce 53949f0 1634869 22db375
+  Status: 2/4 groups done | last review: wave-1 m2 PASS | current: nowline m3 s1-s6 [deep] | updated 2026-10-19
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, harness-assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-19 session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef: Unattended (Recommended)
 
@@ -105,31 +105,31 @@ Move `SLACK_DASH`, `renderEdge`, `legPaths`, `splitSlackPath` and `roundedOrthog
 
 Same rules and acceptance as m1. After m2.s7, `render.ts` holds only its imports, the option types, `renderSvg`, `__internal` and the re-exports tests or `index.ts` need.
 
-#### s1 - [exec] Move the header, attribution mark and logo embedding to header.ts
+#### s1 - [exec] Move the header, attribution mark and logo embedding to header.ts (done)
 
 Move `renderHeader`, `renderAttributionMark`, `embedLogo` and `bytesToBase64`.
 
-#### s2 - [exec] Move the item layer to item.ts
+#### s2 - [exec] Move the item layer to item.ts (done)
 
 Move `renderCapacitySuffix`, `META_SUFFIX_DX_EM`, `META_ICON_EM_PER_CHAR`, `renderItemMetaLine`, the inline date-pin helpers if m1.s6 left them in `render.ts`, and `renderItem`, unchanged.
 
-#### s3 - [exec] Move containers and swimlanes to swimlanes.ts
+#### s3 - [exec] Move containers and swimlanes to swimlanes.ts (done)
 
 Move `renderContainer`, `renderTrackChild`, `LANE_UTILIZATION_HEIGHT_PX`, `utilizationColor`, `renderLaneUtilization`, `renderSwimlaneBg` and `renderSwimlane` (and any lane-badge constant only they use).
 
-#### s4 - [exec] Move the footnotes panel to footnotes.ts
+#### s4 - [exec] Move the footnotes panel to footnotes.ts (done)
 
 Move `renderFootnotes`.
 
-#### s5 - [exec] Move include regions to include-region.ts
+#### s5 - [exec] Move include regions to include-region.ts (done)
 
 Move `renderIncludeRegion`.
 
-#### s6 - [exec] Split renderItem into named steps
+#### s6 - [exec] Split renderItem into named steps (done)
 
 In `item.ts`, break `renderItem` (about 360 lines) into named helpers in drawing order, for example the tooltip, bar frame and hatch, progress strip, status dot, inline pins, caption (title and meta, inside or spilled), footnote indicators and link icon. The emitted string must stay identical: same parts in the same order, same attribute order. `renderItem` becomes a short sequence of calls. Keep the existing comments with the code they describe. Acceptance as m1, plus: no helper over about 80 lines, and `renderItem` itself under about 60.
 
-#### s7 - [exec] Leave render.ts as the entry point
+#### s7 - [exec] Leave render.ts as the entry point (done)
 
 Make `render.ts` hold only imports, the option types, `renderSvg`, `__internal` and any re-exports. Remove the `void escAttr; void escText;` lines if `render.ts` no longer imports those helpers. Add a short comment at the top of `render.ts` that lists the layer modules in the z-order `renderSvg` draws them. Acceptance as m1, plus: `grep -c '^function\|^async function\|^const' packages/renderer/src/svg/render.ts` shows nothing but `renderSvg` and `__internal`.
 
@@ -178,6 +178,7 @@ In `specs/review-since-v086.md`, update the R5 bullet to done: `render.ts` split
 ## Review log
 
 review wave-1 (nowline m1 s1-s7) 831468b..8938c21: PASS - pure moves verbatim into primitives, waves, timeline, nowline, markers, edges; 252 parity renders identical; pre-commit green; passed unattended: gate 4 - 2026-10-19
+review wave-1 (nowline m2 s1-s7) 8307d3e..e2275d5: PASS - header, item, swimlanes, footnotes, include-region moved verbatim; renderItem split into 10 helpers (max 70 lines, renderItem 24) with identical output; render.ts entry point only (239 lines); 252 parity renders identical; pre-commit green (env: Node 22.22.0, only Node in container; .nvmrc pins 26.2.0); 22db375 verified at HEAD; passed unattended - 2026-10-19
 
 ## Token log
 
@@ -194,3 +195,6 @@ tokens review-wave-1 nowline-m1-s1-s7 (claude-opus-5-5): input ~32 / cache read 
 tokens orchestrator-wave-1 nowline-m1-s1-s7 (claude-opus-5-5): input ~12 / cache read ~1.2M / cache write ~0 5m + ~12k 1h / output ~5.9k | ~$0.45 API-equiv
 tokens wave-1 nowline-m2-s1-s7 (claude-sonnet-5-5): input ~56 / cache read ~2.9M / cache write ~84k / output ~19k | ~$0.98 API-equiv (output est.) session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef
 tokens orchestrator-wave-1 nowline-m2-s1-s7 (claude-opus-5-5): input ~24 / cache read ~3.2M / cache write ~0 5m + ~43k 1h / output ~12k | ~$1.21 API-equiv
+tokens wave-1 nowline-m2-s1-s7-relaunch (claude-sonnet-5-5): input ~32 / cache read ~1.2M / cache write ~94k / output ~8.4k | ~$0.55 API-equiv
+tokens review-wave-1 nowline-m2-s1-s7 (claude-opus-5-5): input ~46 / cache read ~1.9M / cache write ~100k / output ~9.5k | ~$1.09 API-equiv
+tokens orchestrator-wave-1 nowline-m2-s1-s7-relaunch (claude-opus-5-5): input ~28 / cache read ~950k / cache write ~0 5m + ~52k 1h / output ~5.8k | ~$0.72 API-equiv

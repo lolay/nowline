@@ -3,22 +3,11 @@
 - **Branch:** `claude/lucid-cannon-6tq5ly` (harness-assigned task branch, cut from `main` at `5b17389`). Name was assigned, not guessed.
 - **Plan:** [`plan-render-split-kestrel.md`](./plan-render-split-kestrel.md).
 - **Mode:** unattended, confirmed 2026-10-19 in session `fc39e88b` (dialog: Unattended; session: This session).
-- **Done:** wave 1 unit m1 s1-s7, `831468b..8938c21`, review PASS (parity harness; primitives, waves, timeline, nowline, markers, edges moved; `render.ts` 3192 -> 1730 lines). Plan tagged into 3 waves: 1 [exec] m1 s1-s7 + m2 s1-s7 (two units, one per milestone), 2 [deep] m3 s1-s6, 3 [exec] m4 s1.
-- **Spend:** ~$8.0 of ~$15 expected (Cost table in the plan); guard 3x min $50.
-- **Next unit:** wave 1, m2 s1-s7 [exec] (`nowline m2 s1-s7`), relaunched from `8307d3e`; the worker skips steps that already have commits once they meet acceptance. Gate 4 passed unattended.
-- **Resume:** paste the plan's Kickoff prompt into a new session, or answer the pending question here.
-
-## Pending
-
-The container restarted while run `wf_2dad70a4-aba` (m2 s1-s7) was working, so the run left no result and no review. Reconciled from git:
-
-- Committed by the worker, **UNREVIEWED**: `ab7a1d2` m2.s1 header.ts, `7e82fce` m2.s2 item.ts, `53949f0` m2.s3 swimlanes.ts, `1634869` m2.s4 footnotes.ts.
-- `22db375` m2.s5 include-region.ts (partial): the move was in the tree, uncommitted; the parent committed it as found so it survives. Its `make pre-commit` and parity check were not confirmed.
-- m2.s6 and m2.s7 not started.
-
-Gary answered "just run it here". The relaunch in session `fc39e88b` was denied by the gate hook, verbatim: "personal-plan-orchestrate gate: run wf_2dad70a4-aba has not finished; wait for it (a run with no record after a crash means: start a new session)". m2 has to run from a new session: paste the plan's Kickoff prompt (it confirms unattended once), and the worker re-verifies the partial m2.s5 commit before s6 and s7.
-
-Gary said yes to a new session ("yes, start the new session"); session `fc39e88b` started a cloud session on `claude/lucid-cannon-6tq5ly` with the Kickoff prompt and stops orchestrating. The new session confirms unattended with Gary once, then launches m2.
+- **Done:** wave 1 complete. m1 s1-s7 `831468b..8938c21` review PASS; m2 s1-s7 `8307d3e..e2275d5` review PASS (header, item, swimlanes, footnotes, include-region; renderItem split into 10 helpers; `render.ts` 3192 -> 239 lines, entry point only). Plan tagged into 3 waves: 1 [exec] m1+m2, 2 [deep] m3 s1-s6, 3 [exec] m4 s1.
+- **Spend:** ~$10.4 of ~$15 expected; guard 3x min $50.
+- **Next unit:** wave 2, m3 s1-s6 [deep] (`nowline m3 s1-s6`), from `e2275d5`.
+- **Resume:** paste the plan's Kickoff prompt into a new session.
+- **Orchestrator note:** session `db6b66a7` had no `personal-plan-orchestrate` skill installed in its cloud container; it ran the procedure as the plan file describes it (worker subagent per unit, review subagent, plan update), without the skill's gate hooks.
 
 ## After the run, before the PR
 
