@@ -41,7 +41,7 @@ The staging steps (parse and validate, resolve includes with the include-error p
 
 ### 1.4 The same work runs more than once
 
-- **The logo is read twice per render, three times per raster export.** `loadLogo` reads the file to measure it (`packages/renderer/src/logo.ts:46-48`); `renderSvg` reads it again to embed it (`embedLogo`, `packages/renderer/src/svg/render.ts:2337-2346`); the kernel's PNG and PDF paths render a second, font-pinned SVG (`export/src/index.ts:327-341`, `:455`, `:470`), which reads it a third time.
+- **The logo is read twice per render, three times per raster export.** `loadLogo` reads the file to measure it (`packages/renderer/src/logo.ts:46-48`); `renderSvg` reads it again to embed it (`embedLogo`, `packages/renderer/src/svg/header.ts:190-206`); the kernel's PNG and PDF paths render a second, font-pinned SVG (`export/src/index.ts:327-341`, `:455`, `:470`), which reads it a third time.
 - **An MCP `render` call parses twice and resolves and lays out twice.** `diagnosticsErrorBlock` parses and validates (`server.ts:694`), `exportDocument` parses again, resolves and lays out (`:721`), and `collectMcpLayoutInsights` reuses the first parse (`doc: blocked.doc`, `:747`) but resolves includes and lays out a second time (`:738-749`, `diagnostics.ts:201-221`). `export` parses twice too (`:934`, `:958`) and collects no insights.
 - **A CLI render parses twice.** `produce` validates first so diagnostics come out in the operator's locale, and the kernel re-parses ("double work accepted", `render.ts:266-271`).
 
@@ -223,7 +223,7 @@ export interface LoadedLogo {
 }
 ```
 
-`renderSvg` gains `RenderOptions.logo?: LoadedLogo` and embeds those bytes instead of calling the resolver (`render.ts:3140-3147`); without it, it resolves as today, so direct callers keep working. The kernel's portable and font-pinned renders both pass it. Same bytes in, same SVG out.
+`renderSvg` gains `RenderOptions.logo?: LoadedLogo` and embeds those bytes instead of calling the resolver (`embedLogo`, `header.ts:196-206`); without it, it resolves as today, so direct callers keep working. The kernel's portable and font-pinned renders both pass it. Same bytes in, same SVG out.
 
 ### 3.5 Each pipeline on the stage
 
