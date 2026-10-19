@@ -14,22 +14,18 @@ Branch `claude/clever-allen-vtmks9` (harness-assigned), cut from `main` at 6ad60
 - `make pre-commit` on this commit fails only `attach-geometry.test.ts` (integration-tests): it flags the 4 host-frame arrows (`beta`, `review`, `p-beta`, `p-due` in the partner file alone) whose x lands on a bar end but whose y is off its row. That is the bug, pinned on `main`. The region arrows and anchor arrows slip past it because their x is on no bar end; plan: add a marker rule to the sweep (an arrow whose x is on a marker's cut line, in the same scope, starts at that marker's `center.y`).
 - Before/after (hand-edited SVG) shown to the maintainer.
 
-## Pending: maintainer sign-off on the visual change
+- Maintainer approved the before/after, keeping the region-anchor arrow, and added: no arrow when the two diamonds sit on top of each other (implemented: within 2 diamond radii, 12 px), and consider moving markers to other rows when their arrows would conflict (pending design, below).
+- Implemented (commit "Start marker-predecessor arrows on the marker's final row"): placement records the marker (`MilestoneArrowStart`), `positionMilestones` reads its final row (f6 or the region pack), f7 translates only item arrows, `chartFrameY` and `estimatedChartTopY` removed, `LayoutContext.markerIds` added, marker arrows own no corridor, group/parallel overrun arrows start on the milestone's own final row. Tests: `chart-local-frame.test.ts` (grown band, region, region anchor, diamonds meeting, group overrun), `layout-context.test.ts` (`markerIds`), and a marker rule in `attach-geometry.test.ts` covering host and region. Docs: `specs/rendering.md` Milestones ("Marker predecessors"), `specs/layout-phases.md` §3.5, §3.10 rule 4, §9 ("Marker-predecessor arrows (after F2)"). Fragment `.changelog/clever-allen-vtmks9.txt`.
+- Gate: `make pre-commit` green, `make pack-mcpb` ran, `make determinism` 314/314 unchanged. Every sample rendered on `main` (6ad6008) and the branch, light/dark/grayscale + xlsx/msproj/Mermaid: only the 6 SVGs of the two new fixtures moved (the arrow paths, exactly the approved mock); exports, stderr and exit codes identical. No snapshot moved.
 
-Question asked: approve the before/after so implementation can start?
+## Pending: marker-row conflict design (maintainer asked to consider)
 
-## Design (to implement once approved)
-
-- Placement stops reading a marker's y. `collectMilestonePredecessors` marks a predecessor that names one of the scope's anchors or milestones as a marker (ids from the context's source content) and gives it no y. A slack or overrun arrow from it carries the marker's id instead of a y.
-- A dated milestone's overrun arrow from a predecessor with no y (a group or parallel) starts on the milestone's own row, resolved the same way.
-- `positionMilestones` resolves those arrows from the final rows: f6 (`band.placements`) for host milestones, the region's own `markerRowPlacements` in `placeRegionMarkers`. Chart arrows (item predecessors) keep their local y.
-- f7 translates only the chart arrows of a host milestone; header arrows are already final canvas y. Regions translate everything (their rows are in the chart frame).
-- Marker predecessors no longer produce slack corridors (their arrows run in the marker band; today they produce negative-y corridors that never meet a row but still trigger the pass-2 rerun).
-- Removes `chartFrameY` and `LayoutContext.estimatedChartTopY` (f7 reads `measured.bands.chartTopY`).
-- `estimatedCenterY` stays only as the milestone midpoint the f6 trace compares against; §9 bullet rewritten.
-- Docs: `specs/rendering.md` Milestones (marker predecessors start on the marker's own row), `specs/layout-phases.md` §9 (retire the stale read). Changelog `fixed`.
+Arrows from markers run along the predecessor's row in the marker band and cross other markers' diamonds and labels (Kickoff to Alpha crosses Cut and Code freeze). Also, when the predecessor sits above the milestone, the arrow ends in empty space above the milestone's diamond (Alpha to Beta), since cut lines only run down from a diamond. Next: propose a packer change (`packMarkerRow`, `nodes/marker-band.ts`) with a mock, and stop for sign-off. The corpus has no marker-predecessor arrows, so it would move only the new fixture.
 
 ## Gotchas
 
+- `make format` also rewrites `packages/layout/src/start-rules.ts` imports (not flagged by `make lint`); revert that file to keep the PR scoped.
+- `make changelog-check` sees committed fragments only.
+- Render gate: `.scratch/render-gate.sh <built-repo> <samples-root> <out>`; the `main` copy is a `git archive` in the scratchpad, built with `make init && make build-fast` (not a worktree).
 - `.nvmrc` pins Node 26; the container has 22. `make doctor` passed.
-- Probe scripts: `.scratch/probe-marker-arrows.mjs` and `.scratch/probe-rows.mjs` import `packages/*/dist` directly; rebuild with `make build-fast` first.
+- Probe scripts `.scratch/probe-marker-arrows.mjs` and `.scratch/probe-rows.mjs` import `packages/*/dist` directly; rebuild with `make build-fast` first.

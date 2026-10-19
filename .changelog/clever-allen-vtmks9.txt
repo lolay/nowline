@@ -1,0 +1,3 @@
+```release-note:fixed
+A milestone's slack or overrun arrow from an anchor or milestone now starts on that marker's own row, even when the marker band grows, and in an isolated region on the region's own marker row instead of a host lane. A region milestone `after:` a region anchor now draws its arrow, and no arrow is drawn when the two diamonds touch.
+```

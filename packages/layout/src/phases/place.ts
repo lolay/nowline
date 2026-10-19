@@ -78,7 +78,7 @@ export function placeChart(
     const { cal, calendar, schedule } = window;
     const plan = schedule.plan;
     const { originX, scale: timeScale } = measured.axis;
-    const { timeline, bands } = measured;
+    const { timeline } = measured;
 
     // Footnotes index must exist before sequencing items reference
     // them.
@@ -104,7 +104,6 @@ export function placeChart(
         },
         {
             chartTopY: 0,
-            estimatedChartTopY: bands.chartTopY,
             chartBottomY: 0,
             swimlaneBottomY: 0,
         },

@@ -18,8 +18,12 @@ roadmap r "R" start:2026-01-05
 
 size sm effort:2d
 
+anchor k date:2026-01-05
+
 swimlane a
   item x "X" size:sm
+
+milestone m after:x
 `;
 
 async function build(init: Parameters<typeof createLayoutContext>[3], waves?: object) {
@@ -39,7 +43,7 @@ async function build(init: Parameters<typeof createLayoutContext>[3], waves?: ob
         ctx: createLayoutContext(
             resolved,
             shared as unknown as Parameters<typeof createLayoutContext>[1],
-            { chartTopY: 10, estimatedChartTopY: 40, chartBottomY: 20, swimlaneBottomY: 30 },
+            { chartTopY: 10, chartBottomY: 20, swimlaneBottomY: 30 },
             init,
         ),
     };
@@ -48,12 +52,7 @@ async function build(init: Parameters<typeof createLayoutContext>[3], waves?: ob
 describe('createLayoutContext', () => {
     it('passes the chart fields through unchanged', async () => {
         const { ctx } = await build({});
-        expect([
-            ctx.chartTopY,
-            ctx.estimatedChartTopY,
-            ctx.chartBottomY,
-            ctx.swimlaneBottomY,
-        ]).toEqual([10, 40, 20, 30]);
+        expect([ctx.chartTopY, ctx.chartBottomY, ctx.swimlaneBottomY]).toEqual([10, 20, 30]);
     });
 
     it('carries no canvas extent, so placement cannot read the canvas', async () => {
@@ -68,6 +67,8 @@ describe('createLayoutContext', () => {
         expect(ctx.styleCtx.styles).toBe(resolved.config.styles);
         expect(ctx.styleCtx.theme).toBe(themes.light);
         expect([...ctx.sizes.keys()]).toEqual(['sm']);
+        // A milestone's arrow from one of these starts on its marker row.
+        expect([...ctx.markerIds]).toEqual(['k', 'm']);
     });
 
     it('starts a region-style context with no footnotes, marker placements or edges', async () => {
