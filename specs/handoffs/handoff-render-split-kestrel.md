@@ -16,7 +16,9 @@ The container restarted while run `wf_2dad70a4-aba` (m2 s1-s7) was working, so t
 - `22db375` m2.s5 include-region.ts (partial): the move was in the tree, uncommitted; the parent committed it as found so it survives. Its `make pre-commit` and parity check were not confirmed.
 - m2.s6 and m2.s7 not started.
 
-Gary answered "just run it here": m2 relaunches in session `fc39e88b` from `8307d3e`, with the worker re-verifying the partial m2.s5 commit before s6 and s7.
+Gary answered "just run it here". The relaunch in session `fc39e88b` was denied by the gate hook, verbatim: "personal-plan-orchestrate gate: run wf_2dad70a4-aba has not finished; wait for it (a run with no record after a crash means: start a new session)". m2 has to run from a new session: paste the plan's Kickoff prompt (it confirms unattended once), and the worker re-verifies the partial m2.s5 commit before s6 and s7.
+
+Question to Gary (verbatim): "The hook won't relaunch in this session after the crash. Start a new cloud session on this branch from the Kickoff prompt?"
 
 ## After the run, before the PR
 
