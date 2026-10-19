@@ -101,9 +101,9 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 
 A change is visual if it changes the rendered SVG of any file under `examples/` or `tests/`, or any snapshot under `packages/integration-tests/test/__snapshots__/`. Theme, spacing, and DSL-default changes count, whichever package you touch.
 
-Before implementing a visual change, show the maintainer what it will do to the diagrams and stop until they agree. Use whatever is least effort and still makes the change clear: render 1 to 3 affected fixtures on the base commit (`node packages/cli/dist/index.js <file> -o .scratch/<name>-before.svg`) and pair each with an "after" (a hand-edited copy of the SVG, a mockup, or a quick hack rendered the same way). Add a sentence or two on what changes and which other diagrams it will touch. Revert any hack before implementing.
+Before implementing a visual change, show the maintainer what it will do to the diagrams and stop until they agree. Use whatever is least effort and still makes the change clear: render 1 to 3 affected fixtures on the base commit (`node packages/cli/dist/index.js <file> -o .scratch/<name>-before.svg`) and pair each with an "after" (a hand-edited copy of the SVG, a mockup, or a quick hack rendered the same way). With each pair, quote the `.nowline` source that draws the affected part in a fenced block: the relevant lines, not the whole file, with the fixture path so the reader can open the rest. Add a sentence or two on what changes and which other diagrams it will touch. Revert any hack before implementing.
 
-When the change is done, show before and after again from the real implementation: the same fixtures, plus any other diagram whose render changed. This is a report, not a gate; don't wait for sign-off.
+When the change is done, show before and after again from the real implementation: the same fixtures, plus any other diagram whose render changed, each with its `.nowline` excerpt as above. This is a report, not a gate; don't wait for sign-off.
 
 ## Where new files go
 
