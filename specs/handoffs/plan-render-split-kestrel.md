@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 0/4 groups done | last review: — | current: nowline m1 s1-s7 [exec] | updated 2026-10-19
+  Status: 1/4 groups done | last review: wave-1 PASS | current: nowline m2 s1-s7 [exec] | updated 2026-10-19 | passed unattended: gate 4 before m2
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, harness-assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-19 session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef: Unattended (Recommended)
 
@@ -73,31 +73,31 @@ The script runs the CLI with `node` directly; that is a read-only render of fixt
 
 Each step moves the named declarations out of `packages/renderer/src/svg/render.ts` into the named new module under `packages/renderer/src/svg/`, verbatim (bodies, doc comments and section comments unchanged), adds `export` to what other modules use, and imports them back into `render.ts`. Nothing is renamed, reordered within a function, or reformatted beyond what biome requires. Acceptance for every step: the declarations are gone from `render.ts`, `make pre-commit` is green, `specs/handoffs/r5-parity.sh check` exits 0, and no file under `packages/integration-tests/test/__snapshots__/` or any determinism golden changed.
 
-#### s1 - [exec] Add the parity harness and record the baseline
+#### s1 - [exec] Add the parity harness and record the baseline (done)
 
 Write `specs/handoffs/r5-parity.sh` as the "Parity harness" section above specifies, make it executable, and run `baseline` then `check` on the unchanged tree; `check` must exit 0. Then prove it can fail: temporarily change one emitted attribute in `render.ts` (say a `stroke-width`), run `make build-fast` and `check`, confirm a non-zero exit naming the changed files, and revert the change (rebuild so `dist/` matches source). Commit only the script. Note the render count and the wall time of a `check` in the artifact.
 
-#### s2 - [exec] Move the shared drawing primitives to primitives.ts
+#### s2 - [exec] Move the shared drawing primitives to primitives.ts (done)
 
 Move `WEIGHT_NUM`, `textSizePx`, `fontAttrs`, `strokeDash`, `relativeLuminance`, `pickStatusDotPalette`, `estimateCaptionWidthPx`, `rectFrame` and `intersectBox` (from the waves section; the non-working bands use it too) to `primitives.ts`, with the `WEIGHT_NUM` comment block above it.
 
-#### s3 - [exec] Move the waves layer to waves.ts
+#### s3 - [exec] Move the waves layer to waves.ts (done)
 
 Move everything after the `// --- Waves (specs/waves.md §9) ---` divider up to (not including) `renderSvg`, except `intersectBox` (already in primitives): the `WAVE_*` constants, `WaveHatchKind`, `barFill`, `waveHatchKind`, `waveHatchUrl`, `waveHatchPatternDef`, `hasOverrunArrow`, `usedWaveHatchKinds`, `hatchOverlay`, the wave-cell helpers and `WaveCellCorners`, `renderWaveStrip`, `renderWaveTints`, `renderWaveBoundaries`, `waveTextWidth`, `renderWaveLabels`, `renderWaveCrossings`, `legendSwatchFill` and `renderWaveLegend`. `hasOverrunArrow` is a defs check `renderSvg` makes; it goes with the waves only because it sits in that section today; if it reads better in `markers.ts` later (m1.s6), move it there in that step and say so.
 
-#### s4 - [exec] Move the timeline and grid to timeline.ts
+#### s4 - [exec] Move the timeline and grid to timeline.ts (done)
 
 Move `renderGridLines`, `renderNonWorkingBands`, `renderNonWorkingLabels`, `calendarLabelText` and `renderTimeline`.
 
-#### s5 - [exec] Move the now-line and its pill to nowline.ts
+#### s5 - [exec] Move the now-line and its pill to nowline.ts (done)
 
 Move `renderNowline`, `squaredEdgeX`, `renderNowPillBg` and `renderNowPillLabel`.
 
-#### s6 - [exec] Move anchors, milestones and cut lines to markers.ts
+#### s6 - [exec] Move anchors, milestones and cut lines to markers.ts (done)
 
 Move `renderAnchor`, `renderAnchorCutLine`, `renderMilestone`, `hiddenDateTitle` and `renderMilestoneCutLine`. `renderMilestone` uses `renderInlineDatePin`, which is still in `render.ts` until m2.s2: move `renderInlineDatePin`, `renderInlineDatePins` and `hasAfterPin` here too if that keeps runtime imports one-way, or into a small `date-pins.ts` that both markers and items import. Pick one and record it under decided.
 
-#### s7 - [exec] Move the dependency edges to edges.ts
+#### s7 - [exec] Move the dependency edges to edges.ts (done)
 
 Move `SLACK_DASH`, `renderEdge`, `legPaths`, `splitSlackPath` and `roundedOrthogonalPath`.
 
@@ -177,6 +177,8 @@ In `specs/review-since-v086.md`, update the R5 bullet to done: `render.ts` split
 
 ## Review log
 
+review wave-1 (nowline m1 s1-s7) 831468b..8938c21: PASS - pure moves verbatim into primitives, waves, timeline, nowline, markers, edges; 252 parity renders identical; pre-commit green; passed unattended: gate 4 - 2026-10-19
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -186,4 +188,6 @@ In `specs/review-since-v086.md`, update the R5 bullet to done: `render.ts` split
 - Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
-tokens orchestrator-kickoff plan-render-split-kestrel (claude-opus-5-5): input ~60 / cache read ~4.9M / cache write ~0 5m + ~170k 1h / output ~29k | ~$2.94 API-equiv
+tokens orchestrator-kickoff plan-render-split-kestrel (claude-opus-5-5): input ~70 / cache read ~6M / cache write ~0 5m + ~180k 1h / output ~35k | ~$3.33 API-equiv
+tokens wave-1 nowline-m1-s1-s7 (claude-sonnet-5-5): input ~92 / cache read ~4.5M / cache write ~130k / output ~27k | ~$1.50 API-equiv (output est.) session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef
+tokens review-wave-1 nowline-m1-s1-s7 (claude-opus-5-5): input ~32 / cache read ~470k / cache write ~39k / output ~10k | ~$0.50 API-equiv (output est.) session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef

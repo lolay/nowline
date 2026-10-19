@@ -3,14 +3,14 @@
 - **Branch:** `claude/lucid-cannon-6tq5ly` (harness-assigned task branch, cut from `main` at `5b17389`). Name was assigned, not guessed.
 - **Plan:** [`plan-render-split-kestrel.md`](./plan-render-split-kestrel.md).
 - **Mode:** unattended, confirmed 2026-10-19 in session `fc39e88b` (dialog: Unattended; session: This session).
-- **Done:** kickoff only. Plan tagged into 3 waves: 1 [exec] m1 s1-s7 + m2 s1-s7 (two units, one per milestone), 2 [deep] m3 s1-s6, 3 [exec] m4 s1.
-- **Spend:** ~$2.94 (kickoff) of ~$15 expected (Cost table in the plan); guard 3x min $50.
-- **Next unit:** wave 1, m1 s1-s7 [exec], one group (`nowline m1 s1-s7`), so no canary.
+- **Done:** wave 1 unit m1 s1-s7, `831468b..8938c21`, review PASS (parity harness; primitives, waves, timeline, nowline, markers, edges moved; `render.ts` 3192 -> 1730 lines). Plan tagged into 3 waves: 1 [exec] m1 s1-s7 + m2 s1-s7 (two units, one per milestone), 2 [deep] m3 s1-s6, 3 [exec] m4 s1.
+- **Spend:** ~$5.33 of ~$15 expected (Cost table in the plan); guard 3x min $50.
+- **Next unit:** wave 1, m2 s1-s7 [exec] (`nowline m2 s1-s7`); gate 4 passed unattended.
 - **Resume:** paste the plan's Kickoff prompt into a new session, or answer the pending question here.
 
 ## Pending
 
-Gary skipped the `/compact` ("continue, compact not needed"). Wave 1's first unit (m1 s1-s7) is launching from `HEAD` of this commit. If this session is lost mid-run, reconcile from git (commits whose subjects start `m1.s`) and resume from the Kickoff prompt.
+Nothing waiting on Gary. m2 launches next in session `fc39e88b`.
 
 ## After the run, before the PR
 
@@ -19,12 +19,15 @@ Gary skipped the `/compact` ("continue, compact not needed"). Wave 1's first uni
 
 ## Decisions so far
 
-None yet.
+- review wave-1 (nowline m1 s1-s7) 831468b..8938c21: PASS. m1.s6: `renderMilestone` never calls `renderInlineDatePin` (only a doc comment mentions it), so `renderInlineDatePin`, `renderInlineDatePins` and `hasAfterPin` stay in `render.ts` for m2.s2 to move into `item.ts`; no `date-pins.ts`. `hasOverrunArrow` stays in `waves.ts`, exported for `renderSvg`. Names used only inside their own module stay unexported. Modules reach the option types with `import type { FontFamilies } from './render.js'`.
 
 ## Environment notes
 
 - `origin/HEAD` was unset in the cloud checkout; set with `git remote set-head origin --auto`.
 - `make doctor` passed at session start.
+- `node_modules` was absent in the container: run `make init` first.
+- `make format` rewrites `packages/layout/src/start-rules.ts` (a `useImportType` fix) on a clean tree; this predates R5 and is out of scope. Revert it after any `make format` and never stage it. `make lint` shows the same 10 warnings before and after.
+- Parity: `specs/handoffs/r5-parity.sh check` renders 252 files (63 fixtures x 4 variants) in about 38 s; state under `.git/r5-parity/`; the first baseline builds the base worktree itself.
 
 ## Deviations from plan
 
