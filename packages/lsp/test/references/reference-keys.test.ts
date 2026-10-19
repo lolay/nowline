@@ -1,12 +1,9 @@
-import { describe, expect, it } from 'vitest';
-// The validator's tables are not on `@nowline/core/internal` (that barrel may
-// not import the validator), so the test reads them from source, as
-// textmate-value-coverage.test.ts does.
 import {
     ENTITY_KNOWN_PROPS,
     STYLE_PROP_KEYS,
     UNIVERSAL_ENTITY_PROPS,
-} from '../../../core/src/language/validator/tables.js';
+} from '@nowline/core/internal';
+import { describe, expect, it } from 'vitest';
 import { REFERENCE_PROP_KEYS } from '../../src/references/ast-utils.js';
 
 // The LSP navigates, renames and completes ids only under REFERENCE_PROP_KEYS.

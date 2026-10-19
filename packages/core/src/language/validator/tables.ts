@@ -6,12 +6,22 @@ import {
     BUILTIN_CAPACITY_ICONS,
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
+    CALENDAR_FIELDS as CALENDAR_FIELD_LIST,
     CALENDAR_MODES as CALENDAR_MODE_LIST,
     COLOR_NAMES as COLOR_NAME_LIST,
+    DEFAULT_ENTITY_TYPES as DEFAULT_ENTITY_TYPE_LIST,
+    DIRECTIVE_FIELDS as DIRECTIVE_FIELD_LIST,
+    ENTITY_KNOWN_PROPS as ENTITY_KNOWN_PROP_LISTS,
     INCLUDE_MODES as INCLUDE_MODE_LIST,
     NON_WORKING_DISPLAYS,
+    ROADMAP_ONLY_STYLE_KEYS as ROADMAP_ONLY_STYLE_KEY_LIST,
+    SCALE_FIELDS as SCALE_FIELD_LIST,
     STYLE_PROP_ENUMS as STYLE_PROP_ENUM_LISTS,
+    STYLE_PROP_KEYS as STYLE_PROP_KEY_LIST,
+    UNIVERSAL_ENTITY_PROPS as UNIVERSAL_ENTITY_PROP_LIST,
 } from '../value-tables.js';
+
+export { UTILIZATION_NONE } from '../value-tables.js';
 
 export const SUPPORTED_VERSION = 'v1';
 
@@ -21,51 +31,15 @@ export const BUILTIN_STATUS_SET: ReadonlySet<string> = new Set(BUILTIN_STATUSES)
 export const BUILTIN_CAPACITY_ICON_SET: ReadonlySet<string> = new Set(BUILTIN_CAPACITY_ICONS);
 export const BUILTIN_ICON_NAME_SET: ReadonlySet<string> = new Set(BUILTIN_ICON_NAMES);
 
-export const STYLE_PROP_KEYS = new Set([
-    'bg',
-    'fg',
-    'text',
-    'border',
-    'icon',
-    'shadow',
-    'font',
-    'weight',
-    'italic',
-    'text-size',
-    'padding',
-    'spacing',
-    'header-height',
-    'corner-radius',
-    'bracket',
-    'header-position',
-    'capacity-icon',
-    'timeline-position',
-    'minor-grid',
-    'non-working',
-]);
+// Key vocabularies come from value-tables.ts too, held here as sets.
+export const STYLE_PROP_KEYS: ReadonlySet<string> = new Set(STYLE_PROP_KEY_LIST);
 
 // `non-working:` values (specs/working-calendar.md §4.2). Kept out of
 // `STYLE_PROP_ENUMS` on purpose: the key reports its own coded NL.E0800,
 // and the generic enum check would add a second error (NL.E0802).
 export const NON_WORKING_VALUES: ReadonlySet<string> = new Set(NON_WORKING_DISPLAYS);
 
-// Style keys only the roadmap reads (specs/dsl.md style table). On another
-// entity's `default` line they are a silent no-op, so they warn (NL.W0703).
-// Style blocks are not checked: one block can be referenced by the roadmap
-// and by other entities alike, so the key there is not necessarily wrong.
-export const ROADMAP_ONLY_STYLE_KEYS = new Set([
-    'header-height',
-    'header-position',
-    'timeline-position',
-    'minor-grid',
-    'non-working',
-]);
-
-// `utilization-warn-at:` / `utilization-over-at:` accept the literal `none`
-// to opt out of that color band (per specs/dsl.md rule 17d). Numeric forms
-// (positive percent, decimal, integer) are validated separately via
-// POSITIVE_NUMBER_RE / POSITIVE_PERCENT_RE.
-export const UTILIZATION_NONE = 'none';
+export const ROADMAP_ONLY_STYLE_KEYS: ReadonlySet<string> = new Set(ROADMAP_ONLY_STYLE_KEY_LIST);
 
 // Style enums, colour names and calendar modes come from value-tables.ts,
 // held here as sets for the membership checks.
@@ -77,26 +51,11 @@ export const COLOR_NAMES: ReadonlySet<string> = new Set(COLOR_NAME_LIST);
 
 export const CALENDAR_MODES: ReadonlySet<string> = new Set(CALENDAR_MODE_LIST);
 
-export const CALENDAR_FIELDS = new Set([
-    'days-per-week',
-    'days-per-month',
-    'days-per-quarter',
-    'days-per-year',
-]);
+export const CALENDAR_FIELDS: ReadonlySet<string> = new Set(CALENDAR_FIELD_LIST);
 
-export const SCALE_FIELDS = new Set(['name', 'label-every', 'label']);
+export const SCALE_FIELDS: ReadonlySet<string> = new Set(SCALE_FIELD_LIST);
 
-export const DEFAULT_ENTITY_TYPES = new Set([
-    'item',
-    'label',
-    'swimlane',
-    'roadmap',
-    'milestone',
-    'footnote',
-    'anchor',
-    'parallel',
-    'group',
-]);
+export const DEFAULT_ENTITY_TYPES: ReadonlySet<string> = new Set(DEFAULT_ENTITY_TYPE_LIST);
 
 // Banned properties per entity type on `default <entity>` lines.
 // `capacity` on `default swimlane` is banned because each lane's budget must be
@@ -123,72 +82,11 @@ export const DEFAULT_BANNED: Record<DefaultEntityType, Set<string>> = {
     group: new Set(),
 };
 
-// Properties every entity declaration may carry (`specs/dsl.md` § Universal Properties).
-// `description` is technically a sub-directive (`description "text"` indented under the
-// entity), not an EntityProperty, but we accept it here too: authors who type
-// `description:"text"` as a property aren't doing anything meaningful, but the typo is
-// common enough that warning on it adds noise rather than signal — the value is at
-// least carried into the AST and could be surfaced later if we choose to.
-export const UNIVERSAL_ENTITY_PROPS = new Set(['labels', 'link', 'style', 'description']);
+export const UNIVERSAL_ENTITY_PROPS: ReadonlySet<string> = new Set(UNIVERSAL_ENTITY_PROP_LIST);
 
-// Properties each entity declaration's `properties: EntityProperty[]` bag actually
-// consumes downstream. Sourced from (a) the property tables in `specs/dsl.md` and
-// (b) every `propValue(...)`/`propValues(...)` call site in `packages/layout/`. Keys
-// outside this set + `UNIVERSAL_ENTITY_PROPS` are silently dropped by the layout —
-// `checkUnknownEntityProperties` warns on them so authors notice typos like
-// `now:2026-01-25` on a `roadmap` line.
-//
-// Raw style props (`bg`, `fg`, ...) intentionally stay OUT of this map — they are
-// rejected as errors by `checkNoRawStyleProperties` and the unknown-property check
-// short-circuits on them so authors don't see a duplicate diagnostic.
-export const ENTITY_KNOWN_PROPS: Record<string, Set<string>> = {
-    RoadmapDeclaration: new Set([
-        'author',
-        'start',
-        'length',
-        'scale',
-        'calendar',
-        'logo',
-        'logo-size',
-    ]),
-    AnchorDeclaration: new Set(['date']),
-    SwimlaneDeclaration: new Set([
-        'owner',
-        'capacity',
-        'utilization-warn-at',
-        'utilization-over-at',
-        'status',
-        'after',
-        'before',
-    ]),
-    // An item has no `date:` or `start:`: it cannot be pinned to a fixed start
-    // date (`specs/dsl.md` § Item Properties, "Pinning is not supported"), so
-    // both keys draw this warning with the `after:<date>` concept hint below.
-    ItemDeclaration: new Set([
-        'size',
-        'duration',
-        'status',
-        'owner',
-        'after',
-        'before',
-        'remaining',
-        'capacity',
-    ]),
-    // size/duration/remaining/capacity on parallel/group are already errors via
-    // `checkNoComputedProperties`, so we don't list them here.
-    ParallelBlock: new Set(['owner', 'after', 'before', 'status']),
-    GroupBlock: new Set(['owner', 'after', 'before', 'status']),
-    MilestoneDeclaration: new Set(['date', 'after']),
-    FootnoteDeclaration: new Set(['on']),
-    PersonDeclaration: new Set(),
-    TeamDeclaration: new Set(),
-    LabelDeclaration: new Set(),
-    SizeDeclaration: new Set(['effort']),
-    StatusDeclaration: new Set(),
-    // The other keys a wave takes are universal; the keys it may not take
-    // are NL.E1105 (`isWaveBannedProperty`), owned by the wave rules.
-    WaveDeclaration: new Set(['after']),
-};
+export const ENTITY_KNOWN_PROPS: Record<string, ReadonlySet<string>> = Object.fromEntries(
+    Object.entries(ENTITY_KNOWN_PROP_LISTS).map(([type, keys]) => [type, new Set(keys)]),
+);
 
 // Conceptual mistakes that aren't typos of a real key — e.g. `progress:60` is a
 // reasonable guess for "60% done", but Nowline models completion as
@@ -270,7 +168,4 @@ export const BCP47_RE = /^[a-zA-Z]{2,3}(-[a-zA-Z]{2}|-\d{3})?$/;
 // From value-tables.ts, held as a set for the membership check.
 export const INCLUDE_MODES: ReadonlySet<string> = new Set(INCLUDE_MODE_LIST);
 
-// Allow-listed property keys on the `nowline` directive line. The directive existed
-// historically as `nowline v1` only; properties are a forward-extension point but stay
-// restrictive so authors get an early error instead of typos rendering silently.
-export const DIRECTIVE_FIELDS = new Set(['locale']);
+export const DIRECTIVE_FIELDS: ReadonlySet<string> = new Set(DIRECTIVE_FIELD_LIST);
