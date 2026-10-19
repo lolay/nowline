@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 2/4 groups done | last review: wave-1 m2 PASS | current: nowline m3 s1-s6 [deep] | updated 2026-10-19
+  Status: 3/4 groups done | last review: wave-2 PASS (after fix-up 1) | current: nowline m4 s1 [exec] | updated 2026-10-19
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, harness-assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-19 session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef: Unattended (Recommended)
 
@@ -143,27 +143,27 @@ Goal: where layout already computes a value the renderer recomputes, or should c
 
 New fields on positioned types are additive and internal to the layout-to-renderer handoff. Don't change any `Theme` token value, `LayoutOptions`, `layoutRoadmap`'s signature, or any exporter. Add a unit test in `packages/layout/test/` for each value layout now computes (the new field's value on a small roadmap), per AGENTS.md "Tests".
 
-#### s1 - [deep] Survey the renderer's measurement
+#### s1 - [deep] Survey the renderer's measurement (done)
 
 Read every module under `packages/renderer/src/svg/` and list each place it measures text or derives geometry rather than reading the positioned model: at least `estimateCaptionWidthPx` (a copy of layout's `estimateTextWidth`, `packages/layout/src/text-measure.ts`), `waveTextWidth` and the wave label halo widths (`packages/layout/src/nodes/wave-node.ts:257` computes the same bold width), the status-key table and `pickStatusDotPalette` in `renderItem` (deferred here by `specs/layout-phases.md` §2 non-goals), `relativeLuminance` (layout has its own in `themes/contrast.ts`, which handles non-hex input differently), the capacity suffix and meta-line x positions (`renderCapacitySuffix`, `renderItemMetaLine`; layout has `estimateCapacitySuffixWidth`), and the lane badge width in `renderSwimlane`. For each: file and function, what it computes, layout's counterpart if any, whether the values agree for every input the renderer can see, and a verdict (move in s2-s5, or leave with a reason). Write it to `specs/handoffs/r5-measurement-survey-kestrel.md` (tracked, removed with the plan) and commit it. If the survey finds a candidate the steps below don't cover, put it in s6. Acceptance: the doc exists, each entry cites code, `make pre-commit` is green.
 
-#### s2 - [deep] One text-width estimator
+#### s2 - [deep] One text-width estimator (done)
 
 Delete the renderer's `estimateCaptionWidthPx` and use layout's `estimateTextWidth` (export it from `@nowline/layout` if it isn't). Where layout already computed the width the renderer recomputes (wave strip label halos, bold superscript widths), carry it on the positioned wave model and read it. Acceptance: no text-width formula remains under `packages/renderer/src/`, byte-identical, `make pre-commit` green.
 
-#### s3 - [deep] Status-dot colour from layout
+#### s3 - [deep] Status-dot colour from layout (done)
 
 Move the status-key table, `pickStatusDotPalette` and the luminance test it needs into layout, so each positioned item carries its resolved status-dot colour and `renderItem` reads it. Reconcile the two `relativeLuminance` copies only if every input the renderer passes gives the same value from layout's; otherwise keep the renderer's semantics in the moved code and say so. Acceptance: `renderItem` has no status table and no luminance call, byte-identical, `make pre-commit` green.
 
-#### s4 - [deep] Caption meta and capacity suffix positions from layout
+#### s4 - [deep] Caption meta and capacity suffix positions from layout (done)
 
 Have layout compute the x positions `renderItemMetaLine` and `renderCapacitySuffix` derive (the meta separator, the tight icon width, the suffix start after the preceding text) and carry them on the positioned item and lane capacity, so the renderer stops estimating text widths there. Acceptance: those two functions take positions, not widths; byte-identical; `make pre-commit` green.
 
-#### s5 - [deep] Lane badge and remaining wave geometry from layout
+#### s5 - [deep] Lane badge and remaining wave geometry from layout (done)
 
 Move the lane footnote-badge width in `renderSwimlane` and any wave-label geometry the survey found still derived in `waves.ts` (halo boxes, superscript offsets computed from text widths) into layout's positioned lane and wave models. Acceptance: as s4.
 
-#### s6 - [deep] Remaining survey items
+#### s6 - [deep] Remaining survey items (done)
 
 Do the moves the survey listed that s2-s5 didn't cover, under the leave rule. If there are none, make an empty commit saying so. Acceptance: every survey entry is marked moved (with its commit) or left (with its reason) in the survey doc; `make pre-commit` green.
 
@@ -179,6 +179,8 @@ In `specs/review-since-v086.md`, update the R5 bullet to done: `render.ts` split
 
 review wave-1 (nowline m1 s1-s7) 831468b..8938c21: PASS - pure moves verbatim into primitives, waves, timeline, nowline, markers, edges; 252 parity renders identical; pre-commit green; passed unattended: gate 4 - 2026-10-19
 review wave-1 (nowline m2 s1-s7) 8307d3e..e2275d5: PASS - header, item, swimlanes, footnotes, include-region moved verbatim; renderItem split into 10 helpers (max 70 lines, renderItem 24) with identical output; render.ts entry point only (239 lines); 252 parity renders identical; pre-commit green (env: Node 22.22.0, only Node in container; .nvmrc pins 26.2.0); 22db375 verified at HEAD; passed unattended - 2026-10-19
+review wave-2 (nowline m3 s1-s6) 283bf38..d299f05: FAIL - s2/s3/s5/s6 byte-identical incl. scratch probes; s4 capacityIconDx changed float summation order, capacity icon x moved 0.01 px at .xx5 rounding ties above 512 px (scratch far.nowline); pre-commit 0, parity 0 - 2026-10-19
+review wave-2-fix (nowline m3 s1-s6) 283bf38..0d3a6af: PASS - 045731f carries capacityIconDxTerms summed from x in base order (meta line, no-meta item, lane badge); far.nowline identical to base in 3 themes; 240-render brute force (9600 icons) identical; dead labelWidth/gapLabel.width removed; survey complete, left F1 (all-empty wave placeholder halo, needs finalize.ts) and F2 (lane owner tab sized from id, drawn from person title; bar can overlap); 252 parity renders identical; pre-commit green (env: Node 22.22.0) - fixups used 1 of 2 - 2026-10-19
 
 ## Token log
 
@@ -198,3 +200,8 @@ tokens orchestrator-wave-1 nowline-m2-s1-s7 (claude-opus-5-5): input ~24 / cache
 tokens wave-1 nowline-m2-s1-s7-relaunch (claude-sonnet-5-5): input ~32 / cache read ~1.2M / cache write ~94k / output ~8.4k | ~$0.55 API-equiv
 tokens review-wave-1 nowline-m2-s1-s7 (claude-opus-5-5): input ~46 / cache read ~1.9M / cache write ~100k / output ~9.5k | ~$1.09 API-equiv
 tokens orchestrator-wave-1 nowline-m2-s1-s7-relaunch (claude-opus-5-5): input ~28 / cache read ~950k / cache write ~0 5m + ~52k 1h / output ~5.8k | ~$0.72 API-equiv
+tokens wave-2 nowline-m3-s1-s6 (claude-opus-5-5): input ~210 / cache read ~24M / cache write ~320k / output ~95k | ~$8.28 API-equiv
+tokens review-wave-2 nowline-m3-s1-s6 (claude-opus-5-5): input ~120 / cache read ~8.1M / cache write ~180k / output ~35k | ~$3.20 API-equiv
+tokens wave-2-fix nowline-m3-s1-s6 (claude-opus-5-5): input ~82 / cache read ~4.3M / cache write ~94k / output ~23k | ~$1.81 API-equiv
+tokens review-wave-2-fix nowline-m3-s1-s6 (claude-opus-5-5): input ~48 / cache read ~2.1M / cache write ~200k / output ~14k | ~$1.70 API-equiv
+tokens orchestrator-wave-2 nowline-m3-s1-s6 (claude-opus-5-5): input ~42 / cache read ~1.8M / cache write ~0 5m + ~21k 1h / output ~8.7k | ~$0.70 API-equiv

@@ -3,9 +3,9 @@
 - **Branch:** `claude/lucid-cannon-6tq5ly` (harness-assigned task branch, cut from `main` at `5b17389`). Name was assigned, not guessed.
 - **Plan:** [`plan-render-split-kestrel.md`](./plan-render-split-kestrel.md).
 - **Mode:** unattended, confirmed 2026-10-19 in session `fc39e88b` (dialog: Unattended; session: This session).
-- **Done:** wave 1 complete. m1 s1-s7 `831468b..8938c21` review PASS; m2 s1-s7 `8307d3e..e2275d5` review PASS (header, item, swimlanes, footnotes, include-region; renderItem split into 10 helpers; `render.ts` 3192 -> 239 lines, entry point only). Plan tagged into 3 waves: 1 [exec] m1+m2, 2 [deep] m3 s1-s6, 3 [exec] m4 s1.
-- **Spend:** ~$10.4 of ~$15 expected; guard 3x min $50.
-- **Next unit:** wave 2, m3 s1-s6 [deep] (`nowline m3 s1-s6`), from `e2275d5`.
+- **Done:** wave 1 (m1 `831468b..8938c21`, m2 `8307d3e..e2275d5`, both PASS) and wave 2 (m3 `283bf38..0d3a6af`, PASS after fix-up 1: s4 float summation order). `render.ts` 3192 -> 239 lines; measurement moved into layout per `r5-measurement-survey-kestrel.md`, follow-ups F1 (all-empty wave placeholder halo) and F2 (lane owner tab sized from id, drawn from person title; item bar can overlap the owner text, a real visual bug).
+- **Spend:** ~$26 of ~$15 expected (wave 2 deep worker ran ~$8 vs ~$4.7 estimate, plus one review/fix-up cycle); guard 3x min $50.
+- **Next unit:** wave 3, m4 s1 [exec] (`nowline m4 s1`), from `0d3a6af`.
 - **Resume:** paste the plan's Kickoff prompt into a new session.
 - **Orchestrator note:** session `db6b66a7` had no `personal-plan-orchestrate` skill installed in its cloud container; it ran the procedure as the plan file describes it (worker subagent per unit, review subagent, plan update), without the skill's gate hooks.
 
