@@ -25,6 +25,8 @@ Don't call `pnpm` directly to stand in for any of these.
 
 Keep the branch current. On every wake (CI result, review, conflict notice, check-in), fetch `main`. If the branch is behind, merge `main` in, even if the merge is clean. Then run the local gate and push. The merge queue would catch drift anyway, but a current branch surfaces conflicts and man-page stamp breakage while the session that wrote the change is still around to fix it.
 
+Once the PR is in the merge queue, stop. Any push dequeues it, and the queue already tests it against the latest `main`. Only resume merging `main` if it's dropped from the queue.
+
 Use a merge commit, never a rebase or force-push. Squash-merge flattens the history anyway.
 
 ### Resolving conflicts
