@@ -18,12 +18,13 @@ import {
     CONTAINER_NESTED_BODY_FILL_OPACITY,
     containerHeaderTitleX,
     estimateCapacitySuffixWidth,
+    estimateTextWidth,
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
     frameTabGeometry,
 } from '@nowline/layout';
 import { hasAfterPin, renderCapacitySuffix, renderInlineDatePins, renderItem } from './item.js';
-import { estimateCaptionWidthPx, fontAttrs } from './primitives.js';
+import { fontAttrs } from './primitives.js';
 import type { FontFamilies, RenderOptions } from './render.js';
 import { num, tag, textTag } from './xml.js';
 
@@ -232,7 +233,7 @@ export function renderSwimlane(
         const footnoteIndicatorText =
             s.footnoteIndicators.length > 0 ? s.footnoteIndicators.join(',') : '';
         const footnoteIndicatorWidthPx = footnoteIndicatorText
-            ? estimateCaptionWidthPx(footnoteIndicatorText, LANE_BADGE_FONT_SIZE_PX)
+            ? estimateTextWidth(footnoteIndicatorText, LANE_BADGE_FONT_SIZE_PX)
             : 0;
         const tab = frameTabGeometry(
             s.box.x,

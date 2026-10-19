@@ -19,8 +19,8 @@ import type {
 } from '@nowline/layout';
 import {
     CORNER_RADIUS_PX,
+    estimateTextWidth,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
-    MARKER_BOLD_WIDTH_FACTOR,
     WAVE_BOUNDARY_WIDTH_PX,
     WAVE_CROSS_DASH,
     WAVE_EMPTY_MARKER_SIZE_PX,
@@ -32,7 +32,7 @@ import {
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
-import { estimateCaptionWidthPx, intersectBox, relativeLuminance } from './primitives.js';
+import { intersectBox, relativeLuminance } from './primitives.js';
 import type { FontFamilies } from './render.js';
 import { escText, num, tag, textTag } from './xml.js';
 
@@ -364,12 +364,6 @@ export function renderWaveBoundaries(
     return tag('g', { 'data-layer': 'wave-boundary' }, parts.join(''));
 }
 
-/** Estimated width of 10 px wave text, bold when `bold`. */
-function waveTextWidth(text: string, bold: boolean): number {
-    const w = estimateCaptionWidthPx(text, WAVE_STRIP_LABEL_FONT_SIZE_PX);
-    return bold ? w * MARKER_BOLD_WIDTH_FACTOR : w;
-}
-
 /**
  * `wave-labels` (§9.1): strip labels on halos in their cell's fill,
  * right-aligned footnote superscripts, empty-wave diamonds, gap floor
@@ -388,9 +382,10 @@ export function renderWaveLabels(
     const haloHeight = strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX;
     const parts: string[] = [];
     // Muted italics on a halo in the backing panel's fill, so the major
-    // grid lines drawn later never cut through the text (§9.1).
-    const mutedText = (x: number, text: string): string => {
-        const haloWidth = waveTextWidth(text, false) + 2 * WAVE_LABEL_HALO_PAD_PX;
+    // grid lines drawn later never cut through the text (§9.1). `width` is
+    // the text's estimated width, as layout measured it.
+    const mutedText = (x: number, text: string, width: number): string => {
+        const haloWidth = width + 2 * WAVE_LABEL_HALO_PAD_PX;
         return (
             tag('rect', {
                 x: num(x - haloWidth / 2),
@@ -415,15 +410,18 @@ export function renderWaveLabels(
     };
 
     if (strip.placeholder !== undefined) {
-        parts.push(mutedText(t.box.x + t.box.width / 2, strip.placeholder));
+        // Layout keeps no width for the placeholder (survey F1), so it is
+        // measured here with layout's estimator.
+        const width = estimateTextWidth(strip.placeholder, WAVE_STRIP_LABEL_FONT_SIZE_PX);
+        parts.push(mutedText(t.box.x + t.box.width / 2, strip.placeholder, width));
     }
 
     for (const w of model.waves) {
         // A gap opened by a start floor: no cell, the floor reference in
         // muted italics on a halo in the backing panel's fill.
         if (w.strip.gapLabel) {
-            const { text, x } = w.strip.gapLabel;
-            parts.push(mutedText(x, text));
+            const { text, x, width } = w.strip.gapLabel;
+            parts.push(mutedText(x, text, width));
         }
 
         // An empty wave: a hollow diamond, with the wave's tooltip.
@@ -461,7 +459,7 @@ export function renderWaveLabels(
             );
         }
         if (w.strip.label !== undefined) {
-            const textWidth = waveTextWidth(w.strip.label, true);
+            const textWidth = w.strip.labelWidth ?? 0;
             // Centred on the visible span, but never under the superscripts.
             const x = superscriptWidth
                 ? Math.min(

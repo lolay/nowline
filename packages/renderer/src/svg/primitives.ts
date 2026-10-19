@@ -93,16 +93,6 @@ export function pickStatusDotPalette(bg: string, palette: Theme): Theme['statusD
     return relativeLuminance(bg) >= 0.24 ? palette.statusDot.onLight : palette.statusDot.onDark;
 }
 
-/**
- * Approx. rendered width (px) of `text` at `fontSizePx`. Mirrors the
- * `0.58 em / char` heuristic the layout uses for spill detection so the
- * renderer's positioning of the capacity suffix lines up with what the
- * layout reserved.
- */
-export function estimateCaptionWidthPx(text: string, fontSizePx: number): number {
-    return text.length * fontSizePx * 0.58;
-}
-
 export function rectFrame(
     x: number,
     y: number,

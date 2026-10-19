@@ -939,6 +939,12 @@ export interface PositionedWaveStrip {
     /** The label text; omitted when `labelKind` is `none`. */
     label?: string;
     /**
+     * The label's estimated width at the strip's 10 px bold weight (the
+     * width `fitStripLabel` tested it at); present exactly when `label` is.
+     * The renderer sizes the label's halo from it.
+     */
+    labelWidth?: number;
+    /**
      * Which step of the fit chain won: the title, the id, the title
      * ellipsized to 3 or more characters plus "…", the 1-based `#k`, or
      * no label. Always `none` for an empty wave (it has no cell).
@@ -971,9 +977,10 @@ export interface PositionedWaveStrip {
     /**
      * The floor reference (`fy-budget`, `2026-02-02`) centred in the gap
      * this wave's start floor opened before it (`S_k > E_{k-1}`, k >= 2),
-     * when it fits; drawn in muted italics. Omitted otherwise.
+     * when it fits; drawn in muted italics. `width` is the text's estimated
+     * width at 10 px, the one its fit was tested at. Omitted otherwise.
      */
-    gapLabel?: { text: string; x: number };
+    gapLabel?: { text: string; x: number; width: number };
 }
 
 /** A wave's resolved colours (specs/waves.md §9.4). */

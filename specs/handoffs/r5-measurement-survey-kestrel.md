@@ -12,7 +12,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `text-measure.ts:14` `estimateTextWidth(text, fontSize)`, the same expression in the same operand order. Not exported from `@nowline/layout` at `283bf38`.
 - **Agree:** yes, for every input (identical expression, so identical doubles).
 - **Verdict:** move in s2: export `estimateTextWidth`, delete the copy.
-- **Status:** pending (s2).
+- **Status:** moved in m3.s2: `estimateTextWidth` exported from `@nowline/layout`, `estimateCaptionWidthPx` deleted.
 
 ### E2. Wave strip label width (`waveTextWidth`, bold)
 
@@ -20,7 +20,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** `nodes/wave-node.ts:257` (`fitStripLabel`) computes `estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) * MARKER_BOLD_WIDTH_FACTOR` for the candidate that won, but does not keep it.
 - **Agree:** yes, for every label (same expression; the renderer measures the label `fitStripLabel` returned).
 - **Verdict:** move in s2: carry the winning label's bold width on `PositionedWaveStrip`.
-- **Status:** pending (s2).
+- **Status:** moved in m3.s2: `estimateTextWidth` exported from `@nowline/layout`; `PositionedWaveStrip.labelWidth`.
 
 ### E3. Wave gap-label and placeholder halo widths (`waveTextWidth`, regular)
 
@@ -28,7 +28,7 @@ Line numbers are at `283bf38`. "Status" is filled in as m3 steps land.
 - **Layout:** the gap label's width is computed at `nodes/wave-node.ts:171` (`estimateTextWidth(span.floorRef, 10)`) for its fit test. The placeholder is built at `nodes/wave-node.ts:229` and copied onto `timeline.waveStrip.placeholder` by `phases/finalize.ts:911-912`; nothing measures it.
 - **Agree:** gap label yes (same expression). Placeholder: no layout value exists.
 - **Verdict:** gap label width: move in s2 (carry on `gapLabel`). Placeholder width: leave (see F1).
-- **Status:** pending (s2); placeholder left (F1).
+- **Status:** gap label moved in m3.s2 (`gapLabel.width`); placeholder left (F1): the renderer measures it with layout's `estimateTextWidth`.
 
 ### E4. Wave label halo boxes and superscript offsets
 

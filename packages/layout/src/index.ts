@@ -137,6 +137,7 @@ export type {
     ScheduleOptions,
 } from './schedule.js';
 export { scheduleRoadmap } from './schedule.js';
+export { estimateTextWidth } from './text-measure.js';
 export { contrastRatio, relativeLuminance } from './themes/contrast.js';
 export {
     darkTheme,

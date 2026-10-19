@@ -170,7 +170,7 @@ export function buildWaves(
             const gapRight = Math.min(span.start, visRight);
             const textWidth = estimateTextWidth(span.floorRef, WAVE_STRIP_LABEL_FONT_SIZE_PX);
             if (textWidth + 2 * WAVE_STRIP_LABEL_PAD_PX <= gapRight - gapLeft) {
-                gapLabel = { text: span.floorRef, x: (gapLeft + gapRight) / 2 };
+                gapLabel = { text: span.floorRef, x: (gapLeft + gapRight) / 2, width: textWidth };
             }
         }
 
@@ -200,7 +200,7 @@ export function buildWaves(
                     width: span.end - span.start,
                     height: strip.height,
                 },
-                ...(fit ? { label: fit.label } : {}),
+                ...(fit ? { label: fit.label, labelWidth: stripLabelWidth(fit.label) } : {}),
                 labelKind: fit?.kind ?? 'none',
                 labelX,
                 tooltip: tooltipParts.join(' · '),
@@ -239,6 +239,11 @@ interface LabelFit {
     label: string;
 }
 
+/** A strip label's estimated width: 10 px text, widened for its bold weight. */
+function stripLabelWidth(text: string): number {
+    return estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) * MARKER_BOLD_WIDTH_FACTOR;
+}
+
 /**
  * The first strip label candidate that fits (§9.1): the title, the id, the
  * title ellipsized to 3 or more characters plus "…", then the 1-based
@@ -254,10 +259,7 @@ export function fitStripLabel(
     extraWidth: number,
 ): LabelFit | undefined {
     const fits = (text: string): boolean =>
-        estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) * MARKER_BOLD_WIDTH_FACTOR +
-            extraWidth +
-            2 * WAVE_STRIP_LABEL_PAD_PX <=
-        visibleWidth;
+        stripLabelWidth(text) + extraWidth + 2 * WAVE_STRIP_LABEL_PAD_PX <= visibleWidth;
     if (fits(title)) return { kind: 'title', label: title };
     if (id !== title && fits(id)) return { kind: 'id', label: id };
     for (let n = title.length - 1; n >= 3; n--) {

@@ -6,6 +6,7 @@
 import type { InlineDatePin, PositionedCapacity, PositionedItem, Theme } from '@nowline/layout';
 import {
     CORNER_RADIUS_PX,
+    estimateTextWidth,
     ITEM_CAPTION_META_FONT_SIZE_PX,
     ITEM_CAPTION_SPILL_GAP_PX,
     ITEM_CAPTION_TITLE_BASELINE_OFFSET_PX,
@@ -27,12 +28,7 @@ import {
     TEXT_SIZE_PX,
 } from '@nowline/layout';
 import { BUILTIN_ICON_SVG, CAPACITY_ICON_SVG } from './icons.js';
-import {
-    estimateCaptionWidthPx,
-    fontAttrs,
-    pickStatusDotPalette,
-    rectFrame,
-} from './primitives.js';
+import { fontAttrs, pickStatusDotPalette, rectFrame } from './primitives.js';
 import type { FontFamilies, RenderOptions } from './render.js';
 import { shadowFilterUrl } from './shadow.js';
 import { hatchOverlay } from './waves.js';
@@ -77,11 +73,11 @@ export function renderCapacitySuffix(
     color: string,
 ): string {
     const charWidthPx = fontSize * 0.58;
-    const precedingWidthPx = precedingText ? estimateCaptionWidthPx(precedingText, fontSize) : 0;
+    const precedingWidthPx = precedingText ? estimateTextWidth(precedingText, fontSize) : 0;
     const separatorPx = precedingText ? charWidthPx : 0;
     const numberX = x0 + precedingWidthPx + separatorPx;
     const { text: numberStr, icon } = capacity;
-    const numberWidthPx = estimateCaptionWidthPx(numberStr, fontSize);
+    const numberWidthPx = estimateTextWidth(numberStr, fontSize);
     const baseAttrs = {
         'font-family': fontFamily,
         'font-size': fontSize,
@@ -147,7 +143,7 @@ const META_ICON_EM_PER_CHAR = 0.5;
  * Paint the item meta line (metaText plus optional capacity suffix) as
  * a single SVG fragment. Call sites used to emit metaText and the
  * suffix as two unrelated `<text>` nodes whose horizontal offsets came
- * from `estimateCaptionWidthPx` — fine for short metas like `2w`, but
+ * from `estimateTextWidth` — fine for short metas like `2w`, but
  * the per-character estimate over-reserves for longer captions like
  * `L 1w — 1w remaining`, leaving a visible gap before `2×`.
  *
