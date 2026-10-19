@@ -1,9 +1,9 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: BLOCKED at gate mode | 0/4 groups done | last review: — | current: nowline m1 s1-s7 [exec] | updated 2026-10-19
+  Status: 0/4 groups done | last review: — | current: nowline m1 s1-s7 [exec] | updated 2026-10-19
 
-  mode: pending | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, harness-assigned branch) | guard 3x min $50 | fixups 2
+  mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, harness-assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-19 session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef: Unattended (Recommended)
 
   review: every-wave (log-only)
 
@@ -14,6 +14,7 @@
   Prompt to paste into the next chat:
     In lolay/nowline, read specs/handoffs/plan-render-split-kestrel.md. The plan is already tagged.
     On branch claude/lucid-cannon-6tq5ly (task branch): subagents commit each finished step.
+    Run in unattended mode.
     Run the personal-plan-orchestrate skill from the top: walk to
     each tier boundary, dispatch subagents per the skill's procedure,
     and pause only where the recorded mode stops. Do not execute plan
@@ -185,3 +186,4 @@ In `specs/review-since-v086.md`, update the R5 bullet to done: `render.ts` split
 - Rates by `<model>`, $ per Mtok input / cached / output: `claude-opus-5-5` 4.00 / 0.20 / 20.00; `claude-sonnet-5-5` 2.00 / 0.20 / 10.00.
 - `$C` = (input × in + cache read × cached + 5m write × in × 1.25 + 1h write × in × 2.00 + output × out) / 1M.
 - In another harness, or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
+tokens orchestrator-kickoff plan-render-split-kestrel (claude-opus-5-5): input ~60 / cache read ~4.9M / cache write ~0 5m + ~170k 1h / output ~29k | ~$2.94 API-equiv
