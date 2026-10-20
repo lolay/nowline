@@ -19,19 +19,39 @@
 //     chip. This means short labels naturally shrink-wrap their
 //     chiclet rather than reserving a wide whitespace column.
 //
-// The per-char width factors are calibrated to actual avg-char-width
-// of the system sans-serif stack at the relevant font sizes / weights.
-// They lean slightly conservative (~5 % over actual) so the chiclet
-// never visually clips its label even when the runtime font's metrics
-// exceed the calibration target.
+// The width factors are calibrated to the system sans-serif stack at
+// the relevant font sizes / weights. The title uses per-character
+// width classes rather than one average: a flat average let wide
+// titles ("Headcount") overrun their estimate by most of the inner
+// gap while narrow ones ("Sprint pts") reserved a wide hole.
 
-/**
- * Px-per-char for a 12 pt 600-weight title in `FONT_STACK.sans`.
- * Calibrated against system-ui at 12 pt bold (~6.3 px/char actual);
- * 6.5 leaves a small safety margin without producing a wide gap to
- * the owner / badge that follows.
- */
-export const FRAME_TAB_TITLE_PX_PER_CHAR = 6.5;
+/** Font size (px) of the 600-weight title in `FONT_STACK.sans`. */
+export const FRAME_TAB_TITLE_FONT_SIZE_PX = 12;
+
+// Title width classes, in em. Calibrated against system-ui (Inter) at
+// 12px semibold, the widest common resolution of the stack, so other
+// system fonts land at or slightly inside the estimate.
+const TITLE_NARROW_EM = 0.28;
+const TITLE_SEMI_NARROW_EM = 0.4;
+const TITLE_WIDE_EM = 0.9;
+const TITLE_CAPITAL_OR_DIGIT_EM = 0.7;
+const TITLE_DEFAULT_EM = 0.6;
+const TITLE_NARROW_CHARS = new Set(" ijlI.,:;!'|`");
+const TITLE_SEMI_NARROW_CHARS = new Set('frt()[]{}/\\1-_"');
+const TITLE_WIDE_CHARS = new Set('mwMW@%');
+
+/** Estimated rendered width (px) of a frame-tab title. */
+export function estimateFrameTabTitleWidth(title: string): number {
+    let em = 0;
+    for (const ch of title) {
+        if (TITLE_NARROW_CHARS.has(ch)) em += TITLE_NARROW_EM;
+        else if (TITLE_SEMI_NARROW_CHARS.has(ch)) em += TITLE_SEMI_NARROW_EM;
+        else if (TITLE_WIDE_CHARS.has(ch)) em += TITLE_WIDE_EM;
+        else if (/[A-Z0-9]/.test(ch)) em += TITLE_CAPITAL_OR_DIGIT_EM;
+        else em += TITLE_DEFAULT_EM;
+    }
+    return em * FRAME_TAB_TITLE_FONT_SIZE_PX;
+}
 
 /**
  * Px-per-char for a 10 pt regular owner suffix in `FONT_STACK.sans`.
@@ -137,7 +157,7 @@ export function frameTabGeometry(
     const tabX = boxX + FRAME_TAB_OFFSET_FROM_BOX_PX;
     const titleX = tabX + FRAME_TAB_LEFT_INSET_PX;
 
-    const titleTextWidth = title.length * FRAME_TAB_TITLE_PX_PER_CHAR;
+    const titleTextWidth = estimateFrameTabTitleWidth(title);
     let cursorX = titleX + titleTextWidth;
 
     let ownerTextWidth = 0;
