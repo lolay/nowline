@@ -3,14 +3,16 @@
 // nodes (e.g. `swimlane-node.ts`) can type their inputs without importing
 // the phases that drive them.
 
-import type {
-    GroupBlock,
-    ItemDeclaration,
-    LabelDeclaration,
-    ParallelBlock,
-    ResolvedConfig,
-    ResolvedContent,
-    SymbolDeclaration,
+import {
+    type GroupBlock,
+    type ItemDeclaration,
+    isTeamDeclaration,
+    type LabelDeclaration,
+    type ParallelBlock,
+    type ResolvedConfig,
+    type ResolvedContent,
+    type SymbolDeclaration,
+    type TeamDeclaration,
 } from '@nowline/core';
 import type { AxisColumns } from './axis-columns.js';
 import type { BandScale } from './band-scale.js';
@@ -91,7 +93,8 @@ export interface LayoutContext {
     styleCtx: StyleContext;
     sizes: Map<string, ResolvedSize>;
     labels: Map<string, LabelDeclaration>;
-    teams: Map<string, import('@nowline/core').TeamDeclaration>;
+    /** Every team by id, the ones nested in another team included. */
+    teams: Map<string, TeamDeclaration>;
     persons: Map<string, import('@nowline/core').PersonDeclaration>;
     /**
      * Custom `symbol` declarations from `ResolvedConfig.symbols`. Used by
@@ -208,6 +211,24 @@ export interface LayoutContext {
     waves?: WaveLayoutState;
 }
 
+/**
+ * `teams` plus every team nested in one of them, so an `owner:` naming a
+ * nested team resolves to its title. The resolved content keys only the
+ * file's top-level declarations. A top-level id wins over a nested one.
+ */
+function withNestedTeams(teams: Map<string, TeamDeclaration>): Map<string, TeamDeclaration> {
+    const out = new Map(teams);
+    const visit = (team: TeamDeclaration): void => {
+        for (const member of team.content) {
+            if (!isTeamDeclaration(member)) continue;
+            if (member.name && !out.has(member.name)) out.set(member.name, member);
+            visit(member);
+        }
+    };
+    for (const team of teams.values()) visit(team);
+    return out;
+}
+
 /** The per-file half of a context: the root file, or an isolated region. */
 export interface ContextSource {
     config: Pick<ResolvedConfig, 'styles' | 'defaults' | 'symbols'>;
@@ -260,7 +281,7 @@ export function createLayoutContext(
         // pixels-per-day scale.
         sizes: resolveSizes(source.content.sizes, shared.cal),
         labels: source.content.labels,
-        teams: source.content.teams,
+        teams: withNestedTeams(source.content.teams),
         persons: source.content.persons,
         symbols: source.config.symbols,
         footnoteIndex: init.footnotes?.index ?? new Map(),

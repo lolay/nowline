@@ -19,12 +19,13 @@ import {
     containerHeaderTitleX,
     FRAME_TAB_HEIGHT_PX,
     FRAME_TAB_LABEL_BASELINE_OFFSET_PX,
-    frameTabGeometry,
+    FRAME_TAB_OWNER_GLYPH_PX,
 } from '@nowline/layout';
+import { CAPACITY_ICON_SVG } from './icons.js';
 import { hasAfterPin, renderCapacitySuffix, renderInlineDatePins, renderItem } from './item.js';
 import { fontAttrs } from './primitives.js';
 import type { FontFamilies, RenderOptions } from './render.js';
-import { num, tag, textTag } from './xml.js';
+import { escAttr, num, tag, textTag } from './xml.js';
 
 /**
  * A group or parallel, drawn above and around its content
@@ -212,27 +213,15 @@ export function renderSwimlane(
     const ownerText = palette.swimlane.ownerText;
     const footnoteColor = palette.swimlane.footnoteIndicator;
     const parts: string[] = [];
-    // Frame-tab chiclet at the top-left of the band — auto-sized to fit
-    // title + owner. Geometry comes from the shared `frameTabGeometry`
-    // helper that the layout's row-packer also calls, so the chiclet's
-    // visible footprint matches the collision box layout reserved for it.
-    if (s.title) {
-        // Lane capacity badge + footnote indicator sit inside the frame
-        // tab after the owner (or after the title if no owner). Layout
-        // measured both widths (the ones it sized the tab's collision box
-        // with), so `frameTabGeometry` sizes the chiclet to fit them, then
-        // the placement positions are read back out — no second placement
-        // pass in the renderer.
+    // Frame-tab chiclet at the top-left of the band, auto-sized to fit
+    // title, owner, capacity badge and footnote indicators. Layout sized it
+    // (`PositionedSwimlane.tab`, the same rectangle it reserved for the
+    // row packer) and placed each element inside it; this only draws.
+    const tab = s.tab;
+    if (tab) {
         const LANE_BADGE_FONT_SIZE_PX = 10;
         const footnoteIndicatorText =
             s.footnoteIndicators.length > 0 ? s.footnoteIndicators.join(',') : '';
-        const tab = frameTabGeometry(
-            s.box.x,
-            s.title,
-            s.owner,
-            s.capacityBadgeWidth,
-            s.footnoteIndicatorWidth,
-        );
         const tabH = FRAME_TAB_HEIGHT_PX;
         const tabY = s.box.y + 10;
         const labelY = tabY + FRAME_TAB_LABEL_BASELINE_OFFSET_PX;
@@ -263,16 +252,23 @@ export function renderSwimlane(
             ),
         );
         if (s.owner) {
+            // A person or people glyph leads the owner name, lifted onto
+            // the text's x-height like the capacity badge's glyph.
+            const glyph = CAPACITY_ICON_SVG[s.ownerKind === 'person' ? 'person' : 'people'];
+            const glyphSize = FRAME_TAB_OWNER_GLYPH_PX;
+            parts.push(
+                `<svg x="${num(tab.ownerX)}" y="${num(labelY - glyphSize * 0.85)}" width="${num(glyphSize)}" height="${num(glyphSize)}" viewBox="${glyph.viewBox}" style="color:${escAttr(ownerText)}" aria-hidden="true">${glyph.body}</svg>`,
+            );
             parts.push(
                 textTag(
                     {
-                        x: num(tab.ownerX),
+                        x: num(tab.ownerTextX),
                         y: num(labelY),
                         'font-family': fonts[s.style.font],
                         'font-size': 10,
                         fill: ownerText,
                     },
-                    `owner: ${s.owner}`,
+                    s.owner,
                 ),
             );
         }

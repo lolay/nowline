@@ -90,30 +90,21 @@ const TAB_BOTTOM_Y = 38; // tab (height 22) plus 6 px breathing room
 const TAB_GUTTER_PX = 8;
 
 /**
- * Right edge (canvas px) of the lane title tab. Delegates to the
- * shared `frameTabGeometry` helper that the renderer also uses, so
- * the chiclet's collision footprint and its painted footprint stay
- * exactly in sync. Capacity badge and footnote-indicator widths are
- * added when present so the first-item collision math reserves
- * enough horizontal space for the (now-wider) chiclet.
+ * The lane's owner as the frame tab shows it: the person's or team's
+ * title (nested teams included), else the bare id, plus which glyph leads
+ * it. Undefined without `owner:`.
  */
-function computeLaneTabRightX(
+function resolveLaneOwner(
     lane: SwimlaneDeclaration,
-    capacityBadgeWidthPx: number,
-    footnoteIndicatorWidthPx: number,
-): number {
-    const title = lane.title ?? lane.name ?? '';
-    if (!title) return 0;
+    ctx: LayoutContext,
+): { text: string; kind: 'person' | 'team' } | undefined {
     const ownerRaw = propValue(lane.properties, 'owner');
-    // Box is laid out at `box.x = 0` for top-level lanes; the helper
-    // adds the standard `FRAME_TAB_OFFSET_FROM_BOX_PX` itself.
-    return frameTabGeometry(
-        0,
-        title,
-        ownerRaw ?? undefined,
-        capacityBadgeWidthPx,
-        footnoteIndicatorWidthPx,
-    ).rightX;
+    if (!ownerRaw) return undefined;
+    const team = ctx.teams.get(ownerRaw);
+    if (team) return { text: team.title ?? ownerRaw, kind: 'team' };
+    const person = ctx.persons.get(ownerRaw);
+    if (person) return { text: person.title ?? ownerRaw, kind: 'person' };
+    return { text: ownerRaw, kind: 'team' };
 }
 
 /**
@@ -199,8 +190,17 @@ export class SwimlaneNode {
             footnoteIndicators.length > 0
                 ? estimateTextWidth(footnoteIndicators.join(','), LANE_CAPACITY_BADGE_FONT_SIZE_PX)
                 : 0;
-        // Title-tab geometry (mirrors the renderer; see renderSwimlane).
-        const tabRightX = computeLaneTabRightX(lane, badgeWidthPx, footnoteIndicatorWidthPx);
+        // Title-tab geometry, computed once from the owner's display
+        // title: the collision box below and the chiclet the renderer
+        // draws (`PositionedSwimlane.tab`) are the same rectangle. Every
+        // lane box sits at x 0 (`box` below); finalize sets only widths.
+        const boxX = 0;
+        const owner = resolveLaneOwner(lane, ctx);
+        const title = lane.title ?? lane.name ?? '';
+        const tab = title
+            ? frameTabGeometry(boxX, title, owner?.text, badgeWidthPx, footnoteIndicatorWidthPx)
+            : null;
+        const tabRightX = tab?.rightX ?? 0;
         // First-row Y: when the first child's desired x is past the title
         // tab, top-align with the tab and reclaim ~28 px per lane.
         // Otherwise drop below the tab.
@@ -233,20 +233,11 @@ export class SwimlaneNode {
         // lane's width to it and `fitIncludeRegionWidth` a region lane's to
         // the region's. Placement never reads the canvas.
         const box: BoundingBox = {
-            x: 0,
+            x: boxX,
             y: origin.y,
             width: 0,
             height: bandHeight,
         };
-
-        // Owner display string: id → title for teams/people; falls back to id.
-        const ownerRaw = propValue(lane.properties, 'owner');
-        let ownerDisplay: string | undefined;
-        if (ownerRaw) {
-            const team = ctx.teams.get(ownerRaw);
-            const person = ctx.persons.get(ownerRaw);
-            ownerDisplay = team?.title ?? person?.title ?? ownerRaw;
-        }
 
         // Lane utilization underline (m12). Computed *after* children are
         // positioned so the contributors carry their final box.x / box.width.
@@ -272,17 +263,17 @@ export class SwimlaneNode {
         return {
             positioned: {
                 id: lane.name,
-                title: lane.title ?? lane.name ?? '',
+                title,
                 box,
                 bandIndex,
                 children,
                 nested: [],
                 style,
-                owner: ownerDisplay,
+                owner: owner?.text,
+                ownerKind: owner?.kind,
                 footnoteIndicators,
                 capacity,
-                capacityBadgeWidth: badgeWidthPx,
-                footnoteIndicatorWidth: footnoteIndicatorWidthPx,
+                tab,
                 utilization,
             },
             usedHeight: bandHeight,

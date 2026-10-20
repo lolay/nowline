@@ -190,10 +190,10 @@ describe('lane frame-tab badge widths', () => {
         );
         const lane = model.swimlanes[0];
         expect(lane.footnoteIndicators).toEqual([1, 2]);
-        expect(lane.capacityBadgeWidth).toBe(
+        expect(lane.tab?.capacityBadgeWidth).toBe(
             estimateCapacitySuffixWidth('8', { kind: 'builtin', name: 'person' }, 10),
         );
-        expect(lane.footnoteIndicatorWidth).toBe(estimateTextWidth('1,2', 10));
+        expect(lane.tab?.footnoteIndicatorWidth).toBe(estimateTextWidth('1,2', 10));
     });
 
     it('are 0 for a lane without a badge or indicators', async () => {
@@ -204,8 +204,8 @@ roadmap r "R" start:2026-01-05 scale:1w
 swimlane a "A"
   item x duration:1w
 `);
-        expect(model.swimlanes[0].capacityBadgeWidth).toBe(0);
-        expect(model.swimlanes[0].footnoteIndicatorWidth).toBe(0);
+        expect(model.swimlanes[0].tab?.capacityBadgeWidth).toBe(0);
+        expect(model.swimlanes[0].tab?.footnoteIndicatorWidth).toBe(0);
     });
 });
 
