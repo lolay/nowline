@@ -4,9 +4,11 @@ Branch: `claude/serene-gates-yvx5of` (harness-assigned, cut from `main` at 70f41
 
 ## Status
 
-Options presented, waiting on the maintainer's pick. No code changed.
+Maintainer picked C, and added two asks: replace the `owner: ` prefix with a glyph (person glyph for a person, people glyph for a team), and fix the nested-team title bug below in the same change. Mocked all three together; waiting on sign-off of the mock. No code changed.
 
-Pending question, verbatim: "Which option for F2: A (size from display title), B (draw the raw id), or C (layout carries the tab geometry on `PositionedSwimlane`)? Recommended: C."
+Pending question, verbatim: "Ship C + owner glyph + nested-team titles as mocked (Lucide `user` for a person, `users` for a team, reusing the capacity glyphs)?"
+
+Glyph mock moves 5 renders (F2 fixture, `examples/platform-2026`, `examples/teams`, `tests/capacity-lanes`, `tests/grammar-properties`), 4 snapshots (`platform-2026{,-dark,-grayscale}.svg`, `capacity-lanes.svg`) and the `platform-2026` / `platform-2026-dark` determinism goldens (`make determinism-update`). Concern raised: the owner glyphs are the same as `capacity-icon:person` / `people`, which also paint in the tab (`tests/capacity-lanes` "Headcount 6 [person]"). Spec to update: `specs/rendering.md` "Owner badge" (line ~317). Tests asserting `owner: ` text: `packages/renderer/test/render.test.ts`. Item owner resolution (`packages/layout/src/nodes/item-measure.ts:182`) has the same nested-team bug; fix both through one helper.
 
 ## Findings
 
