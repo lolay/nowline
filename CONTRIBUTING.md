@@ -36,7 +36,7 @@ This project follows the [Contributor Covenant 2.1](./CODE_OF_CONDUCT.md). Repor
 
 You'll need:
 
-- **Node.js** ≥ 22 to **consume** `@nowline/*` packages (matches `engines.node` in every published `package.json`). To **develop** in this repo, install **Node 26** — `.nvmrc` pins `26.2.0` and CI runs on it. See [Toolchain & Supported Versions](#toolchain--supported-versions) for the full policy.
+- **Node.js** ≥ 22 to **consume** `@nowline/*` packages (matches `engines.node` in every published `package.json`). To **develop** in this repo, install **Node 26** — `.nvmrc` pins `26.12.0` and CI runs the latest Node 26. See [Toolchain & Supported Versions](#toolchain--supported-versions) for the full policy.
 - **pnpm** ≥ 11 (the repo is a pnpm workspace and pins the package manager via `packageManager: pnpm@12.8.1` in the root `package.json`). Install with `corepack enable && corepack prepare pnpm@latest --activate`.
 - **Git**.
 - **Python 3** — `scripts/changelog.py` needs it (stdlib only, nothing to install).
@@ -64,7 +64,7 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 
 | Pin | Where | Value | Why |
 | --- | --- | --- | --- |
-| Node | `.nvmrc` (root) | **`26.2.0`** | Latest current; gives us early signal on Node 26 features before it becomes LTS in October 2026. Single source of truth — `nvm use` / `fnm use` picks it up automatically. |
+| Node | `.nvmrc` (root) | **`26.12.0`** | Latest Node 26. Renovate keeps it current with minor and patch bumps; a major bump stays manual (below). Single source of truth — `nvm use` / `fnm use` picks it up automatically. |
 | Node | `actions/setup-node` calls in `.github/workflows/**` + the composite at `.github/actions/setup-node-pnpm/action.yml` | **`26`** (with a `22` cell in the `ci.yml` unit-test matrix) | Default uses 26 to match `.nvmrc`. The 22-cell exists to exercise the consumer floor on every PR, so we catch any accidental dependence on Node 26-only APIs leaking into published code. |
 | pnpm | root `package.json` `packageManager` field | **`pnpm@12.8.1`** | Pinned to a specific version so every dev gets the same `pnpm install` resolution. CI provisions pnpm via `corepack enable` (reads `packageManager` from `package.json`); `pnpm/action-setup` was dropped because its Windows self-update path crashed intermittently with STATUS_STACK_BUFFER_OVERRUN (pnpm/action-setup#260). |
 | Bun | `bun-version:` in `ci.yml` and `build.yml` | **`1.4.2`** | The Bun runtime is baked into shipped `bun compile` binaries (Homebrew, apt, GitHub Releases). Pinning makes those binaries reproducible. Tracked by a Renovate custom manager. |
@@ -77,7 +77,7 @@ Tightening any of these — e.g. moving the consumer floor from `>=22` to `>=24`
 ### Adjacent automation
 
 - **Renovate** ([shared preset](./.github/renovate-shared.json)) opens a single grouped PR per week for minor/patch updates across npm, GitHub Actions, Terraform, Bun, and actionlint. Major updates open individually with a 30-day cooldown. See the per-repo `renovate.json` files for repo-specific overrides. The Dependency Dashboard issue in each repo is the single triage entry point.
-- **Node version is explicitly disabled in Renovate's `packageRules`** — version bumps are governed manually by this section, not by Renovate, because changing the consumer floor is policy work, not a routine dependency bump.
+- **Renovate bumps only the `.nvmrc` pin, within its major.** Two `packageRules` keep the rest manual: Node major updates are disabled everywhere, and `engines` updates are disabled outright, because changing the consumer floor or the dev/CI major is policy work governed by this section, not a routine dependency bump.
 - **`@types/vscode` is explicitly disabled in Renovate's `packageRules`** — the floor is governed by the Cursor-tracking policy below, not Renovate. Renovate would otherwise bump `@types/vscode` past `engines.vscode` and break `vsce package` (as seen in the v0.3.0 release-run failure). `editor-release-monitor.yml` + `vscode-extension-engine-bump.yml` are the source of truth for when and how this field changes.
 - **Cross-references:** [Node release schedule](https://nodejs.org/en/about/previous-releases) · [`.nvmrc`](./.nvmrc) · [`.github/renovate-shared.json`](./.github/renovate-shared.json).
 

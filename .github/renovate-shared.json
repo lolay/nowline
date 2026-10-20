@@ -34,8 +34,15 @@
         },
         {
             "matchPackageNames": ["node"],
+            "matchUpdateTypes": ["major"],
             "enabled": false,
-            "description": "Node version is governed by .nvmrc + engines policy (see nowline/CONTRIBUTING.md § Toolchain & Supported Versions), not Renovate"
+            "description": "Node majors (the .nvmrc and setup-node major, and the consumer floor) are policy changes governed by nowline/CONTRIBUTING.md § Toolchain & Supported Versions, not Renovate. Minor and patch bumps of the .nvmrc pin stay enabled."
+        },
+        {
+            "matchPackageNames": ["node"],
+            "matchDepTypes": ["engines"],
+            "enabled": false,
+            "description": "engines.node is the consumer floor; tightening it is a breaking change (nowline/CONTRIBUTING.md § Toolchain & Supported Versions), never a Renovate bump."
         },
         {
             "matchPackageNames": ["@types/vscode"],
