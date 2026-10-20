@@ -31,14 +31,15 @@ export {
     ARROW_HEAD_WIDTH_PX,
 } from './edge-routing.js';
 export {
+    estimateFrameTabOwnerWidth,
     estimateFrameTabTitleWidth,
     FRAME_TAB_INNER_GAP_PX,
     FRAME_TAB_LEFT_INSET_PX,
     FRAME_TAB_MIN_WIDTH_PX,
     FRAME_TAB_OFFSET_FROM_BOX_PX,
+    FRAME_TAB_OWNER_FONT_SIZE_PX,
     FRAME_TAB_OWNER_GLYPH_GAP_PX,
     FRAME_TAB_OWNER_GLYPH_PX,
-    FRAME_TAB_OWNER_PX_PER_CHAR,
     FRAME_TAB_RIGHT_INSET_PX,
     FRAME_TAB_TITLE_FONT_SIZE_PX,
     type FrameTabGeometry,

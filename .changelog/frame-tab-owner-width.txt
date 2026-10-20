@@ -1,0 +1,3 @@
+```release-note:fixed
+Swimlane frame tabs size the owner name per character, like the lane name, so a wide owner name (`Sam Chen`, `Mobile Team`) no longer crowds the capacity badge or the tab's right edge.
+```
