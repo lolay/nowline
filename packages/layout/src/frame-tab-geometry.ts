@@ -20,44 +20,54 @@
 //     chiclet rather than reserving a wide whitespace column.
 //
 // The width factors are calibrated to the system sans-serif stack at
-// the relevant font sizes / weights. The title uses per-character
-// width classes rather than one average: a flat average let wide
-// titles ("Headcount") overrun their estimate by most of the inner
-// gap while narrow ones ("Sprint pts") reserved a wide hole.
+// the relevant font sizes / weights. Title and owner use per-character
+// width classes rather than one average: a flat average let wide text
+// ("Headcount", "Sam Chen") overrun its estimate by most of the inner
+// gap while narrow text ("Sprint pts") reserved a wide hole.
 
 /** Font size (px) of the 600-weight title in `FONT_STACK.sans`. */
 export const FRAME_TAB_TITLE_FONT_SIZE_PX = 12;
 
-// Title width classes, in em. Calibrated against system-ui (Inter) at
-// 12px semibold, the widest common resolution of the stack, so other
-// system fonts land at or slightly inside the estimate.
-const TITLE_NARROW_EM = 0.28;
-const TITLE_SEMI_NARROW_EM = 0.4;
-const TITLE_WIDE_EM = 0.9;
-const TITLE_CAPITAL_OR_DIGIT_EM = 0.7;
-const TITLE_DEFAULT_EM = 0.6;
-const TITLE_NARROW_CHARS = new Set(" ijlI.,:;!'|`");
-const TITLE_SEMI_NARROW_CHARS = new Set('frt()[]{}/\\1-_"');
-const TITLE_WIDE_CHARS = new Set('mwMW@%');
+/** Font size (px) of the regular-weight owner name in `FONT_STACK.sans`. */
+export const FRAME_TAB_OWNER_FONT_SIZE_PX = 10;
+
+// Width classes, in em. Calibrated against system-ui (Inter) at 12px
+// semibold, the widest common resolution of the stack, so other system
+// fonts land at or slightly inside the estimate.
+const NARROW_EM = 0.28;
+const SEMI_NARROW_EM = 0.4;
+const WIDE_EM = 0.9;
+const CAPITAL_OR_DIGIT_EM = 0.7;
+const DEFAULT_EM = 0.6;
+const NARROW_CHARS = new Set(" ijlI.,:;!'|`");
+const SEMI_NARROW_CHARS = new Set('frt()[]{}/\\1-_"');
+const WIDE_CHARS = new Set('mwMW@%');
+
+// Regular weight draws about 5 % narrower per em than semibold, which
+// the classes are calibrated to (Inter at 10px regular).
+const REGULAR_WEIGHT_SCALE = 0.95;
+
+function estimateClassedEm(text: string): number {
+    let em = 0;
+    for (const ch of text) {
+        if (NARROW_CHARS.has(ch)) em += NARROW_EM;
+        else if (SEMI_NARROW_CHARS.has(ch)) em += SEMI_NARROW_EM;
+        else if (WIDE_CHARS.has(ch)) em += WIDE_EM;
+        else if (/[A-Z0-9]/.test(ch)) em += CAPITAL_OR_DIGIT_EM;
+        else em += DEFAULT_EM;
+    }
+    return em;
+}
 
 /** Estimated rendered width (px) of a frame-tab title. */
 export function estimateFrameTabTitleWidth(title: string): number {
-    let em = 0;
-    for (const ch of title) {
-        if (TITLE_NARROW_CHARS.has(ch)) em += TITLE_NARROW_EM;
-        else if (TITLE_SEMI_NARROW_CHARS.has(ch)) em += TITLE_SEMI_NARROW_EM;
-        else if (TITLE_WIDE_CHARS.has(ch)) em += TITLE_WIDE_EM;
-        else if (/[A-Z0-9]/.test(ch)) em += TITLE_CAPITAL_OR_DIGIT_EM;
-        else em += TITLE_DEFAULT_EM;
-    }
-    return em * FRAME_TAB_TITLE_FONT_SIZE_PX;
+    return estimateClassedEm(title) * FRAME_TAB_TITLE_FONT_SIZE_PX;
 }
 
-/**
- * Px-per-char for a 10 pt regular owner suffix in `FONT_STACK.sans`.
- * Calibrated against system-ui at 10 pt regular (~5 px/char actual).
- */
-export const FRAME_TAB_OWNER_PX_PER_CHAR = 5;
+/** Estimated rendered width (px) of a frame-tab owner name, without its glyph. */
+export function estimateFrameTabOwnerWidth(owner: string): number {
+    return estimateClassedEm(owner) * FRAME_TAB_OWNER_FONT_SIZE_PX * REGULAR_WEIGHT_SCALE;
+}
 
 /**
  * Size (px) of the person / people glyph that leads the owner name. One
@@ -167,7 +177,7 @@ export function frameTabGeometry(
         ownerTextWidth =
             FRAME_TAB_OWNER_GLYPH_PX +
             FRAME_TAB_OWNER_GLYPH_GAP_PX +
-            owner.length * FRAME_TAB_OWNER_PX_PER_CHAR;
+            estimateFrameTabOwnerWidth(owner);
         ownerX = cursorX + FRAME_TAB_INNER_GAP_PX;
         ownerTextX = ownerX + FRAME_TAB_OWNER_GLYPH_PX + FRAME_TAB_OWNER_GLYPH_GAP_PX;
         cursorX = ownerX + ownerTextWidth;
