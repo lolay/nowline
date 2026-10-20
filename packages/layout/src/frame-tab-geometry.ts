@@ -1,8 +1,9 @@
 // Frame-tab chiclet geometry — the rounded label tab that overhangs a
-// swimlane's frame. Both the layout (collision math) and the renderer
-// (drawing) call `frameTabGeometry` so the chiclet's painted footprint
-// matches the bounding box layout reserves for it, and so the same
-// helper computes WHERE inside the chiclet each text element lands.
+// swimlane's frame. Layout calls `frameTabGeometry` once per lane, with
+// the owner's display title, uses it for the collision math and carries
+// it on `PositionedSwimlane.tab`; the renderer draws from that, so the
+// chiclet's painted footprint is the box layout reserved for it, and the
+// same helper computes WHERE inside the chiclet each text element lands.
 //
 // Design note: this helper separates two concerns that used to be
 // conflated in a single set of "column widths":
@@ -39,6 +40,15 @@ export const FRAME_TAB_TITLE_PX_PER_CHAR = 6.5;
 export const FRAME_TAB_OWNER_PX_PER_CHAR = 5;
 
 /**
+ * Size (px) of the person / people glyph that leads the owner name. One
+ * em of the 10 pt owner text, like the lane capacity badge's glyph.
+ */
+export const FRAME_TAB_OWNER_GLYPH_PX = 10;
+
+/** Gap (px) between the owner glyph and the owner name. */
+export const FRAME_TAB_OWNER_GLYPH_GAP_PX = 3;
+
+/**
  * Visible gap (px) between adjacent text elements inside the chiclet:
  * title→owner, owner→badge, and (no-owner) title→badge. Small enough
  * to read as a single chip but big enough that the eye can still
@@ -66,7 +76,10 @@ export const FRAME_TAB_OFFSET_FROM_BOX_PX = 10;
 export interface FrameTabGeometry {
     /** Estimated rendered width (px) of the title text, no min-clamp. */
     titleTextWidth: number;
-    /** Estimated rendered width (px) of the owner suffix; 0 when no owner. */
+    /**
+     * Estimated rendered width (px) of the owner suffix, glyph and name
+     * together; 0 when no owner.
+     */
     ownerTextWidth: number;
     /** Width (px) of the capacity badge as supplied by the caller; 0 when none. */
     capacityBadgeWidth: number;
@@ -75,8 +88,10 @@ export interface FrameTabGeometry {
 
     /** Canvas X (px) where the title text is painted. */
     titleX: number;
-    /** Canvas X (px) where the owner text is painted; 0 when no owner. */
+    /** Canvas X (px) where the owner glyph is painted; 0 when no owner. */
     ownerX: number;
+    /** Canvas X (px) where the owner name is painted, past the glyph; 0 when no owner. */
+    ownerTextX: number;
     /** Canvas X (px) where the capacity badge starts; 0 when no badge. */
     badgeX: number;
     /**
@@ -95,7 +110,9 @@ export interface FrameTabGeometry {
 }
 
 /**
- * Single source of truth for the swimlane chiclet's geometry.
+ * Single source of truth for the swimlane chiclet's geometry. Layout
+ * calls it once per lane and carries the result on
+ * `PositionedSwimlane.tab`; the renderer draws from that.
  *
  * `capacityBadgeWidth` and `footnoteIndicatorWidth` are supplied by
  * the caller — they depend on resolved icon shape / footnote-indicator
@@ -105,7 +122,7 @@ export interface FrameTabGeometry {
  *
  * Layout order inside the chiclet, left → right:
  *
- *     [LEFT_INSET] title (INNER_GAP) owner (INNER_GAP) badge (INNER_GAP) footnote [RIGHT_INSET]
+ *     [LEFT_INSET] title (INNER_GAP) glyph owner (INNER_GAP) badge (INNER_GAP) footnote [RIGHT_INSET]
  *
  * Each element is optional except title; gaps are inserted only between
  * present elements.
@@ -125,9 +142,14 @@ export function frameTabGeometry(
 
     let ownerTextWidth = 0;
     let ownerX = 0;
+    let ownerTextX = 0;
     if (owner) {
-        ownerTextWidth = `owner: ${owner}`.length * FRAME_TAB_OWNER_PX_PER_CHAR;
+        ownerTextWidth =
+            FRAME_TAB_OWNER_GLYPH_PX +
+            FRAME_TAB_OWNER_GLYPH_GAP_PX +
+            owner.length * FRAME_TAB_OWNER_PX_PER_CHAR;
         ownerX = cursorX + FRAME_TAB_INNER_GAP_PX;
+        ownerTextX = ownerX + FRAME_TAB_OWNER_GLYPH_PX + FRAME_TAB_OWNER_GLYPH_GAP_PX;
         cursorX = ownerX + ownerTextWidth;
     }
 
@@ -156,6 +178,7 @@ export function frameTabGeometry(
         footnoteIndicatorWidth,
         titleX,
         ownerX,
+        ownerTextX,
         badgeX,
         footnoteRightX,
         tabX,

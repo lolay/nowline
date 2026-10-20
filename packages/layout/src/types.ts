@@ -3,6 +3,7 @@
 // top-left. All colors in `ResolvedStyle` are concrete hex strings baked
 // in by style-resolution; the renderer is palette-dumb.
 
+import type { FrameTabGeometry } from './frame-tab-geometry.js';
 import type { NonWorkingDisplay } from './non-working-display.js';
 
 export type SizeBucket = 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
@@ -634,8 +635,15 @@ export interface PositionedSwimlane {
     nested: PositionedSwimlane[]; // recursive sub-swimlanes
     style: ResolvedStyle;
     // Owner display string ("Platform Team", "Sam Chen") rendered inside
-    // the frame tab. Resolved from team/person id → title.
+    // the frame tab. Resolved from team/person id → title (nested teams
+    // included); the bare id when it names neither.
     owner?: string;
+    /**
+     * What `owner` names, for the glyph that leads it in the frame tab:
+     * `person` for a declared person, `team` otherwise (a team, or an id
+     * that names neither). Set exactly when `owner` is.
+     */
+    ownerKind?: 'person' | 'team';
     // Footnote indicator numbers attached to this swimlane (via `on:` in the
     // footnote declaration). Rendered in the upper-right of the frame tab.
     footnoteIndicators: number[];
@@ -653,17 +661,12 @@ export interface PositionedSwimlane {
      */
     capacity: PositionedCapacity | null;
     /**
-     * Estimated width (px) of the capacity badge inside the frame tab, at
-     * the badge's 10 px size (`estimateCapacitySuffixWidth`); 0 without a
-     * badge. With `footnoteIndicatorWidth`, the widths layout sized the tab
-     * with; the renderer passes both to `frameTabGeometry`.
+     * The frame tab's geometry, from `frameTabGeometry` with the lane's
+     * box x, its title, the owner display title and the capacity badge and
+     * footnote-indicator widths. Layout sizes the tab's collision box from
+     * it and the renderer draws it as is. Null when the lane has no title.
      */
-    capacityBadgeWidth: number;
-    /**
-     * Estimated width (px) of the comma-joined footnote indicators in the
-     * frame tab, at 10 px (`estimateTextWidth`); 0 without indicators.
-     */
-    footnoteIndicatorWidth: number;
+    tab: FrameTabGeometry | null;
     /**
      * Tri-state utilization underline data when the lane declares
      * `capacity:` AND has at least one item contributing load AND has not
