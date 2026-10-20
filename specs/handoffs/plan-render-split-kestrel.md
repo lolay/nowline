@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin orchestration at [deep] ---
 
-  Status: 3/4 groups done | last review: wave-2 PASS (after fix-up 1) | current: nowline m4 s1 [exec] | updated 2026-10-19
+  Status: 4/4 groups done | last review: wave-3 PASS | current: none, ready for PR | updated 2026-10-20
 
   mode: unattended | proposed unattended (harness=claude-code runner=cloud; CLAUDE_CODE_REMOTE=true, harness-assigned branch) | guard 3x min $50 | fixups 2 | confirmed 2026-10-19 session fc39e88b-27a2-56ea-85a4-6bbd2b2c56ef: Unattended (Recommended)
 
@@ -171,7 +171,7 @@ Do the moves the survey listed that s2-s5 didn't cover, under the leave rule. If
 
 ### m4 - Close out the docs
 
-#### s1 - [exec] Mark R5 done and fix stale references
+#### s1 - [exec] Mark R5 done and fix stale references (done)
 
 In `specs/review-since-v086.md`, update the R5 bullet to done: `render.ts` split into the layer modules (name them), the measurement moved per the survey, `view-preset.ts` left as is (stable at about 670 lines), and the follow-ups the survey left, if any. Fix references that point into the old `render.ts` layout: `specs/layout-phases.md` §2's `renderer/src/svg/render.ts:1079-1086` (the status-key table, now in layout per m3.s3 or left per the survey), and `specs/export-determinism.md`'s mention if it now points at the wrong file. Don't rewrite historical milestone text in `specs/milestones.md` or `specs/rendering-v2.md`. Acceptance: `make pre-commit` and `make changelog-check` green; no other file changes.
 
@@ -181,6 +181,7 @@ review wave-1 (nowline m1 s1-s7) 831468b..8938c21: PASS - pure moves verbatim in
 review wave-1 (nowline m2 s1-s7) 8307d3e..e2275d5: PASS - header, item, swimlanes, footnotes, include-region moved verbatim; renderItem split into 10 helpers (max 70 lines, renderItem 24) with identical output; render.ts entry point only (239 lines); 252 parity renders identical; pre-commit green (env: Node 22.22.0, only Node in container; .nvmrc pins 26.2.0); 22db375 verified at HEAD; passed unattended - 2026-10-19
 review wave-2 (nowline m3 s1-s6) 283bf38..d299f05: FAIL - s2/s3/s5/s6 byte-identical incl. scratch probes; s4 capacityIconDx changed float summation order, capacity icon x moved 0.01 px at .xx5 rounding ties above 512 px (scratch far.nowline); pre-commit 0, parity 0 - 2026-10-19
 review wave-2-fix (nowline m3 s1-s6) 283bf38..0d3a6af: PASS - 045731f carries capacityIconDxTerms summed from x in base order (meta line, no-meta item, lane badge); far.nowline identical to base in 3 themes; 240-render brute force (9600 icons) identical; dead labelWidth/gapLabel.width removed; survey complete, left F1 (all-empty wave placeholder halo, needs finalize.ts) and F2 (lane owner tab sized from id, drawn from person title; bar can overlap); 252 parity renders identical; pre-commit green (env: Node 22.22.0) - fixups used 1 of 2 - 2026-10-19
+review wave-3 (nowline m4 s1) 193e68b..abbb2a2: PASS - R5 bullet done, names the 11 layer modules, measurement moves and F1/F2 checked against code and self-contained; layout-phases, export-determinism, waves, surface-options references correct at HEAD (waves and surface-options edits are in-scope stale render.ts fixes); no historical text rewritten; pre-commit 0, changelog-check 0 (env: Node 22.22.0) - 2026-10-20
 
 ## Token log
 
@@ -205,3 +206,6 @@ tokens review-wave-2 nowline-m3-s1-s6 (claude-opus-5-5): input ~120 / cache read
 tokens wave-2-fix nowline-m3-s1-s6 (claude-opus-5-5): input ~82 / cache read ~4.3M / cache write ~94k / output ~23k | ~$1.81 API-equiv
 tokens review-wave-2-fix nowline-m3-s1-s6 (claude-opus-5-5): input ~48 / cache read ~2.1M / cache write ~200k / output ~14k | ~$1.70 API-equiv
 tokens orchestrator-wave-2 nowline-m3-s1-s6 (claude-opus-5-5): input ~42 / cache read ~1.8M / cache write ~0 5m + ~21k 1h / output ~8.7k | ~$0.70 API-equiv
+tokens wave-3 nowline-m4-s1 (claude-sonnet-5-5): input ~24 / cache read ~920k / cache write ~95k / output ~5.8k | ~$0.48 API-equiv
+tokens review-wave-3 nowline-m4-s1 (claude-opus-5-5): input ~20 / cache read ~700k / cache write ~90k / output ~4.8k | ~$0.69 API-equiv
+tokens orchestrator-wave-3 nowline-m4-s1 (claude-opus-5-5): input ~24 / cache read ~1.1M / cache write ~0 5m + ~10k 1h / output ~5.3k | ~$0.42 API-equiv
