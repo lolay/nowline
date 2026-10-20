@@ -3,26 +3,21 @@ import {
     BUILTIN_ICON_NAMES,
     BUILTIN_STATUSES,
     CALENDAR_DECLARATION_KEYS,
-    CALENDAR_MODES,
-    INCLUDE_MODES,
-    NON_WORKING_DISPLAYS,
-    STYLE_PROP_ENUMS,
-} from '@nowline/core/internal';
-import { describe, expect, it } from 'vitest';
-// The validator's key tables are not on `@nowline/core/internal` (that barrel
-// may not import the validator), so the test reads them from source, the way
-// the keyword guard reads nowline.langium.
-import {
     CALENDAR_FIELDS,
+    CALENDAR_MODES,
     DEFAULT_ENTITY_TYPES,
     DIRECTIVE_FIELDS,
     ENTITY_KNOWN_PROPS,
+    INCLUDE_MODES,
+    NON_WORKING_DISPLAYS,
     ROADMAP_ONLY_STYLE_KEYS,
     SCALE_FIELDS,
+    STYLE_PROP_ENUMS,
     STYLE_PROP_KEYS,
     UNIVERSAL_ENTITY_PROPS,
     UTILIZATION_NONE,
-} from '../../core/src/language/validator/tables.js';
+} from '@nowline/core/internal';
+import { describe, expect, it } from 'vitest';
 import { scopeOf } from './textmate-tokenize.js';
 
 // The TextMate grammar colours keys and values on its own, without the
