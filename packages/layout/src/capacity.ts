@@ -21,6 +21,7 @@
 
 import type { SymbolDeclaration } from '@nowline/core';
 import { BUILTIN_CAPACITY_ICONS, propKey } from '@nowline/core/internal';
+import { estimateTextWidth } from './text-measure.js';
 import type { ResolvedCapacityIconRef } from './types.js';
 
 /**
@@ -171,4 +172,60 @@ export function estimateCapacitySuffixWidth(
     const glyphWidthEm = 1.0;
     const gapEm = 0.1;
     return text.length * fontSizePx * 0.58 + (gapEm + glyphWidthEm) * fontSizePx;
+}
+
+/**
+ * Em-distance the renderer reserves between an item's metaText and its
+ * capacity suffix (or any inline trailing token). Half a space's worth
+ * — wide enough to read as a separator, narrow enough not to look like
+ * a stray gap. SVG `<tspan dx>` honors this exactly so we don't depend
+ * on per-character estimation for the gap itself.
+ */
+export const META_SUFFIX_DX_EM = 0.6;
+
+/**
+ * Tighter em-per-char width estimate used inside `renderItemMetaLine`
+ * for positioning a built-in SVG icon after a metaText + number. Layout
+ * still uses 0.58 em/char to pessimistically reserve bar width for
+ * spill detection (so `metaText 5×` always fits its row); the renderer
+ * paints the icon at a tighter offset so there's no visible
+ * dead-space between the rendered number and its glyph. Lands inside
+ * the layout reservation either way (`0.5 < 0.58`).
+ */
+const META_ICON_EM_PER_CHAR = 0.5;
+
+/** Gap (em) between a capacity number and its built-in SVG icon. */
+const CAPACITY_ICON_GAP_EM = 0.1;
+
+/**
+ * Where a built-in SVG capacity icon (person, people, points, time) sits:
+ * the px terms that, added in order to the start x of the text run the
+ * suffix is painted in, give the icon's x, at `fontSizePx`. Undefined for
+ * every other glyph (`null`, the multiplier, a literal), which the
+ * renderer paints inside the `<text>`.
+ *
+ * The terms are kept apart rather than summed so the renderer adds them to
+ * its x one at a time, in this order, exactly as it did when it measured
+ * them itself; a pre-summed offset can round differently at the last bit.
+ *
+ * With `metaText`, the run is the item meta line: the meta text's width,
+ * the `META_SUFFIX_DX_EM` separator, the number's width (both widths at
+ * the tighter `META_ICON_EM_PER_CHAR` so the icon hugs the number), then
+ * the gap. Without it, the number starts the run (an item with no meta
+ * text, or a lane badge): its `estimateTextWidth` width, then the gap.
+ * The gap is always 0.1 em.
+ */
+export function capacityIconDxTerms(
+    text: string,
+    icon: ResolvedCapacityIcon | null,
+    fontSizePx: number,
+    metaText?: string,
+): readonly number[] | undefined {
+    if (icon?.kind !== 'builtin' || icon.name === 'multiplier') return undefined;
+    const gapPx = fontSizePx * CAPACITY_ICON_GAP_EM;
+    if (metaText) {
+        const tightWidth = (s: string) => s.length * fontSizePx * META_ICON_EM_PER_CHAR;
+        return [tightWidth(metaText), fontSizePx * META_SUFFIX_DX_EM, tightWidth(text), gapPx];
+    }
+    return [estimateTextWidth(text, fontSizePx), gapPx];
 }

@@ -109,7 +109,7 @@ The probe found two more that shipped at the time of this spec; the migration fi
 - Changing any rendered byte inside the migration (§5).
 - A separate measure pass for lanes, groups and parallels. Their height is the result of row packing on x positions, so measuring them would be placing them twice; they stay single-pass, and the docs say so.
 - Changing scheduling, start rules or barrier semantics (R1), or the row-packing algorithm: topmost fit and the N1 shift stay.
-- The renderer, including its own status-key table (`renderer/src/svg/render.ts:1079-1086`); that is R5.
+- The renderer, including its own status-key table; that was R5, and the table now lives in layout (`status-dot.ts`, carried as `PositionedItem.statusDotColor`).
 - Removing P7. It is needed while engine A's pixel quirks can pass engine C's days ([`scheduler-unification.md`](./scheduler-unification.md) §3.3).
 - Public API: `layoutRoadmap`, `LayoutOptions` and `PositionedRoadmap` keep their shape; `Theme` gains one token group (§3.9).
 

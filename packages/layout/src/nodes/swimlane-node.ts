@@ -18,6 +18,7 @@ import type {
     SwimlaneDeclaration,
 } from '@nowline/core';
 import {
+    capacityIconDxTerms,
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
     parseCapacityValue,
@@ -59,8 +60,9 @@ function resolveLaneCapacity(
     const text = formatCapacityNumber(value);
     const icon = resolveCapacityIcon(style.capacityIcon, symbols);
     const badgeWidthPx = estimateCapacitySuffixWidth(text, icon, LANE_CAPACITY_BADGE_FONT_SIZE_PX);
+    const iconDxTerms = capacityIconDxTerms(text, icon, LANE_CAPACITY_BADGE_FONT_SIZE_PX);
     return {
-        capacity: { value, text, icon },
+        capacity: { value, text, icon, ...(iconDxTerms !== undefined ? { iconDxTerms } : {}) },
         badgeWidthPx,
     };
 }
@@ -279,6 +281,8 @@ export class SwimlaneNode {
                 owner: ownerDisplay,
                 footnoteIndicators,
                 capacity,
+                capacityBadgeWidth: badgeWidthPx,
+                footnoteIndicatorWidth: footnoteIndicatorWidthPx,
                 utilization,
             },
             usedHeight: bandHeight,

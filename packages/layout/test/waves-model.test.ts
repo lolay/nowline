@@ -321,6 +321,7 @@ swimlane a
         expect(execute.strip.gapLabel).toEqual({
             text: 'fy-budget',
             x: (plan.endX + execute.startX) / 2,
+            halo: expect.any(Object),
         });
         expect('gapLabel' in plan.strip).toBe(false);
         expect(execute.strip.box.x).toBe(execute.startX);

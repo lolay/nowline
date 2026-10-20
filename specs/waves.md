@@ -929,7 +929,7 @@ The grammar change keeps the AST shape, so JSON hashes are unchanged.
 - A test asserts that a `PositionedRoadmap` without waves has no new keys.
 - Running the validator over `examples/` and `tests/` gives diagnostics byte-identical to the baseline.
 
-## 9. Rendering (`packages/renderer/src/svg/render.ts`)
+## 9. Rendering (`packages/renderer/src/svg/waves.ts`)
 
 Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-theme design: strip, boundaries, a milestone on a boundary, background hatch and legend. Its SVG snapshots (light, dark and grayscale) are in `packages/integration-tests/test/__snapshots__/`.
 
@@ -988,7 +988,7 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
 The design rule is to mark the exception, not the rule. In a roadmap with waves, most bars are members. Members keep exactly today's look, and their column and its strip header say which wave they belong to. Background bars get two computed cues. Neither is an authored style, so the content/render split holds.
 
 1. **Hatch.** A diagonal hatch overlay is drawn immediately after the bar's fill rect, before the progress strip, text and decorations.
-   - It uses one of two `<pattern>` defs, chosen by the bar fill's relative luminance (the existing `relativeLuminance` helper):
+   - It uses one of two `<pattern>` defs, chosen by the bar fill's relative luminance (layout's `waveHatchKind` in `packages/layout/src/wave-hatch.ts`, carried as `PositionedItem.waveHatch`):
      - `${idPrefix}-wave-hatch-dark` (stroke `wave.hatch`) on light fills;
      - `${idPrefix}-wave-hatch-light` (stroke `wave.hatchOnDark`) on dark fills.
    - The ids carry the per-SVG prefix, like the shadow filters, because the embed tests forbid ids shared across SVGs on one page.
@@ -1068,7 +1068,7 @@ PNG and PDF have no tooltips, so the legend is the fallback for anything the pic
 
 ### 9.8 Include regions
 
-The opaque region fill (`render.ts:1859`) would hide the early layers. So, only when waves exist, `renderIncludeRegion` re-emits:
+The opaque region fill (`include-region.ts`) would hide the early layers. So, only when waves exist, `renderIncludeRegion` re-emits:
 
 - **boundaries and styled tints**, immediately after the region fill rect. They are clipped by rect intersection to the painted region rect (`box.x + 8`, `width − 16`), with no `clipPath` and no new `<defs>`;
 - **crossings and hatch overlays** for region items, after the nested lanes.

@@ -20,8 +20,8 @@ than a fight against the runtime:
 1. **Text layout is a deterministic approximation, not font-metric
    measurement.** `@nowline/layout` and `@nowline/renderer` size text with a
    fixed `text.length * fontSize * 0.58` em-ratio (see
-   `packages/layout/src/nodes/item-node.ts`,
-   `packages/renderer/src/svg/render.ts`). No surface calls
+   `packages/layout/src/text-measure.ts`, which the renderer also imports
+   as `estimateTextWidth`). No surface calls
    `canvas.measureText()` or reads real glyph advances during layout, so the
    **SVG geometry is identical in every JS environment**. This is the
    linchpin: had layout measured real fonts, browser-vs-Node divergence would

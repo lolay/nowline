@@ -46,7 +46,7 @@ Everything goes through the [`Makefile`](./Makefile) — it is the single source
 
 `make build` regenerates the Langium parser, bundles CLI templates, type-checks every package, and re-renders every file under `examples/` and `tests/`; `make build-fast` skips that render for an inner dev loop. CLI integration tests spawn `packages/cli/dist/index.js` and silently skip when it's missing — `make test` builds first (`test: build`) so they always run.
 
-**Toolchain pins:** Node from [`.nvmrc`](./.nvmrc) (currently `26.2.0`); pnpm from `packageManager` in [`package.json`](./package.json). Full policy: [`CONTRIBUTING.md` § Toolchain & Supported Versions](./CONTRIBUTING.md#toolchain--supported-versions).
+**Toolchain pins:** Node from [`.nvmrc`](./.nvmrc) (currently `26.12.0`); pnpm from `packageManager` in [`package.json`](./package.json). Full policy: [`CONTRIBUTING.md` § Toolchain & Supported Versions](./CONTRIBUTING.md#toolchain--supported-versions).
 
 ## Repo map
 

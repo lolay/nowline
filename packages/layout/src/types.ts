@@ -19,6 +19,12 @@ export type HeaderPosition = 'beside' | 'above';
 //     either edge of the viewport
 export type TimelinePosition = 'top' | 'bottom' | 'both';
 export type StatusKind = 'planned' | 'in-progress' | 'done' | 'at-risk' | 'blocked' | 'neutral';
+/**
+ * Which hatch stroke marks background work on a fill (specs/waves.md §9.3):
+ * `dark` (`wave.hatch`) on a light fill, `light` (`wave.hatchOnDark`) on a
+ * dark one.
+ */
+export type WaveHatchKind = 'dark' | 'light';
 
 // The style properties from specs/dsl.md § Style Properties, including the
 // roadmap-only knobs (`header-height`, `header-position`, `timeline-position`,
@@ -406,6 +412,12 @@ export interface PositionedItem {
      */
     dateSpan: { startX: number; endX: number };
     status: StatusKind;
+    /**
+     * The status dot's resolved colour: the theme's `statusDot.onLight` or
+     * `onDark` entry for `status`, picked by the luminance of `style.bg`
+     * (`statusDotColor` in `status-dot.ts`).
+     */
+    statusDotColor: string;
     progressFraction: number; // 0..1; 1 == fully filled
     footnoteIndicators: number[]; // 1-based superscript numbers, empty when no footnotes
     labelChips: PositionedLabelChip[];
@@ -505,6 +517,11 @@ export interface PositionedItem {
      */
     waveRole?: 'member' | 'background';
     /**
+     * The hatch kind for the bar's fill (`waveHatchKind` in
+     * `wave-hatch.ts`). Set exactly on background items; omitted otherwise.
+     */
+    waveHatch?: WaveHatchKind;
+    /**
      * The hover tooltip line wave membership adds to the bar, localized
      * (`Background (no wave)`; specs/waves.md §9.3). Set only on
      * background items; omitted otherwise.
@@ -535,6 +552,15 @@ export interface PositionedCapacity {
     text: string;
     /** Resolved glyph instruction, or `null` when the icon is `'none'`. */
     icon: ResolvedCapacityIconRef | null;
+    /**
+     * For a built-in SVG icon (person, people, points, time): the px terms
+     * that, added in order to the start x of the text run the suffix is
+     * painted in (the item caption x, or the lane badge x), give the icon's
+     * x, from `capacityIconDxTerms`. Kept apart so the sum rounds the same
+     * as adding each width to x in turn. Omitted for every other glyph,
+     * which paints inside the `<text>`.
+     */
+    iconDxTerms?: readonly number[];
 }
 
 /**
@@ -626,6 +652,18 @@ export interface PositionedSwimlane {
      * want the badge fully hidden simply omit `capacity:`.
      */
     capacity: PositionedCapacity | null;
+    /**
+     * Estimated width (px) of the capacity badge inside the frame tab, at
+     * the badge's 10 px size (`estimateCapacitySuffixWidth`); 0 without a
+     * badge. With `footnoteIndicatorWidth`, the widths layout sized the tab
+     * with; the renderer passes both to `frameTabGeometry`.
+     */
+    capacityBadgeWidth: number;
+    /**
+     * Estimated width (px) of the comma-joined footnote indicators in the
+     * frame tab, at 10 px (`estimateTextWidth`); 0 without indicators.
+     */
+    footnoteIndicatorWidth: number;
     /**
      * Tri-state utilization underline data when the lane declares
      * `capacity:` AND has at least one item contributing load AND has not
@@ -939,6 +977,27 @@ export interface PositionedWaveStrip {
     /** The label text; omitted when `labelKind` is `none`. */
     label?: string;
     /**
+     * The painted cell: `box` clipped to the timeline's backing panel and
+     * inset by `WAVE_CELL_INSET_PX` (half the panel's stroke) so it never
+     * covers the panel border. Omitted for an empty wave and for one that
+     * lies outside the timeline.
+     */
+    cell?: BoundingBox;
+    /**
+     * Where the label is drawn when the wave has a `cell`: `x` is the text
+     * centre (`labelX`, moved left when the superscripts would cover it)
+     * and `halo` the backing box in the cell's fill. Omitted when there is
+     * no label or no cell.
+     */
+    labelDraw?: { x: number; halo: BoundingBox };
+    /**
+     * The footnote superscripts when `footnotesShown` and the wave has a
+     * `cell`: `rightX` is the last superscript's right edge (they walk left
+     * by `ITEM_FOOTNOTE_INDICATOR_STEP_PX`, end-anchored) and `halo` their
+     * backing box. Omitted otherwise.
+     */
+    superscripts?: { rightX: number; halo: BoundingBox };
+    /**
      * Which step of the fit chain won: the title, the id, the title
      * ellipsized to 3 or more characters plus "…", the 1-based `#k`, or
      * no label. Always `none` for an empty wave (it has no cell).
@@ -971,9 +1030,11 @@ export interface PositionedWaveStrip {
     /**
      * The floor reference (`fy-budget`, `2026-02-02`) centred in the gap
      * this wave's start floor opened before it (`S_k > E_{k-1}`, k >= 2),
-     * when it fits; drawn in muted italics. Omitted otherwise.
+     * when it fits; drawn in muted italics. `halo` is its backing box in the
+     * panel's fill, sized from the text's estimated width at 10 px (the one
+     * its fit was tested at). Omitted otherwise.
      */
-    gapLabel?: { text: string; x: number };
+    gapLabel?: { text: string; x: number; halo: BoundingBox };
 }
 
 /** A wave's resolved colours (specs/waves.md §9.4). */
@@ -1025,6 +1086,11 @@ export interface WaveLegendEntry {
      * line through its centre). Omitted for the wave list.
      */
     swatch?: BoundingBox;
+    /**
+     * The hatch kind of the `background` swatch, a default item bar's fill.
+     * Omitted for the other entries.
+     */
+    hatch?: WaveHatchKind;
     /**
      * The text, one run per legend line the entry occupies (the wave list
      * wraps between waves). `y` is the text baseline.

@@ -6,8 +6,10 @@ export {
     MIN_PIXELS_PER_DAY,
 } from './canvas-width.js';
 export {
+    capacityIconDxTerms,
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
+    META_SUFFIX_DX_EM,
     parseCapacityValue,
     type ResolvedCapacityIcon,
     resolveCapacityIcon,
@@ -137,6 +139,7 @@ export type {
     ScheduleOptions,
 } from './schedule.js';
 export { scheduleRoadmap } from './schedule.js';
+export { estimateTextWidth } from './text-measure.js';
 export { contrastRatio, relativeLuminance } from './themes/contrast.js';
 export {
     darkTheme,
@@ -184,12 +187,15 @@ export {
     TIMELINE_TICK_PANEL_HEIGHT_PX,
     timelineTickLabelBaselineOffsetPx,
     WAVE_BOUNDARY_WIDTH_PX,
+    WAVE_CELL_INSET_PX,
     WAVE_CROSS_DASH,
     WAVE_EMPTY_MARKER_SIZE_PX,
     WAVE_EMPTY_MARKER_STEP_PX,
     WAVE_HATCH_OPACITY,
     WAVE_HATCH_STROKE_PX,
     WAVE_HATCH_TILE_PX,
+    WAVE_LABEL_HALO_INSET_Y_PX,
+    WAVE_LABEL_HALO_PAD_PX,
     WAVE_LEGEND_BASELINE_OFFSET_PX,
     WAVE_LEGEND_ENTRY_GAP_PX,
     WAVE_LEGEND_GAP_PX,
