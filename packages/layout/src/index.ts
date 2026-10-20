@@ -31,6 +31,7 @@ export {
     ARROW_HEAD_WIDTH_PX,
 } from './edge-routing.js';
 export {
+    estimateFrameTabTitleWidth,
     FRAME_TAB_INNER_GAP_PX,
     FRAME_TAB_LEFT_INSET_PX,
     FRAME_TAB_MIN_WIDTH_PX,
@@ -39,7 +40,7 @@ export {
     FRAME_TAB_OWNER_GLYPH_PX,
     FRAME_TAB_OWNER_PX_PER_CHAR,
     FRAME_TAB_RIGHT_INSET_PX,
-    FRAME_TAB_TITLE_PX_PER_CHAR,
+    FRAME_TAB_TITLE_FONT_SIZE_PX,
     type FrameTabGeometry,
     frameTabGeometry,
 } from './frame-tab-geometry.js';
