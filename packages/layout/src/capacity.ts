@@ -165,12 +165,14 @@ export function estimateCapacitySuffixWidth(
         // no separator gap, glyph width approx. one character.
         return (text.length + 1) * fontSizePx * 0.58;
     }
-    // 0.1em separator + 1em glyph. Estimating the glyph as 1em (rather than
-    // 0.58em, the per-character width) is intentional: SVG icons render at
-    // their full font-size square, and most Unicode literals authors use for
-    // capacity (★, 💰, ⚙) similarly read at near-em widths.
+    // Gap + 1em glyph. Estimating the glyph as 1em (rather than 0.58em, the
+    // per-character width) is intentional: SVG icons render at their full
+    // font-size square, and most Unicode literals authors use for capacity
+    // (★, 💰, ⚙) similarly read at near-em widths. A built-in SVG icon sits
+    // `CAPACITY_ICON_GAP_EM` past the number; a literal flows `0.1em` after
+    // it inside the `<text>`.
     const glyphWidthEm = 1.0;
-    const gapEm = 0.1;
+    const gapEm = icon.kind === 'builtin' ? CAPACITY_ICON_GAP_EM : 0.1;
     return text.length * fontSizePx * 0.58 + (gapEm + glyphWidthEm) * fontSizePx;
 }
 
@@ -184,18 +186,12 @@ export function estimateCapacitySuffixWidth(
 export const META_SUFFIX_DX_EM = 0.6;
 
 /**
- * Tighter em-per-char width estimate used inside `renderItemMetaLine`
- * for positioning a built-in SVG icon after a metaText + number. Layout
- * still uses 0.58 em/char to pessimistically reserve bar width for
- * spill detection (so `metaText 5×` always fits its row); the renderer
- * paints the icon at a tighter offset so there's no visible
- * dead-space between the rendered number and its glyph. Lands inside
- * the layout reservation either way (`0.5 < 0.58`).
+ * Gap (em) between a capacity number and its built-in SVG icon. The icon's
+ * x is an estimate (the number's width at 0.58 em/char) while the number is
+ * drawn with real font metrics, and common UI fonts draw digits at up to
+ * ~0.64 em, so the gap has to absorb that error and still read as space.
  */
-const META_ICON_EM_PER_CHAR = 0.5;
-
-/** Gap (em) between a capacity number and its built-in SVG icon. */
-const CAPACITY_ICON_GAP_EM = 0.1;
+const CAPACITY_ICON_GAP_EM = 0.25;
 
 /**
  * Where a built-in SVG capacity icon (person, people, points, time) sits:
@@ -208,12 +204,13 @@ const CAPACITY_ICON_GAP_EM = 0.1;
  * its x one at a time, in this order, exactly as it did when it measured
  * them itself; a pre-summed offset can round differently at the last bit.
  *
- * With `metaText`, the run is the item meta line: the meta text's width,
- * the `META_SUFFIX_DX_EM` separator, the number's width (both widths at
- * the tighter `META_ICON_EM_PER_CHAR` so the icon hugs the number), then
- * the gap. Without it, the number starts the run (an item with no meta
- * text, or a lane badge): its `estimateTextWidth` width, then the gap.
- * The gap is always 0.1 em.
+ * With `metaText`, the run is the item meta line: the meta text's
+ * `estimateTextWidth` width and the `META_SUFFIX_DX_EM` separator (the
+ * first two terms are where the renderer starts the number), then the
+ * number's width and the gap. Without it, the number starts the run (an
+ * item with no meta text, or a lane badge): its width, then the gap.
+ * Both paths place the icon from the same number estimate and gap, so an
+ * item suffix reads like a lane badge.
  */
 export function capacityIconDxTerms(
     text: string,
@@ -224,8 +221,12 @@ export function capacityIconDxTerms(
     if (icon?.kind !== 'builtin' || icon.name === 'multiplier') return undefined;
     const gapPx = fontSizePx * CAPACITY_ICON_GAP_EM;
     if (metaText) {
-        const tightWidth = (s: string) => s.length * fontSizePx * META_ICON_EM_PER_CHAR;
-        return [tightWidth(metaText), fontSizePx * META_SUFFIX_DX_EM, tightWidth(text), gapPx];
+        return [
+            estimateTextWidth(metaText, fontSizePx),
+            fontSizePx * META_SUFFIX_DX_EM,
+            estimateTextWidth(text, fontSizePx),
+            gapPx,
+        ];
     }
     return [estimateTextWidth(text, fontSizePx), gapPx];
 }

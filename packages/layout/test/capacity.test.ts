@@ -138,11 +138,11 @@ describe('estimateCapacitySuffixWidth', () => {
         expect(estimateCapacitySuffixWidth('5', icon, fontSize)).toBeCloseTo(2 * charPx);
     });
 
-    it('built-in SVG glyph adds 0.1em separator + 1em glyph', () => {
+    it('built-in SVG glyph adds 0.25em separator + 1em glyph', () => {
         const icon: ResolvedCapacityIcon = { kind: 'builtin', name: 'person' };
-        // "5 [person]": 1 char number + 0.1em + 1em = 1*charPx + 1.1*fontSize
+        // "5 [person]": 1 char number + 0.25em + 1em = 1*charPx + 1.25*fontSize
         expect(estimateCapacitySuffixWidth('5', icon, fontSize)).toBeCloseTo(
-            charPx + 1.1 * fontSize,
+            charPx + 1.25 * fontSize,
         );
     });
 

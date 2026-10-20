@@ -15,6 +15,7 @@ import {
     capacityIconDxTerms,
     estimateCapacitySuffixWidth,
     formatCapacityNumber,
+    META_SUFFIX_DX_EM,
     parseCapacityValue,
     resolveCapacityIcon,
 } from '../capacity.js';
@@ -323,8 +324,14 @@ export function resolveItemMeta(
         // Add a small leading separator (a single space's worth) only when
         // the suffix sits next to existing meta text, so `m 5×` has air
         // between the driver token and the count. Standalone suffix needs no
-        // leading separator.
-        const separatorWidth = metaText ? estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL) : 0;
+        // leading separator. A built-in SVG icon is placed past exactly the
+        // `META_SUFFIX_DX_EM` separator, so reserve that, not a space's
+        // estimate, or the icon ends past the reservation.
+        const separatorPx =
+            iconDxTerms !== undefined
+                ? META_FONT_SIZE_PX_LOCAL * META_SUFFIX_DX_EM
+                : estimateTextWidth(' ', META_FONT_SIZE_PX_LOCAL);
+        const separatorWidth = metaText ? separatorPx : 0;
         capacityTrailingWidth =
             separatorWidth +
             estimateCapacitySuffixWidth(capacityText, capacityIcon, META_FONT_SIZE_PX_LOCAL);

@@ -436,7 +436,8 @@ Swimlanes with `capacity:N` render the value as `N[glyph]` inside the frame tab,
 - **Order:** number first, glyph second (`5×`, `8 ★`, `12000 $`). Reads naturally as English ("five times", "eight points").
 - **Spacing:** SVG `<tspan dx="...">` between number and glyph for precise control.
   - `multiplier` glyph: no gap (`5×`) — multiplication sign is a typographic operator that already includes side-bearing.
-  - All other built-in glyphs and custom/literal glyphs: `0.1em` gap (`5 [person]`, `8 ★`, `12000 $`) — small but visible separator.
+  - Built-in SVG glyphs (`person`, `people`, `points`, `time`): `0.25em` gap (`5 [person]`, `8 [star]`). The icon is a sibling `<svg>`, so its x comes from layout's width estimate of the number (and, on an item meta line, of the meta text before it) rather than from the font; on the meta line the number is placed from the same estimate instead of flowing after the meta text, so number and icon always agree. The wider gap absorbs the estimate's error against real digit widths. Same rule on items and lane badges.
+  - Custom/literal glyphs: `0.1em` gap (`12000 $`), flowed inside the `<text>` by `<tspan dx>`.
 - **Number formatting:** integers render as integers (`5`, not `5.0`); decimals render with trailing zeros trimmed (`0.5`, `1.25`); percent literals already converted to decimals at parse time so they render in decimal form (`50%` author input → `0.5` rendered).
 - **ASCII fallback:** when SVG output is constrained to ASCII (e.g. CLI text mode export), substitute the glyph's `ascii:` value. Built-in glyph fallbacks: `multiplier` → `x`, `person` → `p`, `people` → `P`, `points` → `*`, `time` → `t`, `none` → `` (empty). Custom `symbol` declarations supply their own `ascii:` value (default `?` if absent).
 

@@ -63,7 +63,7 @@ function iconXFrom(x0: number, capacity: PositionedCapacity): number {
  *   3. `icon.kind === 'builtin'` and `name` ∈ {person, people, points,
  *      time}: paint the number as `<text>`, then drop the curated SVG
  *      icon at `x0` plus `iconDxTerms` (layout's `capacityIconDxTerms`:
- *      the number's estimated width and a `0.1em` gap, sized to one em). The
+ *      the number's estimated width and a `0.25em` gap, sized to one em). The
  *      icon's `style="color:..."` propagates through the
  *      `currentColor`-bound paths in the icon library.
  *   4. `icon.kind === 'literal'` (inline Unicode literal or
@@ -140,9 +140,9 @@ export function renderCapacitySuffix(
  * regardless of how wide metaText actually rendered.
  *
  * Built-in SVG icons (person/people/points/time) still need an `<svg>`
- * sibling outside `<text>`; layout places the icon (`capacity.iconDxTerms`,
- * from `capacityIconDxTerms` at its tighter `META_ICON_EM_PER_CHAR` estimate),
- * which still lands inside its own pessimistic spill reservation.
+ * sibling outside `<text>`, so their number leaves the flow too: layout's
+ * `capacity.iconDxTerms` (from `capacityIconDxTerms`) place both the number
+ * and the icon, inside the suffix's spill reservation.
  */
 function renderItemMetaLine(opts: {
     metaText: string | undefined;
@@ -197,10 +197,14 @@ function renderItemMetaLine(opts: {
             '</text>'
         );
     }
-    // Built-in SVG icon — text element holds metaText + tspan-separated
-    // number, then the icon SVG sits where layout placed it, at a tighter
-    // per-character estimate than its spill detector so the icon visually
-    // hugs the number.
+    // Built-in SVG icon: the number is NOT flowed after metaText, because
+    // the icon's x can only come from layout's estimates; a number drawn
+    // after the real metaText sits wherever the font put it, and the icon
+    // landed on it. Paint metaText, then the number and the icon both where
+    // layout's `iconDxTerms` place them, so they agree as on a lane badge.
+    const terms = capacity.iconDxTerms ?? [];
+    let numberX = x;
+    for (const term of terms.slice(0, 2)) numberX += term;
     const def = CAPACITY_ICON_SVG[icon.name];
     const iconSize = fontSize;
     const iconX = iconXFrom(x, capacity);
@@ -208,8 +212,8 @@ function renderItemMetaLine(opts: {
     const textPart =
         openText +
         escText(metaText) +
-        `<tspan dx="${sepDx}">${escText(numberStr)}</tspan>` +
-        '</text>';
+        '</text>' +
+        textTag({ x: num(numberX), y: num(baselineY), ...baseAttrs }, numberStr);
     const iconPart = `<svg x="${num(iconX)}" y="${num(iconY)}" width="${num(iconSize)}" height="${num(iconSize)}" viewBox="${def.viewBox}" style="color:${escAttr(color)}" aria-hidden="true">${def.body}</svg>`;
     return textPart + iconPart;
 }
@@ -424,9 +428,9 @@ function renderItemCaption(
     // For pure-text suffixes (multiplier, literal glyph, no glyph) the
     // unified path emits a single `<text>` element with `<tspan dx>`
     // for the gap so the suffix hugs the metaText regardless of how
-    // wide it actually rendered. Built-in SVG icon glyphs still emit a
-    // sibling `<svg>` but at a tighter offset than the legacy two-text
-    // path. See `renderItemMetaLine` for the full case-by-case.
+    // wide it actually rendered. Built-in SVG icon glyphs emit their
+    // number and a sibling `<svg>` where layout placed them. See
+    // `renderItemMetaLine` for the full case-by-case.
     if (i.metaText || i.capacity) {
         parts.push(
             renderItemMetaLine({
