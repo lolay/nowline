@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
     darkTheme,
+    estimateTextWidth,
     grayscaleTheme,
     HEADER_HEIGHT_PX,
     lightTheme,
@@ -10,6 +11,7 @@ import {
 } from '@nowline/layout';
 import { describe, expect, it } from 'vitest';
 import { renderSvg } from '../src/index.js';
+import { renderCapacitySuffix } from '../src/svg/item.js';
 import { parseFilesToModel, parseToModel } from './helpers.js';
 
 const BASIC_DSL = `nowline v1
@@ -255,6 +257,24 @@ describe('renderSvg — item capacity suffix', () => {
         expect(svg).toMatch(/<polygon[^>]*points="12 2 15\.09/);
     });
 
+    it('places a meta-line number and its icon from the same estimate, a gap apart', async () => {
+        // Regression: the number flowed after the real `4w` in the meta
+        // <text> while the icon x came from a tighter width estimate, so
+        // the star painted over the `8`. Now the number is its own <text>
+        // at layout's x, and the icon sits the number's estimated width
+        // plus a 0.25 em gap past it, as on a lane badge.
+        const dsl = `nowline v1\n\nconfig\nstyle scored\n  capacity-icon: points\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Epic" duration:4w capacity:8 style:scored\n`;
+        const svg = await renderSvg(await parseToModel(dsl));
+        const fragment = svg.match(/<g data-id="x" data-layer="item">[\s\S]*?<\/g>/)![0];
+        expect(fragment).toMatch(/>4w<\/text>/);
+        expect(fragment).not.toMatch(/<tspan[^>]*>8<\/tspan>/);
+        const metaX = Number(fragment.match(/<text x="([^"]+)"[^>]*>4w<\/text>/)![1]);
+        const numberX = Number(fragment.match(/<text [^>]*x="([^"]+)"[^>]*>8<\/text>/)![1]);
+        const iconX = Number(fragment.match(/<svg x="([^"]+)"[^>]*viewBox="0 0 24 24"/)![1]);
+        expect(numberX - metaX).toBeCloseTo(estimateTextWidth('4w', 11) + 11 * 0.6, 1);
+        expect(iconX - numberX).toBeCloseTo(estimateTextWidth('8', 11) + 11 * 0.25, 1);
+    });
+
     it('renders inline Unicode literal capacity-icon as a <tspan>-separated glyph', async () => {
         const dsl = `nowline v1\n\nconfig\nstyle gear\n  capacity-icon: "⚙"\n\nroadmap r1 "R" start:2026-01-05\n\nswimlane s "Sprint"\n  item x "Build" duration:2w capacity:2 style:gear\n`;
         const model = await parseToModel(dsl);
@@ -289,39 +309,25 @@ describe('renderSvg — item capacity suffix', () => {
         expect(fragment).not.toMatch(/<svg [^>]*viewBox="0 0 24 24"/);
     });
 
-    it('places a meta-line icon by adding each width to the caption x in turn', async () => {
-        // Bars ending at fractional x put each icon's x on a 2-decimal
-        // rounding tie, where adding one pre-summed offset to the caption
-        // x rounds 0.01 px away from adding the meta width, separator,
-        // number width and gap one at a time (1210.85, 1251.1, 1302.35).
-        const dsl = [
-            'nowline v1',
-            '',
-            'config',
-            '',
-            'style fte',
-            '  capacity-icon: person',
-            '',
-            'roadmap r "Far probe" start:2026-01-05 scale:1w calendar:business',
-            '',
-            'swimlane l1 "L1"',
-            '  item a1 "A" duration:130.015625d',
-            '  item b1 "B" duration:3w capacity:2 style:fte',
-            '',
-            'swimlane l2 "L2"',
-            '  item a2 "A" duration:135.046875d',
-            '  item b2 "B" duration:4w capacity:3 style:fte',
-            '',
-            'swimlane l3 "L3"',
-            '  item a3 "A" duration:140.078125d',
-            '  item b3 "B" duration:10d capacity:12 style:fte',
-            '',
-        ].join('\n');
-        const svg = await renderSvg(await parseToModel(dsl));
-        const iconXs = [...svg.matchAll(/<svg x="([^"]+)"[^>]*viewBox="0 0 24 24"/g)].map(
-            (m) => m[1],
+    it('places a capacity icon by adding each iconDxTerm to x in turn', () => {
+        // From x = 2047.875, adding 0.1 then 0.2 lands on 2048.17 after
+        // rounding; adding their pre-summed 0.3 lands on 2048.18. The
+        // renderer must add the terms one at a time, in order, so its x
+        // matches what layout's terms describe (R5).
+        const svg = renderCapacitySuffix(
+            {
+                value: 1,
+                text: '1',
+                icon: { kind: 'builtin', name: 'person' },
+                iconDxTerms: [0.1, 0.2],
+            },
+            2047.875,
+            100,
+            11,
+            'sans-serif',
+            '#000',
         );
-        expect(iconXs).toEqual(['1210.84', '1251.09', '1302.34']);
+        expect(svg).toMatch(/<svg x="2048\.17"/);
     });
 
     it('omits the entire suffix when no capacity is declared', async () => {

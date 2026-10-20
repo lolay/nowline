@@ -1,0 +1,3 @@
+```release-note:fixed
+Item capacity suffixes with a built-in glyph (`person`, `people`, `points`, `time`) no longer paint the glyph over the number on the item's meta line. The number and glyph are placed from the same width estimate, and the gap between them is now `0.25em` on items and lane badges alike.
+```

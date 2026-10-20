@@ -4,7 +4,11 @@
 
 import type { NowlineFile } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { capacityIconDxTerms, estimateCapacitySuffixWidth } from '../src/capacity.js';
+import {
+    capacityIconDxTerms,
+    estimateCapacitySuffixWidth,
+    META_SUFFIX_DX_EM,
+} from '../src/capacity.js';
 import { estimateTextWidth as estimateTextWidthFromIndex } from '../src/index.js';
 import { ITEM_FOOTNOTE_INDICATOR_STEP_PX } from '../src/item-bar-geometry.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
@@ -150,19 +154,56 @@ describe('capacity icon offset', () => {
         const model = await lay(CAPACITY_SRC, { theme: 'light' });
         const a = itemsOf(model).find((i) => i.id === 'a');
         expect(a?.metaText).toBe('2w');
-        // 0.5 em per char of `2w`, the 0.6 em separator, 0.5 em per char
-        // of `3` and the 0.1 em gap, all at the 11 px meta size, in the
-        // order the renderer adds them to the caption x.
-        expect(a?.capacity?.iconDxTerms).toEqual([2 * 11 * 0.5, 11 * 0.6, 11 * 0.5, 11 * 0.1]);
+        // The width of `2w`, the 0.6 em separator, the width of `3` and the
+        // 0.25 em gap, all at the 11 px meta size, in the order the renderer
+        // adds them to the caption x.
+        expect(a?.capacity?.iconDxTerms).toEqual([
+            estimateTextWidth('2w', 11),
+            11 * 0.6,
+            estimateTextWidth('3', 11),
+            11 * 0.25,
+        ]);
         expect(a?.capacity?.iconDxTerms).toEqual(
             capacityIconDxTerms('3', a?.capacity?.icon ?? null, 11, '2w'),
         );
     });
 
+    it('spaces a meta-line icon from its number as a standalone suffix does', () => {
+        // Regression: the meta line used a tighter 0.5 em/char estimate and a
+        // 0.1 em gap, so the icon landed on the number's last digit. The
+        // number-to-icon terms must match the no-meta (lane badge) path.
+        const icon = { kind: 'builtin', name: 'points' } as const;
+        const withMeta = capacityIconDxTerms('8', icon, 11, '4w');
+        expect(withMeta?.slice(2)).toEqual(capacityIconDxTerms('8', icon, 11));
+        expect(withMeta?.[3]).toBeGreaterThanOrEqual(11 * 0.25);
+    });
+
+    it('reserves caption width out to the icon right edge', () => {
+        // The caption fit reserves the meta text, the separator and
+        // `estimateCapacitySuffixWidth`; the icon `capacityIconDxTerms`
+        // places (one em wide) must end inside that, or a widened gap in
+        // one and not the other lets captions collide with the glyph.
+        for (const name of ['person', 'people', 'points', 'time'] as const) {
+            const icon = { kind: 'builtin', name } as const;
+            for (const [num, meta] of [
+                ['8', '4w'],
+                ['40', '2w — 1w remaining'],
+            ]) {
+                const terms = capacityIconDxTerms(num, icon, 11, meta) ?? [];
+                const iconRight = terms.reduce((sum, t) => sum + t, 0) + 11;
+                const reserved =
+                    estimateTextWidth(meta, 11) +
+                    11 * META_SUFFIX_DX_EM +
+                    estimateCapacitySuffixWidth(num, icon, 11);
+                expect(iconRight).toBeLessThanOrEqual(reserved + 1e-9);
+            }
+        }
+    });
+
     it('places a lane badge icon past the number at the badge size', async () => {
         const lane = (await lay(CAPACITY_SRC, { theme: 'light' })).swimlanes[0];
         expect(lane.capacity?.icon).toEqual({ kind: 'builtin', name: 'person' });
-        expect(lane.capacity?.iconDxTerms).toEqual([estimateTextWidth('8', 10), 10 * 0.1]);
+        expect(lane.capacity?.iconDxTerms).toEqual([estimateTextWidth('8', 10), 10 * 0.25]);
     });
 
     it('is omitted for a glyph painted inside the text', async () => {
@@ -177,7 +218,7 @@ describe('capacity icon offset', () => {
         const icon = { kind: 'builtin', name: 'time' } as const;
         expect(capacityIconDxTerms('12', icon, 11)).toEqual([
             estimateTextWidth('12', 11),
-            11 * 0.1,
+            11 * 0.25,
         ]);
     });
 });
