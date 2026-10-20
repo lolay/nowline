@@ -185,8 +185,42 @@ describe('renderSvg — lane capacity badge', () => {
         const laneFragment = svg.match(/<g data-id="sprint" data-layer="swimlane">[\s\S]*?<\/g>/);
         expect(laneFragment).not.toBeNull();
         // Owner badge text + capacity badge both appear.
-        expect(laneFragment![0]).toContain('owner: Platform');
+        expect(laneFragment![0]).toContain('>Platform<');
         expect(laneFragment![0]).toContain('>5\u00D7<');
+    });
+
+    it('leads the owner name with a people glyph for a team and a person glyph for a person', async () => {
+        const dsl = `nowline v1
+
+person sam "Samantha Rodriguez-Wellington"
+team plat "Platform"
+
+roadmap r1 "R" start:2026-01-05
+
+swimlane mine "Mine" owner:sam
+  item x "Build" duration:2w
+
+swimlane ours "Ours" owner:plat
+  item y "Ship" duration:2w
+`;
+        const model = await parseToModel(dsl);
+        const svg = await renderSvg(model);
+        const laneOf = (id: string): string =>
+            svg.match(new RegExp(`<g data-id="${id}" data-layer="swimlane">[\\s\\S]*?</g>`))?.[0] ??
+            '';
+        const mine = laneOf('mine');
+        const ours = laneOf('ours');
+        expect(mine).not.toContain('owner:');
+        // The glyph svg sits right before the name text, at the tab's owner x.
+        const lane = model.swimlanes[0];
+        expect(mine).toContain(`<svg x="${lane.tab?.ownerX}"`);
+        expect(mine).toMatch(
+            /<circle cx="12" cy="8" r="4"[^>]*\/>.*<\/svg><text[^>]*>Samantha Rodriguez-Wellington</,
+        );
+        expect(mine).not.toContain('M22 21v-2');
+        // The people glyph's second figure.
+        expect(ours).toContain('M22 21v-2');
+        expect(ours).toContain('>Platform<');
     });
 });
 
