@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s4 s6 s7 s8 s9 [exec] (s1 done; waiting on s4 before/after sign-off) | updated 2026-10-21
+  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s6 s7 s8 s9 [exec] (s1, s4 done; waiting on s6/s7/s8 before/after sign-off) | updated 2026-10-21
 
   review: every-wave
 
@@ -142,7 +142,7 @@ Revised twice in review. The region box's right edge is no longer the axis end. 
         headings you finished, update the Kickoff Status line, and flip the
         matching todos. Append one line per model this chat ran to the
         plan's "## Token log", counted and priced per its counting header:
-          tokens wave-2 s1-s4-s6-s7-s8-s9 (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv
+          tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~150 / cache read ~11M / cache write ~160k 1h / output ~37k | ~$2.2 API-equiv (partial: through s6/s7/s8 before/afters, chat still open)
     Then stop at the next REVIEW marker and report what you changed and
     any deviations from the plan.
 
@@ -154,7 +154,7 @@ Revised twice in review. The region box's right edge is no longer the axis end. 
 ### s1 - [fast] Render continuation and minimal.fr (non-visual) (done)
 Add both to `EXAMPLES` in `scripts/lib/render-manifest.mjs` (continuation after `minimal`, minimal.fr beside `minimal`), with descriptions ("Backslash line continuation", "Localized output, fr-CA"). Gallery picks them up through `GALLERY_GROUPS`. No changelog fragment (internal).
 
-### s4 - [exec] Item after a block aligns with its first track
+### s4 - [exec] Item after a block aligns with its first track (done)
 - The header band and bracket are unchanged: an untitled parallel keeps its dashed bracket.
 - `row-packer.ts`: `PackedRow.contentOffsetY`, set in `commitBlock` to `headerHeight + CONTAINER_BODY_PAD_PX` for blocks. `placeItem` adds it when the item fits on that row. Same for groups (`group-node.ts`).
 - Spec: rendering.md:599-614 (a new "Join" y rule) and true-width-layout.md §3.2. Expected moves: utilization-states, dependencies, platform-2026 ×3, and any wave sample whose group has a header.
@@ -240,4 +240,4 @@ tokens kickoff plan-gallery-defects-tranquil (claude-opus-5-5): input ~140 / cac
 tokens wave-1 s2-s3-s5 (claude-opus-5-5): input ~450 / cache read ~63M / cache write ~360k 5m + ~910k 1h / output ~120k | ~$24 API-equiv
 tokens review-wave-1 s2-s3-s5 (claude-opus-5-5): input ~34 / cache read ~2.1M / cache write ~110k 1h / output ~9.9k | ~$1.5 API-equiv
 tokens review-wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~10 / cache read ~450k / cache write ~54k 1h / output ~1.7k | ~$0.28 API-equiv
-tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~52 / cache read ~3.0M / cache write ~85k 1h / output ~11k | ~$0.75 API-equiv (partial: through s4 before/after, chat still open)
+tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~150 / cache read ~11M / cache write ~160k 1h / output ~37k | ~$2.2 API-equiv (partial: through s6/s7/s8 before/afters, chat still open)
