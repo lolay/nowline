@@ -35,6 +35,7 @@ import {
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
+import { renderInlineDatePins } from './item.js';
 import { intersectBox } from './primitives.js';
 import type { FontFamilies } from './render.js';
 import { escText, num, tag, textTag } from './xml.js';
@@ -402,7 +403,8 @@ export function renderWaveLabels(
         // Layout placed the label and superscript halos in the painted
         // cell; a wave without one draws neither.
         if (!w.strip.cell) continue;
-        const { labelDraw, superscripts } = w.strip;
+        const { labelDraw, superscripts, inlineDatePin } = w.strip;
+        if (inlineDatePin) parts.push(renderInlineDatePins([inlineDatePin], w.style.text));
         if (superscripts) {
             // The superscripts' own halo in the cell's fill, first so the
             // label's halo never covers them.

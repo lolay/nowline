@@ -1004,6 +1004,13 @@ export interface PositionedWaveStrip {
      */
     labelDraw?: { x: number; halo: BoundingBox };
     /**
+     * The calendar glyph for a declared date floor (`wave launch after:2026-11-02`),
+     * at the cell's left, vertically centred in the strip, whether or not the
+     * floor opened a gap. The label clears it. Omitted when the wave has no
+     * date floor, no `cell`, or the cell is too narrow to host it.
+     */
+    inlineDatePin?: InlineDatePin;
+    /**
      * The footnote superscripts when `footnotesShown` and the wave has a
      * `cell`: `rightX` is the last superscript's right edge (they walk left
      * by `ITEM_FOOTNOTE_INDICATOR_STEP_PX`, end-anchored) and `halo` their

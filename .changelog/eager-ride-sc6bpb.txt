@@ -17,3 +17,7 @@ The item after a parallel or group now lines up with the block's first track ins
 ```release-note:changed
 A two-word title whose first word misses the bar's first line by a hair now wraps inside its bar instead of spilling beside it. On a one-column bar, `Launch page` reads `Launch` / `page`, with the first line allowed to sit up to the status dot's left edge instead of 4 px short of it. Captions that already fit or wrap do not move.
 ```
+
+```release-note:added
+A wave that declares a date floor (`wave launch "Launch" after:2026-11-02`) now shows the calendar glyph at the left of its strip cell, whether or not the floor opened a gap. Hovering it gives the date. A floor that names an anchor or milestone shows no glyph.
+```

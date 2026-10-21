@@ -945,12 +945,13 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
 
 - **Text.** 10 px, weight 600, in `style.text ?? wave.labelText`, centred at `labelX` (the centre of the visible part of the span).
 - **Halo.** Each label sits on a halo rect in its cell's fill, so grid lines never cut through text. The precedent is the include region's source-path halo.
-- **Fit.** The width test is `estimateTextWidth(text, 10) × MARKER_BOLD_WIDTH_FACTOR + superscript width + 2 × 6 px padding ≤ visible cell width`. Candidates, in order:
+- **Fit.** The width test is `estimateTextWidth(text, 10) × MARKER_BOLD_WIDTH_FACTOR + superscript width + date-floor glyph width + 2 × 6 px padding ≤ visible cell width`. Candidates, in order:
   1. the title;
   2. the id;
   3. the title ellipsized to 3 or more characters plus "…";
   4. the 1-based ordinal `#k`;
   5. no label.
+- **Date-floor glyph.** A wave whose declared floor is a date literal (`wave launch "Launch" after:2026-11-02`, `pickInlineDate`) paints the calendar glyph (rendering.md "Inline-date glyph") at its cell's left: `INLINE_DATE_GLYPH_INSET_LEFT_PX` (6) in from the cell's painted left edge, 12 px square, vertically centred in the 20 px strip, in `style.text`, wrapped in `<title>YYYY-MM-DD</title>` like any inline-date pin. It shows whether or not the floor opened a gap, so a floor that did not bind still reads as declared. A floor that names an entity (`after:fy-budget`) has no date to show and gets no glyph. The glyph needs `6 + 12 + 6` px of visible cell; narrower, it is dropped. The fit test below adds the glyph's `12 + 4` px (`INLINE_DATE_GLYPH_GAP_PX`) to the width, and the label is centred on the visible span but never left of the glyph's right edge plus that gap, as it is never under the superscripts. The italic gap label below stays: it dates the gap, the glyph dates the floor.
 - **Footnote superscripts** are right-aligned in the cell. When they don't fit, they move to the legend.
 - **Tooltip.** Every cell has a `<title>`, for example `Launch · 2026-02-02 – 2026-02-23 · held by i2`. The end date is exclusive, and "held by" comes from the layout `LocaleStrings` table.
 

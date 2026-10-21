@@ -1335,6 +1335,26 @@ describe('renderSvg — waves', () => {
         expect(labels.indexOf(halo)).toBeLessThan(labels.indexOf('>Discovery<'));
     });
 
+    it('paints the calendar glyph of a date floor in the wave-labels layer, with its date', async () => {
+        const model = await parseToModel(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:full
+
+wave plan "Plan"
+wave execute "Execute" after:2026-02-09
+
+swimlane a
+  item a1 duration:2w wave:plan
+  item a2 duration:4w wave:execute
+`);
+        const labels = waveLayer(await renderSvg(model), 'wave-labels') ?? '';
+        expect(labels).toContain('data-layer="inline-date-pin"');
+        expect(labels).toContain('data-date="2026-02-09"');
+        expect(labels).toContain('<title>2026-02-09</title>');
+        // One glyph: `plan` has no floor.
+        expect(labels.match(/data-layer="inline-date-pin"/g)).toHaveLength(1);
+    });
+
     it('draws an empty wave as a hollow diamond with its tooltip', async () => {
         const model = await parseToModel(EXAMPLE_12_SRC);
         const labels = waveLayer(await renderSvg(model), 'wave-labels') ?? '';

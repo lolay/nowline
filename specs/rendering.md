@@ -332,7 +332,7 @@ Anchors, milestones (dated and `after:`-only) and titled non-working runs share 
 
 ### Inline-date glyph
 
-When an `item`, `parallel`, or `group` declares an inline date literal in `after:` or `before:` (e.g. `after:2026-03-15` — see [`specs/dsl.md`](./dsl.md) "Inline date pins"), the renderer paints a small **calendar glyph** in the entity's top-decoration row. This is the lightweight counterpart to a declared `anchor` — it pins the entity to a specific date without claiming chart-spanning visual real estate.
+When an `item`, `parallel`, or `group` declares an inline date literal in `after:` or `before:` (e.g. `after:2026-03-15` — see [`specs/dsl.md`](./dsl.md) "Inline date pins"), the renderer paints a small **calendar glyph** in the entity's top-decoration row. A `wave` that declares a date floor (`wave launch after:2026-11-02`) is an entity too: its glyph sits at the left of its strip cell (see [`waves.md`](./waves.md) §9.1). This is the lightweight counterpart to a declared `anchor` — it pins the entity to a specific date without claiming chart-spanning visual real estate.
 
 - **Glyph:** the renderer's built-in `calendar` icon, rendered from the same curated SVG library as `shield`, `warning`, `lock`, etc. Same sizing and color rules as the other built-in icons; identical across web, CLI, and exports.
 - **Tile size:** 12 × 12 px (`INLINE_DATE_GLYPH_TILE_SIZE_PX`). Slightly smaller than the 14 × 14 link icon — the date glyph reads as a sibling of the status dot and footnote indicators, not a peer of the link tile.
