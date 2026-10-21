@@ -99,12 +99,17 @@ describe('the chart in local coordinates', () => {
             expect(arrow, `${milestone} after ${pred}`).toBeDefined();
             return arrow?.y;
         };
-        // A slack and an overrun arrow from an after-only milestone, which
-        // the final pack moved off the row its placement estimated.
+        // A slack arrow from an after-only milestone, which the final pack
+        // moved off the row its placement estimated.
         expect(arrowFrom('beta', 'alpha')).toBe(byId.get('alpha')?.center.y);
-        expect(arrowFrom('review', 'alpha')).toBe(byId.get('alpha')?.center.y);
         expect(arrowFrom('alpha', 'kickoff')).toBe(byId.get('kickoff')?.center.y);
-        expect(arrowFrom('cut', 'freeze')).toBe(byId.get('freeze')?.center.y);
+        // A dated milestone that overruns slips to its predecessor instead.
+        const review = byId.get('review') as PositionedMilestone;
+        expect(review.slackArrows).toBeUndefined();
+        expect(review.slip).toEqual({ x: byId.get('alpha')?.center.x });
+        expect((byId.get('cut') as PositionedMilestone).slip).toEqual({
+            x: byId.get('freeze')?.center.x,
+        });
     });
 
     it("starts a region marker predecessor's arrow on the region's own row", async () => {
@@ -122,7 +127,9 @@ describe('the chart in local coordinates', () => {
         expect(arrowsOf('p-alpha')).toEqual([{ x: start?.center.x, y: start?.center.y }]);
         // After a region milestone: on its row, not the host's band.
         expect(arrowsOf('p-beta')).toEqual([{ x: alpha?.center.x, y: alpha?.center.y }]);
-        expect(arrowsOf('p-due')).toEqual([{ x: alpha?.center.x, y: alpha?.center.y }]);
+        // A dated region milestone that overruns slips; no arrow.
+        expect(arrowsOf('p-due')).toEqual([]);
+        expect((byId.get('p-due') as PositionedMilestone).slip).toEqual({ x: alpha?.center.x });
         expect(alpha?.center.y).toBeGreaterThan(region.box.y);
     });
 
@@ -147,11 +154,13 @@ swimlane s "S"
         expect(byId.get('slack')?.slackArrows).toBeUndefined();
         expect(byId.get('late')?.isOverrun).toBe(true);
         expect(byId.get('late')?.slackArrows).toBeUndefined();
+        // Its diamond would meet a2's, so it does not slip either.
+        expect(byId.get('late')?.slip).toBeUndefined();
         const a1 = model.anchors.find((a) => a.id === 'a1');
         expect(byId.get('clear')?.slackArrows).toEqual([{ x: a1?.center.x, y: a1?.center.y }]);
     });
 
-    it("starts a group's overrun arrow on the milestone's own row", async () => {
+    it("slips a milestone overrun by a group to the group's end, on its own row", async () => {
         const { model } = await phases(`nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
@@ -164,6 +173,7 @@ swimlane s "S"
 `);
         const due = model.milestones[0];
         expect(due.isOverrun).toBe(true);
-        expect(due.slackArrows?.map((a) => a.y)).toEqual([due.center.y]);
+        expect(due.slackArrows).toBeUndefined();
+        expect(due.slip?.x).toBeGreaterThan(due.center.x);
     });
 });

@@ -36,7 +36,6 @@ import {
     renderTimeline,
 } from './timeline.js';
 import {
-    hasOverrunArrow,
     renderWaveBoundaries,
     renderWaveCrossings,
     renderWaveLabels,
@@ -103,8 +102,7 @@ export async function renderSvg(
 
     // <defs> — shadows + the milestone arrow markers (palette-driven fill
     // baked in). Dependency arrows draw their own heads (`renderEdge`), so
-    // the milestone slack line's dark marker and the overrun arrow's red one
-    // are the only ones. Their ids carry the per-render prefix: several SVGs
+    // the milestone slack line's dark marker is the only one. Their ids carry the per-render prefix: several SVGs
     // inlined in one HTML page share an id namespace and `url(#id)` resolves
     // to the first match, so a global id would paint one diagram's
     // arrowheads (and theme) onto another.
@@ -113,10 +111,6 @@ export async function renderSvg(
     const defs =
         `<defs>${allShadowDefs(idPrefix)}` +
         arrowDef(`${idPrefix}-arrow-dark`, palette.arrowhead.dark) +
-        // The overrun arrow's red head, only when a milestone draws one.
-        (hasOverrunArrow(model)
-            ? arrowDef(`${idPrefix}-arrow-overrun`, palette.milestoneDiamond.cutLineOverrun)
-            : '') +
         // Wave hatch patterns, only those a bar or the legend uses.
         usedWaveHatchKinds(model)
             .map((k) => waveHatchPatternDef(idPrefix, k, palette))

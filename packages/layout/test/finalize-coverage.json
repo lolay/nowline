@@ -77,11 +77,11 @@
             ]
         },
         "growCanvasForMarkerLabels": {
-            "count": 1,
-            "samples": ["tests/marker-left-overflow.nowline"]
+            "count": 2,
+            "samples": ["tests/marker-left-overflow.nowline", "tests/milestone-overrun.nowline"]
         },
         "fitWidths": {
-            "count": 36,
+            "count": 37,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -110,6 +110,7 @@
                 "tests/marker-left-overflow.nowline",
                 "tests/marker-predecessor-arrows.nowline",
                 "tests/marker-predecessor-partner.nowline",
+                "tests/milestone-overrun.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
@@ -122,7 +123,7 @@
             ]
         },
         "packMarkers": {
-            "count": 8,
+            "count": 10,
             "samples": [
                 "examples/dependencies.nowline",
                 "tests/header-height-none.nowline",
@@ -131,11 +132,13 @@
                 "tests/marker-left-overflow.nowline",
                 "tests/marker-predecessor-arrows.nowline",
                 "tests/marker-predecessor-partner.nowline",
+                "tests/milestone-overrun.nowline",
+                "tests/waves-gap-deadline.nowline",
                 "tests/working-exceptions.nowline"
             ]
         },
         "placeMarkers": {
-            "count": 10,
+            "count": 11,
             "samples": [
                 "examples/long.nowline",
                 "examples/platform-2026.nowline",
@@ -145,18 +148,20 @@
                 "tests/marker-left-overflow.nowline",
                 "tests/marker-predecessor-arrows.nowline",
                 "tests/marker-predecessor-partner.nowline",
+                "tests/milestone-overrun.nowline",
                 "tests/waves-coarse.nowline",
                 "tests/working-exceptions.nowline"
             ]
         },
         "growHeaderRows": {
-            "count": 5,
+            "count": 6,
             "samples": [
                 "examples/dependencies.nowline",
                 "tests/late-row-shifts.nowline",
                 "tests/marker-left-overflow.nowline",
                 "tests/marker-predecessor-arrows.nowline",
-                "tests/marker-predecessor-partner.nowline"
+                "tests/marker-predecessor-partner.nowline",
+                "tests/milestone-overrun.nowline"
             ]
         },
         "bottomTickPanel": {
@@ -219,7 +224,7 @@
             ]
         },
         "dependencyEdges": {
-            "count": 15,
+            "count": 14,
             "samples": [
                 "examples/dependencies.nowline",
                 "examples/inline-date-pins.nowline",
@@ -232,7 +237,6 @@
                 "tests/inline-date-corners.nowline",
                 "tests/isolate-include-multi.nowline",
                 "tests/late-row-shifts.nowline",
-                "tests/milestone-overrun.nowline",
                 "tests/nested-both-headers.nowline",
                 "tests/partner-multi.nowline",
                 "tests/text-wraps-inside-bars.nowline"

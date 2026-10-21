@@ -420,7 +420,7 @@ end(x) ≤ E_k ≤ S_{k+1} ≤ E_{k+1} ≤ … ≤ S_j ≤ start(y)
 | `after:<wave>` | `start ≥ E_k`. Use it for background work and milestones. On a member of a later wave it is redundant. On an entity whose wave is k or earlier it is NL.E1103 (Examples 8 and 14). |
 | `before:` an item, an anchor or a date | Soft; it never moves the start. A miss caused by the barrier shows the existing red overflow plus NL.I1003 (Example 10). A miss the structure guarantees also gets NL.W1100 (Example 14). |
 | Floating milestone `after:<wave>` | When a wave reference is the binding term, the diamond sits **on** the boundary at `E_k`, as it sits on an item predecessor's duration end. Wave references draw no slack arrows (Example 8). |
-| Dated milestone `after:<wave>` | Pinned to its date. If the wave ends after that date, the existing overrun treatment (red cut line, diamond and label, no arrow) applies, plus the info NL.I1007. This is the wave-deadline idiom (Example 11). |
+| Dated milestone `after:<wave>` | Pinned to its date. If the wave ends after that date, the milestone slips to the wave's end (red diamond on the date, a red dotted span to a normal diamond and label at `E_k`; [`rendering.md`](./rendering.md) Milestones), plus the info NL.I1007. This is the wave-deadline idiom (Example 11). |
 | Anchors | They are dates. They can floor a wave through its `after:`, and they are never members. |
 | Roadmap `start:` | It is the origin, so `S_1 ≥ 0`. An inline date on a wave requires `start:` (NL.E0412) and must be on or after it (NL.E0413). |
 | Roadmap `length:` | `length:` is a minimum span, not a cap. The content extent includes every `S_k` and `E_n`, so waves that run past `length:` grow the date window to the next tick boundary, like any other content. Floors are still computed from unclamped declaration dates (§5.1). |
@@ -981,7 +981,7 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
 - **Gutter.** The line sits in the gap of at least 2 px between bars of different waves (§8.4, "Visual gutter").
 - **Milestone on a boundary.** A milestone whose diamond falls on a boundary (`|center.x − boundary.x| < 0.5 px`, recorded as `onWaveBoundary`) keeps its diamond and label but **does not draw its cut line**. The boundary already marks that instant, and two vertical lines in the same place would read as a rendering bug.
   - This is the common `milestone … after:<wave>` case (the Beta and GA milestones in the mockup).
-  - A dated milestone that a wave overruns is never on a boundary, so it keeps its red cut line (and its red diamond and label).
+  - A dated milestone that a wave overruns slips to that wave's end, a boundary, so the boundary carries its line; nothing drops from the missed date.
 
 ### 9.3 Background work (`waveRole: 'background'`)
 

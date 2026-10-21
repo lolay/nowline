@@ -672,14 +672,24 @@ function extendTimeline(fx: FinalizeContext): boolean {
  */
 function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     const timeline = fx.measured.timeline;
-    const all: MarkerEntity[] = fx.measured.markers.datePinned.map((e) => ({
-        id: e.id,
-        centerX: e.centerX,
-        radius: e.radius,
-        title: e.title,
-        fontSize: e.fontSize,
-        bold: e.bold,
-    }));
+    // A slipped milestone's entry moves to its slipped diamond, where its
+    // label goes, and reserves the span back to its date.
+    const slips = new Map<string, number>();
+    for (const m of fx.chart.milestones) {
+        if (m.slipX !== undefined) slips.set(m.id, m.slipX);
+    }
+    const all: MarkerEntity[] = fx.measured.markers.datePinned.map((e) => {
+        const slipX = e.isMilestone ? slips.get(e.id) : undefined;
+        return {
+            id: e.id,
+            centerX: slipX ?? e.centerX,
+            radius: e.radius,
+            title: e.title,
+            fontSize: e.fontSize,
+            bold: e.bold,
+            ...(slipX !== undefined ? { slipFromX: e.centerX } : {}),
+        };
+    });
     for (const m of fx.chart.milestones) {
         if (m.fixed) continue;
         all.push({

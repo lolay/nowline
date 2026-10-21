@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] (s2 done; s3 next) | updated 2026-10-21
+  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] (s2, s3 done; s5 next) | updated 2026-10-21
 
   review: every-wave
 
@@ -78,7 +78,7 @@ Waves (per Gary): the deep steps run first as wave 1, then the exec steps as wav
 - f2 `extendTimeline` (`phases/finalize.ts:566`) grows the axis to the boundary at or after `maxSpilledCaptionRightX`, capped by the same budget. Use the same `AxisColumns` call so the cap and the extension agree.
 - Spec: rendering.md:299-301, plus a history note under scheduler-unification §8 decision 12. Tests: update `packages/layout/test/caption-cap.test.ts`, and add cases for a 60px caption at scale:1w (fits in 2 columns, not cut) and an overlong one (cut at the budget).
 
-### s3 - [deep] Dated-milestone slip view (variant B, signed off)
+### s3 - [deep] Dated-milestone slip view (variant B, signed off) (done)
 - Layout (`nodes/milestone-node.ts` dated branch, :256-281): when `maxPred.endX > x`, keep `center.x` at the planned date and add `slip: { x: maxPred.endX, y }` to the positioned milestone. Drop the overrun arrow (`overrunArrowStart`). Replace the overrun corridor in `collectSlackCorridors` with the slip span on the marker band, and teach `marker-band.ts` `markerArrows`/`packMarkerRow` to reserve the span planned→slipped plus the label at the slipped x on one row.
 - Renderer (`packages/renderer/src/svg/markers.ts` `renderMilestoneCutLine`, :113-160): draw a red planned diamond with no cut line, a red 3-3 dotted span, and a navy diamond at the slipped x, with the label and the normal dashed cut line there. Retire the `arrow-overrun` marker def (`render.ts:115-119`, `waves.ts` `hasOverrunArrow`). This also removes the latent `- 6` direction bug.
 - The slipped x drives f2 axis extension and the milestone's entity edge for downstream `after:`.

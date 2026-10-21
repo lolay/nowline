@@ -90,15 +90,6 @@ export function waveHatchPatternDef(idPrefix: string, kind: WaveHatchKind, palet
     );
 }
 
-/** True when a dated milestone, on the host or in a region, draws an overrun arrow. */
-export function hasOverrunArrow(model: PositionedRoadmap): boolean {
-    const draws = (m: PositionedMilestone): boolean =>
-        m.isOverrun && (m.slackArrows?.length ?? 0) > 0;
-    return (
-        model.milestones.some(draws) || model.includes.some((r) => (r.milestones ?? []).some(draws))
-    );
-}
-
 /**
  * The hatch patterns the SVG uses, in a fixed order: one per kind that a
  * background bar (main lanes or isolated regions) or the legend's hatch

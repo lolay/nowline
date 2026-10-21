@@ -765,6 +765,16 @@ export interface PositionedMilestone {
     // milestone has zero or one predecessor.
     slackArrows?: Array<{ x: number; y: number }>;
     isOverrun: boolean; // true when the aggregated predecessor end exceeds `date:`
+    /**
+     * Where an overrun dated milestone actually lands: the end of its
+     * latest predecessor or overrunning wave. `center` stays on the
+     * planned date; the renderer draws that diamond in the overrun colour,
+     * a dotted span on the same row to a second diamond at `slip.x`, and
+     * puts the label and the cut line there (specs/rendering.md,
+     * Milestones). Omitted when the milestone does not overrun, or when
+     * the two diamonds would meet.
+     */
+    slip?: { x: number };
     style: ResolvedStyle;
     // Vertical span of the milestone's cut line through the swimlane area.
     cutTopY: number;

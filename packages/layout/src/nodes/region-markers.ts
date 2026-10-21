@@ -150,11 +150,12 @@ function regionMarkerEntries(
     const entries: MarkerEntity[] = datePinnedMarkerEntries(anchors, new Map(), ctx.scale);
     const milestoneEntry = (m: MilestonePlacement): MarkerEntity => ({
         id: m.id,
-        centerX: m.x,
+        centerX: m.slipX ?? m.x,
         radius: m.radius,
         title: m.title,
         fontSize: 10,
         bold: true,
+        ...(m.slipX !== undefined ? { slipFromX: m.x } : {}),
     });
     entries.push(...milestones.filter((m) => m.fixed).map(milestoneEntry));
     entries.push(...milestones.filter((m) => !m.fixed).map(milestoneEntry));
@@ -162,9 +163,11 @@ function regionMarkerEntries(
 }
 
 function positionedEntry(m: PositionedAnchor | PositionedMilestone, bold: boolean): MarkerEntity {
+    // A slipped milestone's label sits at its slipped diamond.
+    const slipX = 'slip' in m ? m.slip?.x : undefined;
     return {
         id: m.id ?? '',
-        centerX: m.center.x,
+        centerX: slipX ?? m.center.x,
         radius: m.radius,
         title: m.title,
         fontSize: 10,

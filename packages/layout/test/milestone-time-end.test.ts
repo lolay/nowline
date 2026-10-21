@@ -118,7 +118,7 @@ milestone m "Jan 6" date:2026-01-06 after:a
         expect(m.slackArrows).toBeUndefined();
     });
 
-    it('is overrun when the duration passes the date, arrow from the end date', async () => {
+    it('is overrun when the duration passes the date; a day late, the diamonds meet and it does not slip', async () => {
         const { model } = await laidOut(`  item a "A" duration:2d
 
 milestone m "Jan 6" date:2026-01-06 after:a
@@ -126,7 +126,10 @@ milestone m "Jan 6" date:2026-01-06 after:a
         const m = milestone(model, 'm');
         const a = item(model, 'a');
         expect(m.isOverrun).toBe(true);
-        expect(m.slackArrows?.map((p) => p.x)).toEqual([a.dateSpan.endX]);
+        expect(m.slackArrows).toBeUndefined();
+        // One day at this scale is under two diamond radii.
+        expect(a.dateSpan.endX - m.center.x).toBeLessThan(12);
+        expect(m.slip).toBeUndefined();
     });
 });
 

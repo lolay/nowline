@@ -1,3 +1,7 @@
 ```release-note:changed
 A caption that spills past the end of the chart now gets up to 160 px (about 20 characters), or one column when a column is wider, before it is cut with `…`, and the axis grows by the whole columns it needs. At week scale a short title like `Search v2` or `Deploy` now shows in full instead of `Sea…` or `Depl…`.
 ```
+
+```release-note:changed
+A dated milestone whose predecessor finishes after its date now slips instead of pointing back in time: the diamond on the date turns red, a red dotted line runs along its marker row to a second diamond where it actually lands, and its label and cut line move there. The red arrow from the late predecessor back to the date is gone.
+```
