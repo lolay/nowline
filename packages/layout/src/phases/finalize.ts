@@ -624,7 +624,7 @@ function extendTimeline(fx: FinalizeContext): boolean {
                 paddedDays,
                 Math.min(
                     columns.boundaryAtOrAfterX(captionRightX),
-                    columns.captionColumn(axisDays).end,
+                    columns.captionLimit(axisDays),
                 ),
             );
         }
