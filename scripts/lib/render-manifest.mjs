@@ -22,6 +22,20 @@ export const EXAMPLES = [
         now: NOW,
         description: 'Smallest complete file.',
     },
+    {
+        slug: 'minimal.fr',
+        source: 'examples/minimal.fr.nowline',
+        theme: 'light',
+        now: NOW,
+        description: 'Localized output, fr-CA.',
+    },
+    {
+        slug: 'continuation',
+        source: 'examples/continuation.nowline',
+        theme: 'light',
+        now: NOW,
+        description: 'Backslash line continuation.',
+    },
     { slug: 'capacity', source: 'examples/capacity.nowline', theme: 'light', now: NOW },
     { slug: 'sizing', source: 'examples/sizing.nowline', theme: 'light', now: NOW },
     {
