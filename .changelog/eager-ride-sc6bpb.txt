@@ -9,3 +9,7 @@ A dated milestone whose predecessor finishes after its date now slips instead of
 ```release-note:changed
 Every isolated region (`roadmap:isolate`) in a chart now ends at the same right edge, just past the diagram's furthest content (bars, spilled captions, anchors, milestones and the now-line) instead of hugging its own bars. Captions near a region's right side stay inside its dashed border.
 ```
+
+```release-note:changed
+The item after a parallel or group now lines up with the block's first track instead of sitting up beside its header and bracket (`Cool` after `Burst A` / `Burst B`, `Deploy` after a `parallel` block). The block's own header and dashed bracket are unchanged.
+```

@@ -109,6 +109,7 @@ export function sequenceRowTrack(
                 placed: positioned,
                 blockHeight,
                 blockEnd,
+                contentOffsetY: firstTrackOffsetY(positioned),
                 spillReservation: contentRight > blockEnd ? contentRight : null,
                 paintedRight: trackChildPaintedRightX(positioned),
             });
@@ -168,6 +169,16 @@ export function sequenceRowTrack(
 
     if (timeStartX === Number.POSITIVE_INFINITY) timeStartX = ctx.scale.startX(leftX);
     return { children, timeCursorX, timeStartX, packer };
+}
+
+/**
+ * How far below a block's top its first track starts: its header band plus
+ * body pad, read off the first child so a block that reserves no chrome (a
+ * wave-only group) reads 0.
+ */
+function firstTrackOffsetY(block: PositionedTrackChild): number {
+    if (block.kind === 'item') return 0;
+    return (block.children[0]?.box.y ?? block.box.y) - block.box.y;
 }
 
 /**

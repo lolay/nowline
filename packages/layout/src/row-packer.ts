@@ -29,6 +29,11 @@ export interface PackedRow {
     /** Reserved x for caption spill. Items whose `desiredStart < spillX`
      *  bump to a new row even if `rightEdge` would let them in. */
     spillX: number;
+    /** How far below `y` an item joining this row sits: 0 for a row of items,
+     *  and for a row a parallel or group opened, the distance from its top to
+     *  its first track, so the item beside it aligns with that track rather
+     *  than with the block's header band. */
+    contentOffsetY: number;
 }
 
 export interface RowPackerOptions {
@@ -108,6 +113,10 @@ export interface BlockCommitInput {
     blockHeight: number;
     /** Logical right edge of the block. */
     blockEnd: number;
+    /** Distance from the block's top to its first track (header band plus
+     *  body pad); 0 when it has no header or children. An item that joins
+     *  the block's row lands this far down. */
+    contentOffsetY?: number;
     /** Reserved spill x for what the block paints past its right edge
      *  (a header title, a caption its children spill). Omitted or
      *  `null` resets the row's spill reservation to `laneLeftX`. */
@@ -135,6 +144,7 @@ export class RowPacker {
                 height: opts.minRowHeight,
                 rightEdge: opts.laneLeftX,
                 spillX: opts.laneLeftX,
+                contentOffsetY: 0,
             },
         ];
     }
@@ -154,7 +164,7 @@ export class RowPacker {
         const row = fits
             ? last
             : this.appendRow(Math.max(this.opts.minRowHeight, input.predictedHeight));
-        return { rowIndex: this.rows.length - 1, y: row.y };
+        return { rowIndex: this.rows.length - 1, y: row.y + row.contentOffsetY };
     }
 
     /**
@@ -178,7 +188,10 @@ export class RowPacker {
      */
     commitItem(input: ItemCommitInput): void {
         const row = this.rows[input.rowIndex];
-        row.height = Math.max(row.height, input.placed.box.height, input.rowHeight ?? 0);
+        row.height = Math.max(
+            row.height,
+            row.contentOffsetY + Math.max(input.placed.box.height, input.rowHeight ?? 0),
+        );
         row.rightEdge = input.logicalEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
     }
@@ -190,6 +203,7 @@ export class RowPacker {
     commitBlock(input: BlockCommitInput): void {
         const row = this.rows[input.rowIndex];
         row.height = Math.max(row.height, input.blockHeight);
+        row.contentOffsetY = input.contentOffsetY ?? 0;
         row.rightEdge = input.blockEnd;
         row.spillX = input.spillReservation ?? this.opts.laneLeftX;
         if (input.paintedRight !== undefined && input.paintedRight > this.paintedRightX) {
@@ -250,6 +264,7 @@ export class RowPacker {
             height,
             rightEdge: this.opts.laneLeftX,
             spillX: this.opts.laneLeftX,
+            contentOffsetY: 0,
         };
         this.rows.push(r);
         return r;

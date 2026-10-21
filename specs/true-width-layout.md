@@ -39,6 +39,7 @@ Out of scope, by decision:
 
 - A caption that fits inside its bar stays inside; otherwise it sits right of the bar, as before, including the one-column cap at the chart's end (m4.11 F7).
 - **Rows never move up.** The next child of a track (lane or group) stays on the previous child's row if its bar and caption fit there, and otherwise drops to the first row below that fits. It never moves above the previous child. The packer before m4.15 was first-fit from the top, which could put an item above the work before it (`Release` above `Integration` in the nested-parallels stress case, §6).
+- **A child after a block joins at its first track.** When the next child of a track joins the row a parallel or group opened, it sits level with that block's first track (the block's header band and body pad above it), not with the block's top, so it reads as following the work rather than the header. A block that reserves no chrome (a wave-only group) offsets by 0.
 - Collisions use the painted footprint (bar, spilled caption, container header), so a long caption pushes the next item down rather than right.
 
 ### 3.3 Groups and parallels
