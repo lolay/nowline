@@ -172,6 +172,9 @@ function positionedEntry(m: PositionedAnchor | PositionedMilestone, bold: boolea
         title: m.title,
         fontSize: 10,
         bold,
+        // The label is forced right of the slipped diamond, as in the pack
+        // (`regionMarkerEntries`) and f3's host entries.
+        ...(slipX !== undefined ? { slipFromX: m.center.x } : {}),
     };
 }
 

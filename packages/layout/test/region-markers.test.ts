@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { layoutRoadmap, type PositionedRoadmap } from '../src/index.js';
+import {
+    layoutRoadmap,
+    type PositionedIncludeRegion,
+    type PositionedRoadmap,
+} from '../src/index.js';
+import { regionMarkerCanvasRightX } from '../src/nodes/region-markers.js';
 import { parseAndResolve } from './helpers.js';
 
 // An isolated region draws its own anchors and milestones in a marker row
@@ -198,5 +203,36 @@ footnote aa "Earlier" on:${id}-b
         const model = await layout(host, CHILD);
         expect(model.footnotes.entries.map((e) => [e.number, 'region' in e])).toEqual([[1, false]]);
         expect(model.footnotes.box.height).toBe(28 + 18 + 16);
+    });
+});
+
+describe('regionMarkerCanvasRightX with a slipped milestone', () => {
+    // A slipped milestone's label never goes left of its diamond, where the
+    // slip span runs, so near the right inset it grows the canvas even when
+    // there is room on the left. The pack (`regionMarkerEntries`) and f3's
+    // host entries already say so; this entry must too.
+    const region = (slip: { x: number } | undefined): PositionedIncludeRegion =>
+        ({
+            box: { x: 0, y: 0, width: 200, height: 100 },
+            anchors: [],
+            milestones: [
+                {
+                    id: 'gate',
+                    title: 'Gate review',
+                    radius: 6,
+                    center: { x: 100, y: 10 },
+                    ...(slip ? { slip } : {}),
+                },
+            ],
+        }) as unknown as PositionedIncludeRegion;
+
+    it('grows the canvas for a label forced right of a slip near the right inset', () => {
+        expect(regionMarkerCanvasRightX(region({ x: 170 }), 200)).toBeGreaterThan(200);
+    });
+
+    it('lets the same milestone, unslipped at that x, fall back left without growth', () => {
+        const unslipped = region(undefined);
+        (unslipped.milestones?.[0].center as { x: number }).x = 170;
+        expect(regionMarkerCanvasRightX(unslipped, 200)).toBe(200);
     });
 });
