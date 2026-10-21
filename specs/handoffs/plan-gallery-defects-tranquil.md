@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 1/2 groups done | last review: — | current: s1 s4 s6 s7 s8 [exec] (wave 1 awaiting review) | updated 2026-10-21
+  Status: BLOCKED at gate review-wave-1 | 1/2 groups done | last review: — | updated 2026-10-21
 
   review: every-wave
 
@@ -215,6 +215,10 @@ In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if
 - `packages/cli/test/convert/roundtrip.test.ts` stays green (s1 adds no grammar, but the new examples now run through it).
 - After each step, re-render the affected fixtures to `.scratch/` and screenshot them (headless Chromium at `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`) for the before/after report. `make gallery` gives the full side-by-side.
 
+## Review log
+
+review wave-1 (s2-s3-s5) 821d502..9b89a89: CONCERNS - s3 slip is presentation-only (after: still reads date:), reversing the plan's "slipped x drives the entity edge for downstream after:" with no recorded sign-off or test; needs Gary's pick. s2 and s5 match, make pre-commit green. Nits: stale s5 "Pending" note, region-markers positionedEntry omits slipFromX - 2026-10-21
+
 ## Token log
 
 **Counting header (Claude Code)**
@@ -227,3 +231,4 @@ In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if
 
 tokens kickoff plan-gallery-defects-tranquil (claude-opus-5-5): input ~140 / cache read ~11M / cache write ~220k 1h / output ~40k | ~$4.8 API-equiv
 tokens wave-1 s2-s3-s5 (claude-opus-5-5): input ~450 / cache read ~63M / cache write ~360k 5m + ~910k 1h / output ~120k | ~$24 API-equiv
+tokens review-wave-1 s2-s3-s5 (claude-opus-5-5): input ~34 / cache read ~2.1M / cache write ~110k 1h / output ~9.9k | ~$1.5 API-equiv
