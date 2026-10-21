@@ -13,7 +13,6 @@ import {
     type OptionLayer,
     type OptionParse,
     type OptionSpec,
-    type OptionValues,
     rcLayer,
     resolveOptions,
     resolveSurfaceOptions,
@@ -80,7 +79,6 @@ export const CLI_OPTION_SPECS = Object.freeze({
 
 type CliSpecs = typeof CLI_OPTION_SPECS;
 export type CliOptionKey = Extract<keyof CliSpecs, string>;
-type CliValues = OptionValues<CliSpecs>;
 
 /** The flag each option is passed as, for an error that names its source. */
 const FLAG_NAMES: Readonly<Partial<Record<CliOptionKey, string>>> = {
