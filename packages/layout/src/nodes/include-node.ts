@@ -27,9 +27,9 @@ const REGION_INSET_BOTTOM = 14;
 const GAP_BETWEEN_REGIONS = 16;
 
 // Visual breathing room added past the rightmost element when sizing
-// the include's bounding box. Keeps the dashed bracket from butting up
-// against an item's right edge while still trimming the wide
-// chart-width whitespace left over from full-width sizing.
+// the include's bounding box, the axis end included: the box reaches past
+// the last column as if an item ended on it, so the dashed bracket never
+// butts up against an item's right edge or the last grid line.
 const INCLUDE_CONTENT_RIGHT_PAD_PX = 32;
 
 export function buildIncludeRegions(
@@ -137,16 +137,21 @@ export function buildIncludeRegions(
 }
 
 /**
- * Shrink-wrap an include's bounding box to fit chrome + content (with a
- * small right pad) instead of stretching to the full chart width. An
- * include that reaches past the timeline still gets clamped to
- * `chartRightX` so it never extends into the attribution / right-margin
- * area. Finalize runs it once per kept region (f4), after the canvas
- * width is final: the spill growth, the timeline extension and the
- * marker labels can all still grow the canvas after the region is placed.
+ * Size an include's bounding box to the date columns: it reaches past the
+ * axis end `axisRightX` (and past its chrome, bars and marker labels) by a
+ * small right pad, so every region in a chart ends at the same edge
+ * (specs/rendering.md, Included Roadmaps). It is clamped to `chartRightX`;
+ * finalize grows the canvas to hold the pad first (f3). Finalize runs it
+ * once per kept region (f4), after the canvas width is final: the spill
+ * growth, the timeline extension and the marker labels can all still grow
+ * the canvas after the region is placed.
  */
-export function fitIncludeRegionWidth(region: PositionedIncludeRegion, chartRightX: number): void {
-    const boxWidth = includeRegionWidth(region, chartRightX);
+export function fitIncludeRegionWidth(
+    region: PositionedIncludeRegion,
+    chartRightX: number,
+    axisRightX: number,
+): void {
+    const boxWidth = includeRegionWidth(region, chartRightX, axisRightX);
     region.box.width = boxWidth;
     // Mirror the shrunk width onto each nested swimlane band so the
     // tinted background fits inside the dashed bracket instead of
@@ -156,8 +161,15 @@ export function fitIncludeRegionWidth(region: PositionedIncludeRegion, chartRigh
     }
 }
 
-/** The width `fitIncludeRegionWidth` gives `region` on a canvas ending at `chartRightX`. */
-export function includeRegionWidth(region: PositionedIncludeRegion, chartRightX: number): number {
+/**
+ * The width `fitIncludeRegionWidth` gives `region` on a canvas ending at
+ * `chartRightX` and an axis ending at `axisRightX`.
+ */
+export function includeRegionWidth(
+    region: PositionedIncludeRegion,
+    chartRightX: number,
+    axisRightX: number,
+): number {
     const boxX = region.box.x;
     const { chromeRightX } = includeChromeGeometry(boxX, region.label, region.sourcePath);
     // Bars-only extent (never a spilled caption — see
@@ -166,7 +178,7 @@ export function includeRegionWidth(region: PositionedIncludeRegion, chartRightX:
     // dragging it wider.
     const barsRightX = maxLeafItemRightX(region.nestedSwimlanes);
     const naturalRightX =
-        Math.max(chromeRightX, barsRightX, regionMarkerLabelsRightX(region)) +
+        Math.max(chromeRightX, barsRightX, regionMarkerLabelsRightX(region), axisRightX) +
         INCLUDE_CONTENT_RIGHT_PAD_PX;
     return Math.min(chartRightX - boxX, naturalRightX - boxX);
 }

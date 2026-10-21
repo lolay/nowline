@@ -712,8 +712,14 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     );
     // An isolated region's own marker labels grow it the same way, inside
     // the region's insets (placement packed them against the natural canvas).
+    // A region box reaches past the axis end by its pad (`includeRegionWidth`).
+    const axisRightX = fx.scale.range[1];
     for (const inc of fx.chart.includes) {
         rightX = Math.max(rightX, regionMarkerCanvasRightX(inc, fx.canvas.provisional));
+        rightX = Math.max(
+            rightX,
+            inc.box.x + includeRegionWidth(inc, Number.POSITIVE_INFINITY, axisRightX),
+        );
     }
     const grew = fx.canvas.grow(rightX);
     fx.canvas.freeze();
@@ -731,16 +737,21 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
 function fitWidths(fx: FinalizeContext): boolean {
     const chartRightX = fx.canvas.final;
     const natural = fx.measured.naturalChartRightX;
+    const axisRightX = fx.scale.range[1];
+    const naturalAxisRightX = natural - GUTTER_PX;
     // Changed: a width differs from the one the natural canvas would give.
     let changed = fx.chart.swimlanes.length > 0 && chartRightX !== natural;
     for (const lane of fx.chart.swimlanes) {
         lane.box.width = chartRightX;
     }
     for (const inc of fx.chart.includes) {
-        if (includeRegionWidth(inc, chartRightX) !== includeRegionWidth(inc, natural)) {
+        if (
+            includeRegionWidth(inc, chartRightX, axisRightX) !==
+            includeRegionWidth(inc, natural, naturalAxisRightX)
+        ) {
             changed = true;
         }
-        fitIncludeRegionWidth(inc, chartRightX);
+        fitIncludeRegionWidth(inc, chartRightX, axisRightX);
     }
     return changed;
 }
@@ -1076,13 +1087,13 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'growCanvasForMarkerLabels',
-        reads: ['placement', 'calendarRuns', 'canvas'],
+        reads: ['placement', 'calendarRuns', 'canvas', 'scale'],
         writes: ['markerEntries', 'canvas'],
         run: growCanvasForMarkerLabels,
     },
     {
         name: 'fitWidths',
-        reads: ['placement', 'canvas'],
+        reads: ['placement', 'canvas', 'scale'],
         writes: ['laneWidths'],
         run: fitWidths,
     },

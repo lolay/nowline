@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] (s2, s3 done; s5 next) | updated 2026-10-21
+  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] (s2, s3 done; s5 prototype) | BLOCKED at gate s5 before/after sign-off (prototype committed; tests, spec, snapshots pending) | updated 2026-10-21
 
   review: every-wave
 
