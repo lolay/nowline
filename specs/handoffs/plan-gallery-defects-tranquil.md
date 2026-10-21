@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s1 s4 s6 s7 s8 [exec] | updated 2026-10-21
+  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s1 s4 s6 s7 s8 s9 [exec] | updated 2026-10-21
 
   review: every-wave
 
@@ -34,7 +34,7 @@
 | wave | expected tokens | expected $ |
 |---|---|---|
 | 1 [deep] s2 s3 s5 | ~9.5M | ~$5.0 |
-| 2 [exec] s1 s4 s6 s7 s8 | ~3.9M | ~$1.6 |
+| 2 [exec] s1 s4 s6 s7 s8 s9 | ~4.1M | ~$1.7 |
 | kickoff | ~1.5M | ~$1.0 |
 | **Total** | ~15M | ~$7.6 |
 
@@ -123,25 +123,26 @@ Revised twice in review. The region box's right edge is no longer the axis end. 
 ```text
 --- STOP: tier change [deep] -> [exec] ---
 
-  Suggested chat title: Wave 2 of 2 [exec] s1 s4 s6 s7 s8
+  Suggested chat title: Wave 2 of 2 [exec] s1 s4 s6 s7 s8 s9
 
   Next model
     Cursor:      grok-4-7[effort=high,fast=false]   (or claude-sonnet-5-5[effort=high])
     Claude Code: /model sonnet              (/effort high)
 
   Prompt to paste into the next chat:
-    Wave 2 of 2 [exec] s1 s4 s6 s7 s8
+    Wave 2 of 2 [exec] s1 s4 s6 s7 s8 s9
     In lolay/nowline, read specs/handoffs/plan-gallery-defects-tranquil.md. Execute WAVE 2: s1, s4, s6,
-    s7, s8, in that order. Confirm wave 1's review is PASS first.
+    s7, s8, s9, in that order. Confirm wave 1's review is PASS first.
     On branch claude/eager-ride-sc6bpb (task branch): commit each finished step and push.
     Visual steps (s4, s6, s7, s8): show a before/after of 1-3 fixtures
     and wait for sign-off before implementing. s1 is a mechanical
-    manifest edit: apply exactly what the plan says.
+    manifest edit: apply exactly what the plan says. s9 is
+    non-visual: no render should move.
         Before you stop, update plan progress: append ` (done)` to the
         headings you finished, update the Kickoff Status line, and flip the
         matching todos. Append one line per model this chat ran to the
         plan's "## Token log", counted and priced per its counting header:
-          tokens wave-2 s1-s4-s6-s7-s8 (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv
+          tokens wave-2 s1-s4-s6-s7-s8-s9 (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv
     Then stop at the next REVIEW marker and report what you changed and
     any deviations from the plan.
 
@@ -169,19 +170,22 @@ In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if
 ### s8 - [exec] Wave legend lists only waves the band doesn't name in full
 `buildWaveLegend` (`wave-node.ts:620`): keep the trigger, but filter the list to waves that are empty, abbreviated (`labelKind !== 'title'`), or have dropped footnotes. Keep the `#k` numbering. waves-coarse reads `Waves: #4 Beta (TBD) (no items)`. Spec: waves.md §9.5 (:1046, :1715), rendering.md:665. Tests: `waves-model.test.ts` :258, :664, :741.
 
+### s9 - [exec] Region marker canvas check honours a slip (non-visual)
+Follow-up from the wave-1 review. `positionedEntry` (`packages/layout/src/nodes/region-markers.ts`) moves a slipped milestone's entry to `slip.x` but omits `slipFromX: m.center.x`, so `regionMarkerCanvasRightX` (f3) treats its label as able to fall back left while `regionMarkerEntries` (the pack) forces it right. Set `slipFromX` there, as `regionMarkerEntries` and f3's host entries already do. No render moves today (s5's region width counts the real label box), so add a Vitest case that fails without it: a region with a dated milestone slipped near the right inset whose label would fit on the left, asserting `regionMarkerCanvasRightX` grows past `chartRightX`. No changelog fragment (no observable change); no snapshot or determinism bump.
+
 ```text
 --- REVIEW: wave-2 [deep] ---
 
-  Suggested chat title: Review wave 2 of 2 [deep] s1 s4 s6 s7 s8
+  Suggested chat title: Review wave 2 of 2 [deep] s1 s4 s6 s7 s8 s9
 
   Next model
     Cursor:      claude-opus-5-5[effort=high]
     Claude Code: /model opus                (/effort high)
 
   Prompt to paste into the next chat:
-    Review wave 2 of 2 [deep] s1 s4 s6 s7 s8
+    Review wave 2 of 2 [deep] s1 s4 s6 s7 s8 s9
     In lolay/nowline, read specs/handoffs/plan-gallery-defects-tranquil.md. Review the work completed in
-    wave 2 (s1-s4-s6-s7-s8) against its spec: read `git diff <from>` and
+    wave 2 (s1-s4-s6-s7-s8-s9) against its spec: read `git diff <from>` and
     `git status`, where <from> is the commit after `..` on the last
     Review log line (for the first review, `git merge-base HEAD
     origin/main`), and check it against the plan steps and
@@ -189,10 +193,10 @@ In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if
     yourself and do not start the next wave. Append one line to the
     "## Review log" section of the plan file (create the section if
     absent), with <to> from `git rev-parse --short HEAD`:
-      review wave-2 (s1-s4-s6-s7-s8) <from>..<to>: PASS|CONCERNS - <one-line note> - <YYYY-MM-DD>
+      review wave-2 (s1-s4-s6-s7-s8-s9) <from>..<to>: PASS|CONCERNS - <one-line note> - <YYYY-MM-DD>
     Append one line per model this chat ran to "## Token log",
     counted and priced per its counting header:
-      tokens review-wave-2 s1-s4-s6-s7-s8 (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv
+      tokens review-wave-2 s1-s4-s6-s7-s8-s9 (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv
     If the verdict is CONCERNS, also set the Kickoff Status line to
     `BLOCKED at gate review-wave-2`, re-post the concern, and stop.
     On PASS, update the Status line `last review:` field and report back.
