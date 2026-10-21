@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s1 s4 s6 s7 s8 s9 [exec] | updated 2026-10-21
+  Status: BLOCKED at gate review-wave-2 | 1/2 groups done | last review: wave-2 CONCERNS 2026-10-21 | current: s1 s4 s6 s7 s8 s9 [exec] not executed | updated 2026-10-21
 
   review: every-wave
 
@@ -223,6 +223,8 @@ Follow-up from the wave-1 review. `positionedEntry` (`packages/layout/src/nodes/
 
 review wave-1 (s2-s3-s5) 821d502..9b89a89: CONCERNS - s3 slip is presentation-only (after: still reads date:), reversing the plan's "slipped x drives the entity edge for downstream after:" with no recorded sign-off or test; needs Gary's pick. s2 and s5 match, make pre-commit green. Nits: stale s5 "Pending" note, region-markers positionedEntry omits slipFromX - 2026-10-21
 review wave-1 (s2-s3-s5) 9b89a89..0567a5d: PASS - Gary kept the s3 slip presentation-only; plan s3 amended to match, stale s5 note fixed. Open nit: region-markers positionedEntry omits slipFromX (masked by s5 region width) - 2026-10-21
+review wave-2 (s1-s4-s6-s7-s8-s9) 0567a5d..a4648eb: CONCERNS - wave 2 is not in the tree: no code commits past 0567a5d (only plan edits), git status clean; s1 (continuation, minimal.fr) absent from render-manifest.mjs, s9 positionedEntry still omits slipFromX, s4/s6/s7/s8 have no changes and no (done) markers; nothing to review, run wave 2 first - 2026-10-21
+
 
 ## Token log
 
@@ -237,3 +239,4 @@ review wave-1 (s2-s3-s5) 9b89a89..0567a5d: PASS - Gary kept the s3 slip presenta
 tokens kickoff plan-gallery-defects-tranquil (claude-opus-5-5): input ~140 / cache read ~11M / cache write ~220k 1h / output ~40k | ~$4.8 API-equiv
 tokens wave-1 s2-s3-s5 (claude-opus-5-5): input ~450 / cache read ~63M / cache write ~360k 5m + ~910k 1h / output ~120k | ~$24 API-equiv
 tokens review-wave-1 s2-s3-s5 (claude-opus-5-5): input ~34 / cache read ~2.1M / cache write ~110k 1h / output ~9.9k | ~$1.5 API-equiv
+tokens review-wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~10 / cache read ~450k / cache write ~54k 1h / output ~1.7k | ~$0.28 API-equiv
