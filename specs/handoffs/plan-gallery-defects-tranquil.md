@@ -84,9 +84,8 @@ Waves (per Gary): the deep steps run first as wave 1, then the exec steps as wav
 - The slipped x drives f2 axis extension and the milestone's entity edge for downstream `after:`.
 - Spec: rendering.md:368, :371; layout-phases.md:693-700; update the header comments in tests/milestone-overrun.nowline and tests/marker-predecessor-arrows.nowline. Tests: `chart-local-frame.test.ts`, `render.test.ts` "dated milestone overrun", `milestone-time-end.test.ts`, `marker-arrows.test.ts`, and `waves.test.ts` overrun case are rewritten to the slip shape.
 
-### s5 - [deep] Region boxes reach the last column, plus padding
-- `includeRegionWidth` (`nodes/include-node.ts:160-172`) adds `fx.scale.range[1]` (the final axis end) as a content edge before `+ INCLUDE_CONTENT_RIGHT_PAD_PX`. f3 (`growCanvasForMarkerLabels`, finalize.ts:706-711) grows the canvas to the padded box before the freeze. Add `'scale'` to f3/f4 reads (:1072, :1078). f4's "changed" check compares against the natural axis end.
-- Tests: rewrite `layout.test.ts:609-642` and `:675-724`; check `placement-canvas.test.ts:188-234` and `render.test.ts:1612-1660`. Spec: rendering.md:68, :647-652; layout-phases.md §3.5 rows f2-f4 and :237/:533. Moves: isolate-include, nested(+nested/*), isolate-include-multi, waves-isolate, marker-predecessor-arrows.
+### s5 - [deep] Region boxes reach the diagram's content, plus padding
+Revised twice in review. The region box's right edge is no longer the axis end. It is the furthest content anywhere in the diagram, host and every region: bars, spilled captions, anchors and milestones with their labels (a slipped milestone at its landing), and the now-line. A 24px box pad puts the dashed edge 16px past that point. f3 grows the canvas to hold it. The code is `diagramContentRightX` in `phases/finalize.ts`, and `includeRegionWidth` now takes `contentRightX`. Prototype commits: 4e252f3, 05076ba, and the current one. Pending: tests (`layout.test.ts:609-642`, `:675-724`, `placement-canvas.test.ts:188-234`, `render.test.ts:1612-1660`), spec (rendering.md:68, :647-652; layout-phases.md §3.5), changelog, snapshots (isolate-include, waves-isolate), determinism, and coverage register. Gate: Gary is QC-ing the region renders (isolate-include, nested, isolate-include-multi, waves-isolate, marker-predecessor-arrows).
 
 ```text
 --- REVIEW: wave-1 [deep] ---

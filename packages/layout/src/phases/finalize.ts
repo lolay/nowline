@@ -42,7 +42,11 @@ import {
     packMarkerRow,
     workingExceptionMarkerId,
 } from '../nodes/marker-band.js';
-import { MARKER_ROW_PITCH_PX } from '../nodes/marker-geometry.js';
+import {
+    MARKER_BOLD_WIDTH_FACTOR,
+    MARKER_LABEL_GAP_PX,
+    MARKER_ROW_PITCH_PX,
+} from '../nodes/marker-geometry.js';
 import { positionMilestones } from '../nodes/milestone-node.js';
 import { buildNowline } from '../nodes/nowline-node.js';
 import { regionMarkerCanvasRightX } from '../nodes/region-markers.js';
@@ -714,7 +718,7 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     // the region's insets (placement packed them against the natural canvas).
     // A region box reaches past the diagram's content by its pad
     // (`includeRegionWidth`).
-    const contentRightX = diagramContentRightX(fx);
+    const contentRightX = diagramContentRightX(fx, fx.draft.markerEntries);
     for (const inc of fx.chart.includes) {
         rightX = Math.max(rightX, regionMarkerCanvasRightX(inc, fx.canvas.provisional));
         rightX = Math.max(
@@ -729,10 +733,15 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
 
 /**
  * The furthest content edge anywhere in the diagram, main lanes and every
- * isolated region: a leaf bar's right edge or a spilled caption's. Every
- * region box reaches past it by the same pad.
+ * isolated region: a leaf bar's right edge, a spilled caption's, an anchor
+ * or milestone with its label (a host marker's label on its right, as f3
+ * estimates it before the final pack), and the now-line. Every region box
+ * reaches past it by the same pad.
  */
-function diagramContentRightX(fx: FinalizeContext): number {
+function diagramContentRightX(
+    fx: FinalizeContext,
+    markerEntries: { all: MarkerEntity[]; calendarCount: number } | undefined,
+): number {
     const { swimlanes, includes } = fx.chart;
     let rightX = Math.max(maxLeafItemRightX(swimlanes), maxSpilledCaptionRightX(swimlanes));
     for (const inc of includes) {
@@ -741,7 +750,23 @@ function diagramContentRightX(fx: FinalizeContext): number {
             maxLeafItemRightX(inc.nestedSwimlanes),
             maxSpilledCaptionRightX(inc.nestedSwimlanes),
         );
+        for (const m of [...(inc.anchors ?? []), ...(inc.milestones ?? [])]) {
+            rightX = Math.max(rightX, m.labelBox.x + m.labelBox.width);
+        }
     }
+    if (markerEntries) {
+        const markers = markerEntries.all.slice(
+            0,
+            markerEntries.all.length - markerEntries.calendarCount,
+        );
+        for (const e of markers) {
+            const labelWidth =
+                estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
+            rightX = Math.max(rightX, e.centerX + e.radius + MARKER_LABEL_GAP_PX + labelWidth);
+        }
+    }
+    const nowX = fx.options.today ? fx.scale.forwardWithinDomain(fx.options.today) : null;
+    if (nowX !== null) rightX = Math.max(rightX, nowX);
     return rightX;
 }
 
@@ -756,7 +781,10 @@ function diagramContentRightX(fx: FinalizeContext): number {
 function fitWidths(fx: FinalizeContext): boolean {
     const chartRightX = fx.canvas.final;
     const natural = fx.measured.naturalChartRightX;
-    const contentRightX = diagramContentRightX(fx);
+    const contentRightX = diagramContentRightX(
+        fx,
+        need(fx.draft.markerEntries, 'the marker entries'),
+    );
     // Changed: a width differs from the one the natural canvas would give.
     let changed = fx.chart.swimlanes.length > 0 && chartRightX !== natural;
     for (const lane of fx.chart.swimlanes) {
@@ -1105,13 +1133,13 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'growCanvasForMarkerLabels',
-        reads: ['placement', 'calendarRuns', 'canvas'],
+        reads: ['placement', 'calendarRuns', 'canvas', 'scale'],
         writes: ['markerEntries', 'canvas'],
         run: growCanvasForMarkerLabels,
     },
     {
         name: 'fitWidths',
-        reads: ['placement', 'canvas'],
+        reads: ['placement', 'canvas', 'markerEntries', 'scale'],
         writes: ['laneWidths'],
         run: fitWidths,
     },

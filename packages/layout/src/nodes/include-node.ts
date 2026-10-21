@@ -29,8 +29,9 @@ const GAP_BETWEEN_REGIONS = 16;
 // Visual breathing room added past the rightmost element when sizing
 // the include's bounding box. The rightmost element is the diagram's, not
 // the region's own: every region reaches the same edge, past the furthest
-// bar or spilled caption anywhere in the chart.
-const INCLUDE_CONTENT_RIGHT_PAD_PX = 32;
+// bar, spilled caption, marker or now-line anywhere in the chart. The
+// renderer insets the dashed rect by 8 px, so its edge sits 16 px past it.
+const INCLUDE_CONTENT_RIGHT_PAD_PX = 24;
 
 export function buildIncludeRegions(
     regions: IsolatedRegion[],
@@ -138,8 +139,8 @@ export function buildIncludeRegions(
 
 /**
  * Size an include's bounding box to the diagram's content: it reaches past
- * `contentRightX`, the furthest bar or spilled caption anywhere in the
- * chart (and past its own chrome and marker labels), by a small right pad,
+ * `contentRightX`, the furthest bar, spilled caption, marker or now-line
+ * anywhere in the chart (and past its own chrome), by a small right pad,
  * so every region in a chart ends at the same edge (specs/rendering.md,
  * Included Roadmaps). It is clamped to `chartRightX`;
  * finalize grows the canvas to hold the pad first (f3). Finalize runs it
