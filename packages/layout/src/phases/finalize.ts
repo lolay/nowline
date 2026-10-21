@@ -712,18 +712,37 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     );
     // An isolated region's own marker labels grow it the same way, inside
     // the region's insets (placement packed them against the natural canvas).
-    // A region box reaches past the axis end by its pad (`includeRegionWidth`).
-    const axisRightX = fx.scale.range[1];
+    // A region box reaches past the diagram's content by its pad
+    // (`includeRegionWidth`).
+    const contentRightX = diagramContentRightX(fx);
     for (const inc of fx.chart.includes) {
         rightX = Math.max(rightX, regionMarkerCanvasRightX(inc, fx.canvas.provisional));
         rightX = Math.max(
             rightX,
-            inc.box.x + includeRegionWidth(inc, Number.POSITIVE_INFINITY, axisRightX),
+            inc.box.x + includeRegionWidth(inc, Number.POSITIVE_INFINITY, contentRightX),
         );
     }
     const grew = fx.canvas.grow(rightX);
     fx.canvas.freeze();
     return grew;
+}
+
+/**
+ * The furthest content edge anywhere in the diagram, main lanes and every
+ * isolated region: a leaf bar's right edge or a spilled caption's. Every
+ * region box reaches past it by the same pad.
+ */
+function diagramContentRightX(fx: FinalizeContext): number {
+    const { swimlanes, includes } = fx.chart;
+    let rightX = Math.max(maxLeafItemRightX(swimlanes), maxSpilledCaptionRightX(swimlanes));
+    for (const inc of includes) {
+        rightX = Math.max(
+            rightX,
+            maxLeafItemRightX(inc.nestedSwimlanes),
+            maxSpilledCaptionRightX(inc.nestedSwimlanes),
+        );
+    }
+    return rightX;
 }
 
 /**
@@ -737,8 +756,7 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
 function fitWidths(fx: FinalizeContext): boolean {
     const chartRightX = fx.canvas.final;
     const natural = fx.measured.naturalChartRightX;
-    const axisRightX = fx.scale.range[1];
-    const naturalAxisRightX = natural - GUTTER_PX;
+    const contentRightX = diagramContentRightX(fx);
     // Changed: a width differs from the one the natural canvas would give.
     let changed = fx.chart.swimlanes.length > 0 && chartRightX !== natural;
     for (const lane of fx.chart.swimlanes) {
@@ -746,12 +764,12 @@ function fitWidths(fx: FinalizeContext): boolean {
     }
     for (const inc of fx.chart.includes) {
         if (
-            includeRegionWidth(inc, chartRightX, axisRightX) !==
-            includeRegionWidth(inc, natural, naturalAxisRightX)
+            includeRegionWidth(inc, chartRightX, contentRightX) !==
+            includeRegionWidth(inc, natural, contentRightX)
         ) {
             changed = true;
         }
-        fitIncludeRegionWidth(inc, chartRightX, axisRightX);
+        fitIncludeRegionWidth(inc, chartRightX, contentRightX);
     }
     return changed;
 }
@@ -1087,13 +1105,13 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'growCanvasForMarkerLabels',
-        reads: ['placement', 'calendarRuns', 'canvas', 'scale'],
+        reads: ['placement', 'calendarRuns', 'canvas'],
         writes: ['markerEntries', 'canvas'],
         run: growCanvasForMarkerLabels,
     },
     {
         name: 'fitWidths',
-        reads: ['placement', 'canvas', 'scale'],
+        reads: ['placement', 'canvas'],
         writes: ['laneWidths'],
         run: fitWidths,
     },
