@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] | BLOCKED at gate s2 before/after sign-off (prototype committed, tests not yet updated) | updated 2026-10-21
+  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] (s2 done; s3 next) | updated 2026-10-21
 
   review: every-wave
 
@@ -73,7 +73,7 @@ Waves (per Gary): the deep steps run first as wave 1, then the exec steps as wav
 
 --- WAVE 1 [deep] ---
 
-### s2 - [deep] Caption cap: fit within max(1 column, 160px)
+### s2 - [deep] Caption cap: fit within max(1 column, 160px) (done)
 - `AxisColumns.captionCapX`: replace "end of one column past the axis end" with "the end of the fewest whole columns past the axis end that hold the caption, if that end is within max(one column, `CAPTION_OVERHANG_BUDGET_PX = 160`) of the axis end; else the last whole-column boundary within that budget". It needs the caption's right edge, so it takes `spillRightX` as a parameter. `capCaptionAtAxisEnd` (`nodes/item-measure.ts:510`) passes `spill.rightX` and truncates only when the result still falls short.
 - f2 `extendTimeline` (`phases/finalize.ts:566`) grows the axis to the boundary at or after `maxSpilledCaptionRightX`, capped by the same budget. Use the same `AxisColumns` call so the cap and the extension agree.
 - Spec: rendering.md:299-301, plus a history note under scheduler-unification §8 decision 12. Tests: update `packages/layout/test/caption-cap.test.ts`, and add cases for a 60px caption at scale:1w (fits in 2 columns, not cut) and an overlong one (cut at the budget).

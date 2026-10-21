@@ -556,7 +556,7 @@ function growCanvasForSpill(fx: FinalizeContext): boolean {
  * see `maxLeafItemRightX`) and marker diamonds, an isolated region's own
  * included — and grow the window to
  * the next tick boundary when content overflows it. A spilled caption past
- * that end grows it by one more full column at most, labelled by the
+ * that end grows it by whole columns up to `AxisColumns.captionLimit`, labelled by the
  * same rules as any other column: the item measure capped the caption to
  * end inside it (`AxisColumns.captionCapX`). This is driven
  * purely by boxes, never by `today`, so the `length:`-as-minimum and
@@ -604,14 +604,14 @@ function extendTimeline(fx: FinalizeContext): boolean {
         overflowDays > 0
             ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays, calendar)
             : 0;
-    // A spilled caption past the axis end grows it by one column, the one
-    // the item measure capped the caption to; `label-every`, the default
-    // thinning and the narrow-column rules label it like any other column
-    // (specs/scheduler-unification.md §8 decision 12). Under an explicit
-    // `length:` that ends mid-column the column is the full one after the
-    // partial last column. A caption the cap could not bring inside (its
-    // meta line is never truncated) still grows the axis by that one column
-    // only.
+    // A spilled caption past the axis end grows it by the whole columns that
+    // hold it, up to `captionLimit`, the boundary the item measure capped the
+    // caption to; `label-every`, the default thinning and the narrow-column
+    // rules label them like any other column (specs/scheduler-unification.md
+    // §8 decision 12). Under an explicit `length:` that ends mid-column the
+    // columns are the full ones after the partial last column. A caption the
+    // cap could not bring inside (its meta line is never truncated) still
+    // grows the axis only to `captionLimit`.
     let captionRightX = maxSpilledCaptionRightX(swimlanes);
     for (const inc of includes) {
         captionRightX = Math.max(captionRightX, maxSpilledCaptionRightX(inc.nestedSwimlanes));
@@ -622,10 +622,7 @@ function extendTimeline(fx: FinalizeContext): boolean {
         if (columns.isPast(captionRightX, axisDays)) {
             paddedDays = Math.max(
                 paddedDays,
-                Math.min(
-                    columns.boundaryAtOrAfterX(captionRightX),
-                    columns.captionLimit(axisDays),
-                ),
+                Math.min(columns.boundaryAtOrAfterX(captionRightX), columns.captionLimit(axisDays)),
             );
         }
     }

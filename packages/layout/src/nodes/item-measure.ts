@@ -500,12 +500,12 @@ interface CaptionCapInput {
 /**
  * Cap a spilled caption at the chart's end (specs/scheduler-unification.md
  * §8 decision 12). When the spill column (`layoutSpillCluster`: icon,
- * caption, footnotes, dot) would end past `AxisColumns.captionCapX`, one
- * column past the axis end, every title line wider than the room left is
- * truncated with `…` so the column ends there; finalize f2 grows the axis
- * by that column. The meta line is never truncated. A caption in the
- * middle of the chart, or one that ends inside the extra column, keeps its
- * lines.
+ * caption, footnotes, dot) would end past `AxisColumns.captionCapX`, the
+ * overhang budget past the axis end, every title line wider than the room
+ * left is truncated with `…` so the column ends there; finalize f2 grows the
+ * axis by the columns it reaches. The meta line is never truncated. A
+ * caption in the middle of the chart, or one that ends inside the budget,
+ * keeps its lines.
  */
 function capCaptionAtAxisEnd(
     lines: string[],
@@ -652,8 +652,8 @@ export function measureItem(
     // single line to the right). A title with explicit `\n` breaks keeps the
     // author's lines whether it stays in-bar or spills.
     // A spilled caption that would run past the axis end is truncated to
-    // end within one column past it (specs/rendering.md § "Caption cap at
-    // the chart's end").
+    // end within the overhang budget past it (specs/rendering.md § "Caption
+    // cap at the chart's end").
     const capped = capCaptionAtAxisEnd(
         resolveCaptionTitleLines(title, captionFit.fit, iconSpills),
         {

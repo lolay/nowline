@@ -559,13 +559,13 @@ swimlane api
             ['ios-push', 'member'],
         ]);
         // The content ends at W6; pf-scale's caption spills past it, so the
-        // axis gains one column (rendering.md § "Caption cap at the chart's
-        // end"): W7, 35 working days, Mon Feb 23.
+        // axis gains the two columns that hold it (rendering.md § "Caption
+        // cap at the chart's end"): W8, 40 working days, Mon Mar 2.
         const { timeline } = laid.model;
         expect(laid.calendar.workingIndexOf(timeline.startDate, timeline.endDate)).toBe(
-            7 * laid.perWeek,
+            8 * laid.perWeek,
         );
-        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-23');
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-03-02');
         expectBarriers(laid);
     });
 

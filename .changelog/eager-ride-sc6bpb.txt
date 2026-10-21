@@ -1,0 +1,3 @@
+```release-note:changed
+A caption that spills past the end of the chart now gets up to 160 px (about 20 characters), or one column when a column is wider, before it is cut with `…`, and the axis grows by the whole columns it needs. At week scale a short title like `Search v2` or `Deploy` now shows in full instead of `Sea…` or `Depl…`.
+```

@@ -1,12 +1,13 @@
 // Axis columns — the date axis as a run of tick columns, read off the
 // natural scale (specs/rendering.md § "Caption cap at the chart's end",
 // specs/scheduler-unification.md §8 decision 12). A spilled caption that
-// would run past the axis end is capped one full column past it (past the
-// end of a partial last column, when an explicit `length:` ends the axis
+// would run past the axis end may run on for whole columns while it stays
+// within max(one column, CAPTION_OVERHANG_BUDGET_PX) of the axis end (of a
+// partial last column's end, when an explicit `length:` ends the axis
 // mid-column): the item measure truncates the title to `captionCapX`, and
-// finalize step f2 (`extendTimeline`) grows the axis by that one column,
-// labelled by the axis's usual rules. Both read the same columns, so the
-// cap and the extension agree.
+// finalize step f2 (`extendTimeline`) grows the axis by the columns that
+// hold it, labelled by the axis's usual rules. Both read `captionLimit`,
+// so the cap and the extension agree.
 
 import type { TimeScale } from './time-scale.js';
 import { type ScaleUnit, tickBoundaryAtOrAfter } from './view-preset.js';
@@ -126,7 +127,7 @@ export class AxisColumns {
 
     /**
      * Where a spilled caption beside a bar ending at `barRightX` may end at
-     * most: one full column past the axis end (`captionColumn`). The axis
+     * most: the column boundary `captionLimit` gives past the axis end. The axis
      * end is the natural one, or the boundary f2 grows it to for this bar
      * when the bar itself runs past it.
      */

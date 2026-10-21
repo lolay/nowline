@@ -1,9 +1,11 @@
 // The caption cap at the chart's end (specs/rendering.md § "Caption cap at
 // the chart's end", specs/scheduler-unification.md §8 decision 12). A spilled
-// caption that would run past the axis end is truncated with `…` to end
-// within one column past it, the axis grows by exactly that column (labelled
-// by the axis's usual rules), and the item keeps its full title for the
-// renderer's tooltip. A caption in the middle of the chart is unchanged.
+// caption past the axis end may run on for whole columns while the overhang
+// stays within max(one column, CAPTION_OVERHANG_BUDGET_PX); the axis grows by
+// the fewest of those columns that hold it (labelled by the axis's usual
+// rules). Past that it is truncated with `…`, and the item keeps its full
+// title for the renderer's tooltip. A caption in the middle of the chart is
+// unchanged.
 
 import { describe, expect, it } from 'vitest';
 import { layoutRoadmap, type PositionedItem, type PositionedRoadmap } from '../src/index.js';
@@ -50,7 +52,7 @@ const ticksOf = (model: PositionedRoadmap): Array<[number, string | undefined]> 
     ]);
 
 describe('a caption past the axis end (F7)', () => {
-    it('is truncated with … to end within one column past the axis end', async () => {
+    it('is truncated with … to end within the overhang budget past the axis end', async () => {
         const model = await lay(source(LONG));
         const z = item(model, 'z');
         expect(z.textSpills).toBe(true);
@@ -60,13 +62,14 @@ describe('a caption past the axis end (F7)', () => {
         const [line] = z.titleLines ?? [];
         expect(line.endsWith('…')).toBe(true);
         expect(LONG.startsWith(line.slice(0, -1))).toBe(true);
-        // The axis ended at 160 (Feb 2); one 40 px column past it is 200.
+        // The axis ended at 160 (Feb 2); four 40 px columns (the 160 px
+        // budget) past it is 320.
         const { originX } = model.timeline;
-        expect(z.decorationsRightX - originX).toBeLessThanOrEqual(200);
-        expect(z.decorationsRightX - originX).toBeGreaterThan(160);
+        expect(z.decorationsRightX - originX).toBeLessThanOrEqual(320);
+        expect(z.decorationsRightX - originX).toBeGreaterThan(280);
     });
 
-    it('grows the axis by exactly one labelled column', async () => {
+    it("grows the axis by the budget's whole columns, labelled", async () => {
         const model = await lay(source(LONG));
         expect(ticksOf(model)).toEqual([
             [0, 'Jan 05'],
@@ -74,10 +77,25 @@ describe('a caption past the axis end (F7)', () => {
             [80, 'Jan 19'],
             [120, 'Jan 26'],
             [160, 'Feb 02'],
-            [200, undefined],
+            [200, 'Feb 09'],
+            [240, 'Feb 16'],
+            [280, 'Feb 23'],
+            [320, undefined],
         ]);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
-        expect(model.timeline.box.width).toBe(200);
+        expect(iso(model.timeline.endDate)).toBe('2026-03-02');
+        expect(model.timeline.box.width).toBe(320);
+    });
+
+    it('keeps a caption that fits in two columns whole, and grows the axis two columns', async () => {
+        // "Search v2" from examples/capacity: about 68 px, past the one 40 px
+        // column the old cap allowed, inside the 160 px budget.
+        const model = await lay(source('Search v2'));
+        const z = item(model, 'z');
+        expect(z.textSpills).toBe(true);
+        expect(z.titleTruncated).toBeUndefined();
+        expect(z.titleLines).toBeUndefined();
+        expect(iso(model.timeline.endDate)).toBe('2026-02-16');
+        expect(model.timeline.box.width).toBe(240);
     });
 
     it('a short caption that ends inside the extra column keeps its title; the axis still grows one column', async () => {
@@ -108,24 +126,24 @@ describe('a caption past the axis end (F7)', () => {
         expect(iso(model.timeline.endDate)).toBe('2026-05-25');
     });
 
-    it('under an explicit length: the caption reaches past, f2 grows the axis one column', async () => {
+    it('under an explicit length: the caption reaches past, f2 grows the axis by the budget', async () => {
         const model = await lay(source(LONG, { roadmap: 'length:4w' }));
         expect(item(model, 'z').titleTruncated).toBe(true);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-09');
-        expect(ticksOf(model).at(-2)).toEqual([160, 'Feb 02']);
+        expect(iso(model.timeline.endDate)).toBe('2026-03-02');
+        expect(ticksOf(model).at(-2)).toEqual([280, 'Feb 23']);
     });
 
-    it('under a length: that ends mid-column, adds one full labelled column past the partial one', async () => {
+    it('under a length: that ends mid-column, counts the budget from the end of the partial column', async () => {
         // `length:30d` draws the axis to Wed Feb 4 (171.43 px), inside the
-        // Feb 02 column. The caption may run on to the end of the full
-        // column after it: Mon Feb 16, 240 px.
+        // Feb 02 column. The budget starts at that column's end (Feb 09,
+        // 200 px): four more columns, to Mon Mar 9, 360 px.
         const model = await lay(source(LONG, { roadmap: 'length:30d' }));
         const z = item(model, 'z');
         expect(z.titleTruncated).toBe(true);
         const { originX } = model.timeline;
-        expect(z.decorationsRightX - originX).toBeLessThanOrEqual(240);
-        expect(z.decorationsRightX - originX).toBeGreaterThan(200);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-16');
+        expect(z.decorationsRightX - originX).toBeLessThanOrEqual(360);
+        expect(z.decorationsRightX - originX).toBeGreaterThan(320);
+        expect(iso(model.timeline.endDate)).toBe('2026-03-09');
         expect(ticksOf(model)).toEqual([
             [0, 'Jan 05'],
             [40, 'Jan 12'],
@@ -133,7 +151,10 @@ describe('a caption past the axis end (F7)', () => {
             [120, 'Jan 26'],
             [160, 'Feb 02'],
             [200, 'Feb 09'],
-            [240, undefined],
+            [240, 'Feb 16'],
+            [280, 'Feb 23'],
+            [320, 'Mar 02'],
+            [360, undefined],
         ]);
     });
 
@@ -172,8 +193,9 @@ swimlane a "A"
 
     const EVERY_3 = 'config\n\nscale\n  label-every: 3\n\n';
 
-    it('under the default thinning, an added column the thinning labels is labelled', async () => {
-        // The added column is the fifth (Feb 02): every fourth from Jan 05.
+    it('under the default thinning, added columns the thinning labels are labelled', async () => {
+        // The added columns are the fifth to eighth (Feb 02 to Feb 23); the
+        // thinning labels every fourth from Jan 05, so Feb 02 only.
         const model = await lay(thinned(3));
         expect(item(model, 'z').titleTruncated).toBe(true);
         expect(majorsOf(model)).toEqual([
@@ -183,14 +205,18 @@ swimlane a "A"
             [120, false, undefined],
             [160, true, 'Feb 02'],
             [200, false, undefined],
+            [240, false, undefined],
+            [280, false, undefined],
+            [320, true, undefined],
         ]);
     });
 
-    it('under the default thinning, an added column the thinning skips has no label and no grid line', async () => {
-        // The added column is the sixth (Feb 09), between Feb 02 and Mar 02.
+    it('under the default thinning, added columns the thinning skips have no label and no grid line', async () => {
+        // The added columns are the sixth to ninth (Feb 09 to Mar 02): only
+        // Mar 02 is on the thinning's stride.
         const model = await lay(thinned(4));
         expect(item(model, 'z').titleTruncated).toBe(true);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-16');
+        expect(iso(model.timeline.endDate)).toBe('2026-03-09');
         expect(majorsOf(model)).toEqual([
             [0, true, 'Jan 05'],
             [40, false, undefined],
@@ -199,11 +225,15 @@ swimlane a "A"
             [160, true, 'Feb 02'],
             [200, false, undefined],
             [240, false, undefined],
+            [280, false, undefined],
+            [320, true, 'Mar 02'],
+            [360, false, undefined],
         ]);
     });
 
-    it('under label-every: 3, an added column the stride labels is labelled', async () => {
-        // The added column is the seventh (Feb 16): Jan 05, Jan 26, Feb 16.
+    it('under label-every: 3, added columns the stride labels are labelled', async () => {
+        // The added columns are the seventh to tenth (Feb 16 to Mar 09):
+        // Jan 05, Jan 26, Feb 16, Mar 09.
         const model = await lay(thinned(5, EVERY_3));
         expect(item(model, 'z').titleTruncated).toBe(true);
         expect(majorsOf(model)).toEqual([
@@ -215,15 +245,18 @@ swimlane a "A"
             [200, false, undefined],
             [240, true, 'Feb 16'],
             [280, false, undefined],
+            [320, false, undefined],
+            [360, true, 'Mar 09'],
+            [400, false, undefined],
         ]);
     });
 
-    it('under label-every: 3, an added column the stride skips has no label and no grid line', async () => {
-        // The added column is the sixth (Feb 09): unlabelled, like any
-        // column between two labels three apart.
+    it('under label-every: 3, added columns the stride skips have no label and no grid line', async () => {
+        // The added columns are the sixth to ninth (Feb 09 to Mar 02):
+        // unlabelled, like any column between two labels three apart.
         const model = await lay(thinned(4, EVERY_3));
         expect(item(model, 'z').titleTruncated).toBe(true);
-        expect(iso(model.timeline.endDate)).toBe('2026-02-16');
+        expect(iso(model.timeline.endDate)).toBe('2026-03-09');
         expect(majorsOf(model)).toEqual([
             [0, true, 'Jan 05'],
             [40, false, undefined],
@@ -231,7 +264,10 @@ swimlane a "A"
             [120, true, 'Jan 26'],
             [160, false, undefined],
             [200, false, undefined],
-            [240, true, undefined],
+            [240, true, 'Feb 16'],
+            [280, false, undefined],
+            [320, false, undefined],
+            [360, true, undefined],
         ]);
     });
 
@@ -273,10 +309,12 @@ swimlane a "A"
     });
 
     it('under hide, a narrow added column drops its label like any narrow column', async () => {
-        // A business week is 40 px under hide. The added column is the week
-        // of Feb 2, where only Fri Feb 6 works: 8 px, too narrow for its
+        // A business week is 40 px under hide. The first added column is the
+        // week of Feb 2, where only Fri Feb 6 works: 8 px, too narrow for its
         // label, so the narrow-column rule drops it. Its tick stays major
-        // and the Jan 26 label before it stays.
+        // and the Jan 26 label before it stays. The budget then takes three
+        // full weeks (8 + 3 x 40 = 128 px; a fourth would pass 160), each
+        // labelled.
         const model = await lay(
             `nowline v1
 
@@ -297,7 +335,10 @@ swimlane a "A"
             [80, true, 'Jan 19'],
             [120, true, 'Jan 26'],
             [160, true, undefined],
-            [168, true, undefined],
+            [168, true, 'Feb 09'],
+            [208, true, 'Feb 16'],
+            [248, true, 'Feb 23'],
+            [288, true, undefined],
         ]);
     });
 });

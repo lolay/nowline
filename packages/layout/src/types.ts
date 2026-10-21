@@ -398,7 +398,7 @@ export interface PositionedItem {
     titleLines?: string[];
     /**
      * True when a spilled caption that would run past the axis end was
-     * capped one column past it: `titleLines` carries the lines truncated
+     * capped at the overhang budget past it: `titleLines` carries the lines truncated
      * with `…`, and the renderer gives the bar the full `title` as its
      * `<title>` tooltip (specs/rendering.md § "Caption cap at the chart's
      * end"). Omitted otherwise.
