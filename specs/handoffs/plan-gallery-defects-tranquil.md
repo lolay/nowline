@@ -226,3 +226,4 @@ In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if
 - In another harness (Cursor's grok-4-7 is $2.00 / $0.50 / $6.00), or on a model not listed here, count and price per plan-execution.md "Token accounting" and "Model price table" instead.
 
 tokens kickoff plan-gallery-defects-tranquil (claude-opus-5-5): input ~140 / cache read ~11M / cache write ~220k 1h / output ~40k | ~$4.8 API-equiv
+tokens wave-1 s2-s3-s5 (claude-opus-5-5): input ~450 / cache read ~63M / cache write ~360k 5m + ~910k 1h / output ~120k | ~$24 API-equiv
