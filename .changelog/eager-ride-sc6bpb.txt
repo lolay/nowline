@@ -5,3 +5,7 @@ A caption that spills past the end of the chart now gets up to 160 px (about 20 
 ```release-note:changed
 A dated milestone whose predecessor finishes after its date now slips instead of pointing back in time: the diamond on the date turns red, a red dotted line runs along its marker row to a second diamond where it actually lands, and its label and cut line move there. The red arrow from the late predecessor back to the date is gone.
 ```
+
+```release-note:changed
+Every isolated region (`roadmap:isolate`) in a chart now ends at the same right edge, just past the diagram's furthest content (bars, spilled captions, anchors, milestones and the now-line) instead of hugging its own bars. Captions near a region's right side stay inside its dashed border.
+```

@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 0/2 groups done | last review: — | current: s2 s3 s5 [deep] (s2, s3 done; s5 prototype) | BLOCKED at gate s5 before/after sign-off (prototype committed; tests, spec, snapshots pending) | updated 2026-10-21
+  Status: 1/2 groups done | last review: — | current: s1 s4 s6 s7 s8 [exec] (wave 1 awaiting review) | updated 2026-10-21
 
   review: every-wave
 
@@ -84,8 +84,8 @@ Waves (per Gary): the deep steps run first as wave 1, then the exec steps as wav
 - The slipped x drives f2 axis extension and the milestone's entity edge for downstream `after:`.
 - Spec: rendering.md:368, :371; layout-phases.md:693-700; update the header comments in tests/milestone-overrun.nowline and tests/marker-predecessor-arrows.nowline. Tests: `chart-local-frame.test.ts`, `render.test.ts` "dated milestone overrun", `milestone-time-end.test.ts`, `marker-arrows.test.ts`, and `waves.test.ts` overrun case are rewritten to the slip shape.
 
-### s5 - [deep] Region boxes reach the diagram's content, plus padding
-Revised twice in review. The region box's right edge is no longer the axis end. It is the furthest content anywhere in the diagram, host and every region: bars, spilled captions, anchors and milestones with their labels (a slipped milestone at its landing), and the now-line. A 24px box pad puts the dashed edge 16px past that point. f3 grows the canvas to hold it. The code is `diagramContentRightX` in `phases/finalize.ts`, and `includeRegionWidth` now takes `contentRightX`. Prototype commits: 4e252f3, 05076ba, and the current one. Pending: tests (`layout.test.ts:609-642`, `:675-724`, `placement-canvas.test.ts:188-234`, `render.test.ts:1612-1660`), spec (rendering.md:68, :647-652; layout-phases.md §3.5), changelog, snapshots (isolate-include, waves-isolate), determinism, and coverage register. Gate: Gary is QC-ing the region renders (isolate-include, nested, isolate-include-multi, waves-isolate, marker-predecessor-arrows).
+### s5 - [deep] Region boxes reach the diagram's content, plus padding (done)
+Revised twice in review. The region box's right edge is no longer the axis end. It is the furthest content anywhere in the diagram, host and every region: bars, spilled captions, anchors and milestones with their labels (a slipped milestone at its landing), and the now-line. A 24px box pad puts the dashed edge 16px past that point. f3 grows the canvas to hold it. The code is `diagramContentRightX` in `phases/finalize.ts`, and `includeRegionWidth` now takes `contentRightX`. Prototype commits: 4e252f3, 05076ba, and the current one. Pending: tests (`layout.test.ts:609-642`, `:675-724`, `placement-canvas.test.ts:188-234`, `render.test.ts:1612-1660`), spec (rendering.md:68, :647-652; layout-phases.md §3.5), changelog, snapshots (isolate-include, waves-isolate), determinism, and coverage register. Signed off by Gary 2026-10-21.
 
 ```text
 --- REVIEW: wave-1 [deep] ---

@@ -106,7 +106,7 @@
             "icu": false
         },
         "isolate-include:html": {
-            "node": "13e064da1e0aeda90e76594c0fd53bc60175c4ff3ed3abbde0330e469073819e",
+            "node": "3fab9fc98c533e52ddec118116cb7d7f9d4844d1b4aed8186a34b838377dbe09",
             "icu": true
         },
         "isolate-include:json": {
@@ -122,16 +122,16 @@
             "icu": false
         },
         "isolate-include:pdf": {
-            "node": "d55117b3895b6680cc112be85d28779c365031a676f7a294cdb849f5ef766c0d",
+            "node": "64600917124691285ec4a45939745e9bc9fd6ef41c437e5dde7f63ee68dfc83f",
             "icu": true,
-            "cli": "ca74959aa59cacafacd175c96f6b6bb7ce1d77e368ebaf1178ff7044577b4b7f"
+            "cli": "ff2a7819db7ebef1de66cf7e762356b80006d1a61eb4066ec996295ac7046e45"
         },
         "isolate-include:png": {
-            "node": "8dea0f8d0ff038d023cbaa3aee7bf60499a4481cf0af8621ae08af67fb7ad8f8",
+            "node": "8f24749e48f8ddeb36bc72ff307897ea5c858fbb97b4259b36ca46349d6f741e",
             "icu": true
         },
         "isolate-include:svg": {
-            "node": "5e1fdc357aa3e91b3ae5ea4740655d87d4f68109b48eb8a5a0eaf3d93e64e571",
+            "node": "592c233d72e43ee430243e770159b97ab0ebab500cc3a8a5b2dab5e6a4b14c0f",
             "icu": true
         },
         "isolate-include:xlsx": {

@@ -77,11 +77,20 @@
             ]
         },
         "growCanvasForMarkerLabels": {
-            "count": 2,
-            "samples": ["tests/marker-left-overflow.nowline", "tests/milestone-overrun.nowline"]
+            "count": 8,
+            "samples": [
+                "examples/isolate-include.nowline",
+                "examples/nested.nowline",
+                "tests/grammar-properties.nowline",
+                "tests/isolate-include-multi.nowline",
+                "tests/marker-left-overflow.nowline",
+                "tests/marker-predecessor-arrows.nowline",
+                "tests/milestone-overrun.nowline",
+                "tests/waves-isolate.nowline"
+            ]
         },
         "fitWidths": {
-            "count": 37,
+            "count": 39,
             "samples": [
                 "examples/capacity.nowline",
                 "examples/dependencies.nowline",
@@ -99,6 +108,7 @@
                 "examples/sizing.nowline",
                 "examples/waves-program.nowline",
                 "examples/waves.nowline",
+                "tests/grammar-properties.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
                 "tests/inline-date-corners.nowline",
@@ -118,14 +128,17 @@
                 "tests/text-wraps-inside-bars.nowline",
                 "tests/waves-gap-deadline.nowline",
                 "tests/waves-isolate-team.nowline",
+                "tests/waves-isolate.nowline",
                 "tests/waves-parallel-group.nowline",
                 "tests/working-exceptions.nowline"
             ]
         },
         "packMarkers": {
-            "count": 10,
+            "count": 12,
             "samples": [
                 "examples/dependencies.nowline",
+                "examples/nested.nowline",
+                "tests/grammar-properties.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
                 "tests/late-row-shifts.nowline",

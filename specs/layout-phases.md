@@ -283,8 +283,8 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 |---|---|---|---|
 | f1 `growCanvasForSpill` | P3 | `chart.maxRightX` | canvas |
 | f2 `extendTimeline` | P7 | leaf bars of lanes and regions, the markers and milestones of the chart and of each isolated region, spilled captions past the axis end (one column at most; [`rendering.md`](./rendering.md#caption-cap)), window | scale, timeline, canvas |
-| f3 `growCanvasForMarkerLabels` | P8 | every marker entry, final runs and exceptions, each isolated region's own markers | canvas, then freezes it |
-| f4 `fitWidths` | P9, N2, N4 | canvas (final) | lane and region widths |
+| f3 `growCanvasForMarkerLabels` | P8 | every marker entry, final runs and exceptions, each isolated region's own markers, each region box against the diagram's content (`diagramContentRightX`), the final scale (the now-line) | canvas, then freezes it |
+| f4 `fitWidths` | P9, N2, N4 | canvas (final), marker entries, scale | lane and region widths (a region to the diagram's content plus its pad) |
 | f5 `packMarkers` | P10 | canvas (final), marker entries, scale (final), header bands | marker band |
 | f6 `placeMarkers` | P11, N7 | marker band | milestone rows and labels, runs, exceptions, marker midpoints |
 | f7 `growHeaderRows` | P12 | marker band, header bands, scale (final) | chart top, rows bottom, lane bottom, chart bottom, timeline height; translates the chart (lane and region y, milestone cuts and slack arrows) from its local top 0 to the final top |
