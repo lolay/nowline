@@ -21,3 +21,7 @@ A two-word title whose first word misses the bar's first line by a hair now wrap
 ```release-note:added
 A wave that declares a date floor (`wave launch "Launch" after:2026-11-02`) now shows the calendar glyph at the left of its strip cell, whether or not the floor opened a gap. Hovering it gives the date. A floor that names an anchor or milestone shows no glyph.
 ```
+
+```release-note:changed
+The wave legend (`Waves: ...`) now lists only the waves the strip does not name in full: an empty wave, a wave whose label was shortened, or one whose footnote marks moved to the legend. A roadmap with seven waves and one empty one reads `Waves: #4 Beta (TBD) (no items)` instead of repeating all seven names. Each wave keeps its own `#k`.
+```

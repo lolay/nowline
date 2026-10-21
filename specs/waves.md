@@ -1044,7 +1044,7 @@ PNG and PDF have no tooltips, so the legend is the fallback for anything the pic
 
 1. A hatch swatch with `Background work (not in a wave)`, when background items exist.
 2. A boundary swatch with `Wave boundary`.
-3. Wave names whenever any label is abbreviated or any wave is empty, for example `Waves: #1 Discover · #2 Build ¹ · #3 Hardening (TBD) (no items) · #4 Launch`.
+3. Wave names whenever any label is abbreviated, any wave is empty or any footnote indicator was dropped. Only the waves the strip does not name in full are listed: an empty wave, a wave whose label is not its title (id, ellipsis or `#k`, or no label), and a wave whose footnote indicators moved here. A wave the strip spells out in full is left out. Each listed wave keeps its own `#k` (its 1-based declaration position), so the legend still reads against the bands, for example `Waves: #2 Build ¹ · #3 Hardening (TBD) (no items)` when wave 1 shows `Discover` and wave 4 shows `Launch` in full.
 
 ### 9.6 Distinctness
 
@@ -1713,7 +1713,7 @@ Waves: w1 [W0, W2]; w2 [W2, W2], empty; w3 [W2, W4].
 
 - **The W2 boundary** is drawn once, and the hollow w2 diamond sits on it in the strip.
 - **Strip alternation** follows the visible ordinal, so w1 uses `stripFill` and w3 uses `stripFillAlt`.
-- **Legend.** It reads `Wave boundary` · `Waves: #1 Wave 1 · #2 Hardening (TBD) (no items) · #3 Wave 3`.
+- **Legend.** It reads `Wave boundary` · `Waves: #2 Hardening (TBD) (no items)`: waves 1 and 3 are named in full in the strip, so only the empty wave is listed.
 
 Diagnostic (layout insight): `NL.I1006 Wave "w2" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.`
 

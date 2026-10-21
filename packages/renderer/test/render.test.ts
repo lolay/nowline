@@ -1594,8 +1594,9 @@ swimlane a
         );
 
         const fit = waveLayer(await renderSvg(await parseToModel(WAVE_FIT_SRC)), 'wave-legend');
-        // The wave-name list wraps between waves, one <text> per run.
-        expect(fit).toContain('>Waves: #1 Discovery · #2 Implementation and build-out</text>');
+        // The wave-name list wraps between waves, one <text> per run. #1 is named
+        // in full in the strip, so it is not listed; the rest keep their own #k.
+        expect(fit).toContain('>Waves: #2 Implementation and build-out</text>');
         expect(fit).toContain(
             '>#3 Hardening and stabilisation · #4 Rollout everywhere · #5 Launch day</text>',
         );

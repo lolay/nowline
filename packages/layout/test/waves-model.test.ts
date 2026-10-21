@@ -252,11 +252,10 @@ swimlane a
             ['ordinal', '#4'],
             ['none', undefined],
         ]);
-        // Abbreviated labels bring in the legend's wave list.
+        // Abbreviated labels bring in the legend's wave list, which names only
+        // the waves the strip doesn't spell out: #1 is shown in full, so it is not listed.
         const list = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        expect(list?.text).toBe(
-            'Waves: #1 Discovery and research · #2 Build the platform · #3 Hardening · #4 Ship · #5 Tail',
-        );
+        expect(list?.text).toBe('Waves: #2 Build the platform · #3 Hardening · #4 Ship · #5 Tail');
     });
 
     it('Example 9: the tooltip names the dates (end exclusive) and the holder', async () => {
@@ -699,13 +698,11 @@ describe('wave legend (§9.5)', () => {
         expect(boundary.swatch?.x).toBeGreaterThan(bg.runs[0].x);
     });
 
-    it('Example 12: an empty wave lists every wave', async () => {
+    it('Example 12: an empty wave is listed alone, keeping its own #k', async () => {
         const model = await lay(EXAMPLE_12);
         const entries = model.waveLegend?.entries ?? [];
         expect(entries.map((e) => e.kind)).toEqual(['boundary', 'waves']);
-        expect(entries[1].text).toBe(
-            'Waves: #1 Wave 1 · #2 Hardening (TBD) (no items) · #3 Wave 3',
-        );
+        expect(entries[1].text).toBe('Waves: #2 Hardening (TBD) (no items)');
         expect('swatch' in entries[1]).toBe(false);
         expect(entries[1].runs.map((r) => r.text).join(' · ')).toBe(entries[1].text);
     });
@@ -781,7 +778,8 @@ footnote b-vendor "Vendor" on:[w1, a1]
         expect(w1.strip.footnotesShown).toBe(false);
         expect(w1.strip.labelKind).toBe('none');
         const list = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        expect(list?.text).toBe('Waves: #1 Discover ² · #2 Build');
+        // #2 Build is named in full, so only the wave whose footnote moved is listed.
+        expect(list?.text).toBe('Waves: #1 Discover ²');
     });
 });
 

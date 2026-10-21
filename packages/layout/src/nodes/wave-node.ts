@@ -669,7 +669,16 @@ export function buildWaveLegend(
     if (built.boundaries.length > 0) swatchEntry('boundary', strings.waveLegendBoundary);
 
     if (abbreviated || anyEmpty || dropped) {
-        const names = waves.map((w) => {
+        // Only the waves the strip doesn't name in full: an empty one, an
+        // abbreviated label, or footnotes it dropped. The `#k` numbering stays
+        // the wave's own, so the legend still reads against the bands.
+        const unnamed = waves.filter(
+            (w) =>
+                w.empty ||
+                w.strip.labelKind !== 'title' ||
+                (w.footnoteIndicators.length > 0 && !w.strip.footnotesShown),
+        );
+        const names = unnamed.map((w) => {
             let name = `#${w.index + 1} ${w.title}`;
             if (w.footnoteIndicators.length > 0 && !w.strip.footnotesShown) {
                 name += ` ${w.footnoteIndicators.map(superscript).join(',')}`;
