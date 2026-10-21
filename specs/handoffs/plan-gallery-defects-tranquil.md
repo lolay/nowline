@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s6 s7 s8 s9 [exec] (s1, s4 done; waiting on s6/s7/s8 before/after sign-off) | updated 2026-10-21
+  Status: 2/2 groups built, review pending | last review: wave-1 PASS 2026-10-21 | current: wave-2 review [deep] | updated 2026-10-21
 
   review: every-wave
 
@@ -142,7 +142,7 @@ Revised twice in review. The region box's right edge is no longer the axis end. 
         headings you finished, update the Kickoff Status line, and flip the
         matching todos. Append one line per model this chat ran to the
         plan's "## Token log", counted and priced per its counting header:
-          tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~150 / cache read ~11M / cache write ~160k 1h / output ~37k | ~$2.2 API-equiv (partial: through s6/s7/s8 before/afters, chat still open)
+          tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~250 / cache read ~25M / cache write ~220k 1h / output ~61k | ~$4 API-equiv
     Then stop at the next REVIEW marker and report what you changed and
     any deviations from the plan.
 
@@ -159,18 +159,18 @@ Add both to `EXAMPLES` in `scripts/lib/render-manifest.mjs` (continuation after 
 - `row-packer.ts`: `PackedRow.contentOffsetY`, set in `commitBlock` to `headerHeight + CONTAINER_BODY_PAD_PX` for blocks. `placeItem` adds it when the item fits on that row. Same for groups (`group-node.ts`).
 - Spec: rendering.md:599-614 (a new "Join" y rule) and true-width-layout.md §3.2. Expected moves: utilization-states, dependencies, platform-2026 ×3, and any wave sample whose group has a header.
 
-### s6 - [exec] First title line may use the dot's 4px clearance gap
+### s6 - [exec] First title line may use the dot's 4px clearance gap (done)
 In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if it fits the hard limit `barWidth − leftInset − 17` (the dot's own left edge, no `ITEM_DECORATION_SPILL_GAP_PX`), not only the soft 45px. This only turns near-miss spills into wraps; captions that already fit don't move. "Launch" ends 3.76px clear of the dot. Spec rendering.md:258-262, :278. Moves: waves (+dark/grayscale) `Launch page`, possibly others.
 
-### s7 - [exec] Calendar glyph on a wave with a date `after:`
+### s7 - [exec] Calendar glyph on a wave with a date `after:` (done)
 - `wave-node.ts`: when `pickInlineDate([floor.ref])` (`inline-date-pin-geometry.ts`) yields a date from the wave's declared floor, whether or not it created a gap, set `strip.inlineDatePin: InlineDatePin` at the cell's left (`cell.x + INLINE_DATE_GLYPH_INSET_LEFT_PX`, vertically centred in the 20px strip). Reserve its width through `fitStripLabel`'s `extraWidth` and shift `labelDraw.x`.
 - Renderer `renderWaveLabels` (`svg/waves.ts:332`) calls the exported `renderInlineDatePins([pin], w.style.text)` after the cell fill. The italic gap label stays, because it dates the gap.
 - Spec: waves.md §9.1–9.2, rendering.md:331-333 (entity list gains waves). Moves: waves-coarse, waves-gap-deadline.
 
-### s8 - [exec] Wave legend lists only waves the band doesn't name in full
+### s8 - [exec] Wave legend lists only waves the band doesn't name in full (done)
 `buildWaveLegend` (`wave-node.ts:620`): keep the trigger, but filter the list to waves that are empty, abbreviated (`labelKind !== 'title'`), or have dropped footnotes. Keep the `#k` numbering. waves-coarse reads `Waves: #4 Beta (TBD) (no items)`. Spec: waves.md §9.5 (:1046, :1715), rendering.md:665. Tests: `waves-model.test.ts` :258, :664, :741.
 
-### s9 - [exec] Region marker canvas check honours a slip (non-visual)
+### s9 - [exec] Region marker canvas check honours a slip (non-visual) (done)
 Follow-up from the wave-1 review. `positionedEntry` (`packages/layout/src/nodes/region-markers.ts`) moves a slipped milestone's entry to `slip.x` but omits `slipFromX: m.center.x`, so `regionMarkerCanvasRightX` (f3) treats its label as able to fall back left while `regionMarkerEntries` (the pack) forces it right. Set `slipFromX` there, as `regionMarkerEntries` and f3's host entries already do. No render moves today (s5's region width counts the real label box), so add a Vitest case that fails without it: a region with a dated milestone slipped near the right inset whose label would fit on the left, asserting `regionMarkerCanvasRightX` grows past `chartRightX`. No changelog fragment (no observable change); no snapshot or determinism bump.
 
 ```text
@@ -240,4 +240,4 @@ tokens kickoff plan-gallery-defects-tranquil (claude-opus-5-5): input ~140 / cac
 tokens wave-1 s2-s3-s5 (claude-opus-5-5): input ~450 / cache read ~63M / cache write ~360k 5m + ~910k 1h / output ~120k | ~$24 API-equiv
 tokens review-wave-1 s2-s3-s5 (claude-opus-5-5): input ~34 / cache read ~2.1M / cache write ~110k 1h / output ~9.9k | ~$1.5 API-equiv
 tokens review-wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~10 / cache read ~450k / cache write ~54k 1h / output ~1.7k | ~$0.28 API-equiv
-tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~150 / cache read ~11M / cache write ~160k 1h / output ~37k | ~$2.2 API-equiv (partial: through s6/s7/s8 before/afters, chat still open)
+tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~250 / cache read ~25M / cache write ~220k 1h / output ~61k | ~$4 API-equiv
