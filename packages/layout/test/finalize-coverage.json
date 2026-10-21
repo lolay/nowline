@@ -8,9 +8,8 @@
     ],
     "steps": {
         "growCanvasForSpill": {
-            "count": 27,
+            "count": 21,
             "samples": [
-                "examples/capacity.nowline",
                 "examples/dependencies.nowline",
                 "examples/inline-date-pins.nowline",
                 "examples/isolate-include.nowline",
@@ -19,17 +18,12 @@
                 "examples/nested/ios.nowline",
                 "examples/nested/platform.nowline",
                 "examples/nested/web.nowline",
-                "examples/partner.nowline",
                 "examples/showcase.nowline",
-                "examples/sizing.nowline",
-                "examples/waves-program.nowline",
-                "examples/waves.nowline",
                 "tests/inline-date-corners.nowline",
                 "tests/isolate-include-multi.nowline",
                 "tests/item-bumps-up.nowline",
                 "tests/large-roadmap-title.nowline",
                 "tests/large-swimlane-title.nowline",
-                "tests/marker-predecessor-partner.nowline",
                 "tests/non-working-hide.nowline",
                 "tests/partner-multi.nowline",
                 "tests/text-spills-right.nowline",
@@ -40,9 +34,8 @@
             ]
         },
         "extendTimeline": {
-            "count": 32,
+            "count": 28,
             "samples": [
-                "examples/capacity.nowline",
                 "examples/dependencies.nowline",
                 "examples/inline-date-pins.nowline",
                 "examples/isolate-include.nowline",
@@ -52,11 +45,8 @@
                 "examples/nested/ios.nowline",
                 "examples/nested/platform.nowline",
                 "examples/nested/web.nowline",
-                "examples/partner.nowline",
                 "examples/platform-2026.nowline",
                 "examples/showcase.nowline",
-                "examples/sizing.nowline",
-                "examples/waves-program.nowline",
                 "examples/waves.nowline",
                 "tests/header-height-none.nowline",
                 "tests/header-height-xl.nowline",
@@ -90,9 +80,8 @@
             ]
         },
         "fitWidths": {
-            "count": 39,
+            "count": 35,
             "samples": [
-                "examples/capacity.nowline",
                 "examples/dependencies.nowline",
                 "examples/inline-date-pins.nowline",
                 "examples/isolate-include.nowline",
@@ -102,11 +91,8 @@
                 "examples/nested/ios.nowline",
                 "examples/nested/platform.nowline",
                 "examples/nested/web.nowline",
-                "examples/partner.nowline",
                 "examples/platform-2026.nowline",
                 "examples/showcase.nowline",
-                "examples/sizing.nowline",
-                "examples/waves-program.nowline",
                 "examples/waves.nowline",
                 "tests/grammar-properties.nowline",
                 "tests/header-height-none.nowline",

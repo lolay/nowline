@@ -39,6 +39,7 @@
 
 import {
     ITEM_CAPTION_TITLE_MAX_LINES,
+    ITEM_DECORATION_SPILL_GAP_PX,
     itemCaptionInsetX,
     itemTitleFirstLineRightReservePx,
 } from '../item-bar-geometry.js';
@@ -243,6 +244,13 @@ export function titleBreakLines(title: string): string[] | undefined {
  * line 1 of a wrapped title; later lines and the meta line use
  * `innerWidth`.
  *
+ * `firstLineHardWidth` (default `firstLineWidth`) is the widest line 1 may
+ * be: it also uses the top-right decoration's `ITEM_DECORATION_SPILL_GAP_PX`
+ * clearance, up to that cluster's own left edge. It is a fallback, tried
+ * only for a wrap or explicit break that would otherwise spill, so a caption
+ * that fits with the gap never moves; it lets a first word that misses
+ * `firstLineWidth` by a hair wrap instead of spilling.
+ *
  * Words never break mid-word: a single word wider than its line's
  * budget, or a title that needs more than `ITEM_CAPTION_TITLE_MAX_LINES`
  * lines, spills.
@@ -256,6 +264,7 @@ export function fitItemCaption(
     innerWidth: number,
     metaWidth: number,
     firstLineWidth: number = innerWidth,
+    firstLineHardWidth: number = firstLineWidth,
 ): ItemCaptionFit {
     let title = rawTitle;
     const broken = titleBreakLines(rawTitle);
@@ -270,7 +279,7 @@ export function fitItemCaption(
                 broken.every(
                     (line, n) =>
                         estimateTextWidth(line, TITLE_FONT_SIZE_PX) <=
-                        (n === 0 ? firstLineWidth : innerWidth),
+                        (n === 0 ? firstLineHardWidth : innerWidth),
                 );
             return { textSpills: !fits, titleLines: broken };
         }
@@ -285,21 +294,25 @@ export function fitItemCaption(
         return { textSpills: false, titleLines: [title] };
     }
     if (titleOverflows && !metaOverflows) {
-        const lines = wrapText(title, innerWidth, TITLE_FONT_SIZE_PX, firstLineWidth);
-        // `lines.length >= 2` keeps single-line behavior byte-identical: a
-        // title that only "overflows" because of repeated whitespace in
-        // the raw string (the estimate counts every space) normalizes to
-        // one line, and that case still spills exactly as it always has.
-        if (
-            lines.length >= 2 &&
-            lines.length <= ITEM_CAPTION_TITLE_MAX_LINES &&
-            lines.every(
-                (line, n) =>
-                    estimateTextWidth(line, TITLE_FONT_SIZE_PX) <=
-                    (n === 0 ? firstLineWidth : innerWidth),
-            )
-        ) {
-            return { textSpills: false, titleLines: lines };
+        // Line 1 first keeps the dot's clearance; only when that spills does
+        // it try the hard limit.
+        for (const line1Width of [firstLineWidth, firstLineHardWidth]) {
+            const lines = wrapText(title, innerWidth, TITLE_FONT_SIZE_PX, line1Width);
+            // `lines.length >= 2` keeps single-line behavior byte-identical: a
+            // title that only "overflows" because of repeated whitespace in
+            // the raw string (the estimate counts every space) normalizes to
+            // one line, and that case still spills exactly as it always has.
+            if (
+                lines.length >= 2 &&
+                lines.length <= ITEM_CAPTION_TITLE_MAX_LINES &&
+                lines.every(
+                    (line, n) =>
+                        estimateTextWidth(line, TITLE_FONT_SIZE_PX) <=
+                        (n === 0 ? line1Width : innerWidth),
+                )
+            ) {
+                return { textSpills: false, titleLines: lines };
+            }
         }
     }
     return { textSpills: true, titleLines: [title] };
@@ -349,20 +362,24 @@ export function measureItemCaption(input: ItemCaptionInput): ItemCaptionMeasure 
     // budget; when both exist the suffix needs a small separator gap
     // (rendered via `<tspan dx>` later) included in trailingWidth.
     const metaWidth = estimateItemMetaWidth(input.metaText, input.metaTrailingWidth ?? 0);
-    const firstLineWidth = Math.max(
-        0,
+    const firstLineReserve =
+        input.titleFirstLineRightReservePx ??
+        itemTitleFirstLineRightReservePx({
+            barWidth: visualWidth,
+            footnoteLabels: [],
+            hasBeforeGlyph: false,
+        });
+    const firstLineWidth = Math.max(0, visualWidth - leftInset - firstLineReserve);
+    // The same line without the cluster's clearance gap: its left edge is the limit.
+    const firstLineHardWidth = Math.max(
+        firstLineWidth,
         visualWidth -
             leftInset -
-            (input.titleFirstLineRightReservePx ??
-                itemTitleFirstLineRightReservePx({
-                    barWidth: visualWidth,
-                    footnoteLabels: [],
-                    hasBeforeGlyph: false,
-                })),
+            Math.max(TEXT_INSET_PX, firstLineReserve - ITEM_DECORATION_SPILL_GAP_PX),
     );
     return {
         leftInset,
-        fit: fitItemCaption(input.title, innerWidth, metaWidth, firstLineWidth),
+        fit: fitItemCaption(input.title, innerWidth, metaWidth, firstLineWidth, firstLineHardWidth),
     };
 }
 

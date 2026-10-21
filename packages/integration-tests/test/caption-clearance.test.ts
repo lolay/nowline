@@ -21,7 +21,11 @@
 //   line1Right = captionX + len(line1) * 13 * 0.58
 //   cluster    = leftmost of: dot left (R - 17), leftmost footnote digit left
 //                (R - 22 - (n-1)*8 - digitWidth), `before:` glyph left
-//   collision  = line1Right > clusterLeft - 4
+//   collision  = line1Right > clusterLeft
+//
+// The right side asks for no overlap, not for the 4 px gap: a first word that
+// misses the gap-keeping first line by a hair may use it, up to the cluster's
+// own left edge (specs/rendering.md, "Hard limit (fallback)").
 //
 //   linkTileRight = box.x + 6 + 14           (link tile drawn in the bar)
 //   afterRight    = glyph x + 12             (`after:` glyph inside the bar)
@@ -50,8 +54,11 @@ import { FIXED_TODAY } from './snapshot.helpers.js';
 const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const SOURCE_DIRS = ['examples', 'tests'] as const;
 
-/** Required air (px) between a caption and the decoration it must clear. */
+/** Required air (px) between a caption and the decoration it must clear on the left. */
 const CLEARANCE_PX = 4;
+
+/** Required air (px) between title line 1 and the top-right cluster: none, only no overlap. */
+const RIGHT_CLEARANCE_PX = 0;
 
 /** The link tile spans `box.x + 6 .. box.x + 6 + 14` (inset 6, side 14). */
 const LINK_TILE_RIGHT_OFFSET_PX = 6 + 14;
@@ -130,7 +137,7 @@ function* allItems(model: PositionedRoadmap): Generator<PositionedItem> {
 interface Overlap {
     title: string;
     line1: string;
-    /** px by which line 1 (plus the clearance) passes the cluster's left edge. */
+    /** px by which line 1 passes the cluster's left edge. */
     over: number;
 }
 
@@ -153,7 +160,7 @@ function firstLineOverlap(item: PositionedItem, captionX: number): Overlap | nul
             clusterLeft = Math.min(clusterLeft, pin.glyphTopLeft.x);
         }
     }
-    const over = line1Right - (clusterLeft - CLEARANCE_PX);
+    const over = line1Right - (clusterLeft - RIGHT_CLEARANCE_PX);
     return over > 0 ? { title: item.title, line1, over } : null;
 }
 

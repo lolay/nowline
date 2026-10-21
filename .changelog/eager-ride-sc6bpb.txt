@@ -13,3 +13,7 @@ Every isolated region (`roadmap:isolate`) in a chart now ends at the same right 
 ```release-note:changed
 The item after a parallel or group now lines up with the block's first track instead of sitting up beside its header and bracket (`Cool` after `Burst A` / `Burst B`, `Deploy` after a `parallel` block). The block's own header and dashed bracket are unchanged.
 ```
+
+```release-note:changed
+A two-word title whose first word misses the bar's first line by a hair now wraps inside its bar instead of spilling beside it. On a one-column bar, `Launch page` reads `Launch` / `page`, with the first line allowed to sit up to the status dot's left edge instead of 4 px short of it. Captions that already fit or wrap do not move.
+```
