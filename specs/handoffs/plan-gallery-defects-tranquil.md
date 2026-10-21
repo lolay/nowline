@@ -1,7 +1,7 @@
 ```text
 --- KICKOFF: begin execution at [deep] ---
 
-  Status: BLOCKED at gate review-wave-1 | 1/2 groups done | last review: — | updated 2026-10-21
+  Status: 1/2 groups done | last review: wave-1 PASS 2026-10-21 | current: s1 s4 s6 s7 s8 [exec] | updated 2026-10-21
 
   review: every-wave
 
@@ -81,11 +81,11 @@ Waves (per Gary): the deep steps run first as wave 1, then the exec steps as wav
 ### s3 - [deep] Dated-milestone slip view (variant B, signed off) (done)
 - Layout (`nodes/milestone-node.ts` dated branch, :256-281): when `maxPred.endX > x`, keep `center.x` at the planned date and add `slip: { x: maxPred.endX, y }` to the positioned milestone. Drop the overrun arrow (`overrunArrowStart`). Replace the overrun corridor in `collectSlackCorridors` with the slip span on the marker band, and teach `marker-band.ts` `markerArrows`/`packMarkerRow` to reserve the span planned→slipped plus the label at the slipped x on one row.
 - Renderer (`packages/renderer/src/svg/markers.ts` `renderMilestoneCutLine`, :113-160): draw a red planned diamond with no cut line, a red 3-3 dotted span, and a navy diamond at the slipped x, with the label and the normal dashed cut line there. Retire the `arrow-overrun` marker def (`render.ts:115-119`, `waves.ts` `hasOverrunArrow`). This also removes the latent `- 6` direction bug.
-- The slipped x drives f2 axis extension and the milestone's entity edge for downstream `after:`.
+- The slip is presentation only (amended after review, Gary 2026-10-21): the milestone's entity edge for downstream `after:` stays its `date:`, so engine C and the exports keep the declared date. The slipped x lands on a predecessor's end, which already drives f2 axis extension.
 - Spec: rendering.md:368, :371; layout-phases.md:693-700; update the header comments in tests/milestone-overrun.nowline and tests/marker-predecessor-arrows.nowline. Tests: `chart-local-frame.test.ts`, `render.test.ts` "dated milestone overrun", `milestone-time-end.test.ts`, `marker-arrows.test.ts`, and `waves.test.ts` overrun case are rewritten to the slip shape.
 
 ### s5 - [deep] Region boxes reach the diagram's content, plus padding (done)
-Revised twice in review. The region box's right edge is no longer the axis end. It is the furthest content anywhere in the diagram, host and every region: bars, spilled captions, anchors and milestones with their labels (a slipped milestone at its landing), and the now-line. A 24px box pad puts the dashed edge 16px past that point. f3 grows the canvas to hold it. The code is `diagramContentRightX` in `phases/finalize.ts`, and `includeRegionWidth` now takes `contentRightX`. Prototype commits: 4e252f3, 05076ba, and the current one. Pending: tests (`layout.test.ts:609-642`, `:675-724`, `placement-canvas.test.ts:188-234`, `render.test.ts:1612-1660`), spec (rendering.md:68, :647-652; layout-phases.md §3.5), changelog, snapshots (isolate-include, waves-isolate), determinism, and coverage register. Signed off by Gary 2026-10-21.
+Revised twice in review. The region box's right edge is no longer the axis end. It is the furthest content anywhere in the diagram, host and every region: bars, spilled captions, anchors and milestones with their labels (a slipped milestone at its landing), and the now-line. A 24px box pad puts the dashed edge 16px past that point. f3 grows the canvas to hold it. The code is `diagramContentRightX` in `phases/finalize.ts`, and `includeRegionWidth` now takes `contentRightX`. Prototype commits: 4e252f3, 05076ba, f6aada5; finished in 01e0c62 with tests, spec, changelog, snapshots (isolate-include, waves-isolate), determinism, and coverage register. Signed off by Gary 2026-10-21.
 
 ```text
 --- REVIEW: wave-1 [deep] ---
@@ -218,6 +218,7 @@ In `fitItemCaption` (`nodes/item-node.ts:272-278`, `:289-297`), line 1 passes if
 ## Review log
 
 review wave-1 (s2-s3-s5) 821d502..9b89a89: CONCERNS - s3 slip is presentation-only (after: still reads date:), reversing the plan's "slipped x drives the entity edge for downstream after:" with no recorded sign-off or test; needs Gary's pick. s2 and s5 match, make pre-commit green. Nits: stale s5 "Pending" note, region-markers positionedEntry omits slipFromX - 2026-10-21
+review wave-1 (s2-s3-s5) 9b89a89..0567a5d: PASS - Gary kept the s3 slip presentation-only; plan s3 amended to match, stale s5 note fixed. Open nit: region-markers positionedEntry omits slipFromX (masked by s5 region width) - 2026-10-21
 
 ## Token log
 
