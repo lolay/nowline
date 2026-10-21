@@ -190,7 +190,7 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     }
 
     // Waves → one end milestone per wave, dated from the day schedule.
-    const waves = emitWaves(inputs, schedule, drops, out, startDate);
+    const waves = emitWaves(schedule, drops, out, startDate);
 
     // Swimlanes → sections; their items become tasks.
     const swimlanes = ast.roadmapEntries.filter(
@@ -236,7 +236,6 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
  * nothing, when the roadmap has no waves.
  */
 function emitWaves(
-    inputs: ExportInputs,
     schedule: RoadmapSchedule,
     drops: DropCounts,
     out: string[],

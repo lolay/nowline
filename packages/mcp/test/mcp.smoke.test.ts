@@ -2012,6 +2012,7 @@ describe('@nowline/mcp — resource content (generated)', () => {
 
 // ---- --root expansion (mcpb ${HOME} / ~ / env tokens) -----------------------
 
+// biome-ignore-start lint/suspicious/noTemplateCurlyInString: the inputs are literal, unexpanded .mcpb ${...} tokens
 describe('@nowline/mcp — expandRootPath', () => {
     it('expands a literal ${HOME} token (the unexpanded .mcpb default)', async () => {
         const { expandRootPath } = await import('../src/root-path.js');
@@ -2061,3 +2062,4 @@ describe('@nowline/mcp — expandRootPath', () => {
         expect(result).toContain('${NOWLINE_DEFINITELY_UNSET}');
     });
 });
+// biome-ignore-end lint/suspicious/noTemplateCurlyInString: end of literal-token tests
