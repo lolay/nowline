@@ -3,7 +3,8 @@
 // barrier driver starts from C's `S_k`, both projected to px. C is a lower
 // bound of A (`schedule-lower-bound.test.ts`), so the passes reach the same
 // least fixpoint: the positioned model is identical to a cold start's, and
-// the driver needs no more passes, and on the wave samples fewer.
+// the driver needs no more passes, and fewer on every wave sample whose
+// cold solve takes more than one.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -81,7 +82,11 @@ describe('warm start from the day schedule (scheduler-unification F4)', () => {
         expect(placement(warm)).toBe(placement(cold));
         expect(cold.waveSolve?.capped).toBe(false);
         expect(warm.waveSolve?.capped).toBe(false);
-        expect(warm.waveSolve?.passes ?? 0).toBeLessThan(cold.waveSolve?.passes ?? 0);
+        // A cold solve that converges in one pass (no item in any wave, as in
+        // tests/waves-all-empty) leaves the warm start nothing to save.
+        const coldPasses = cold.waveSolve?.passes ?? 0;
+        if (coldPasses > 1) expect(warm.waveSolve?.passes ?? 0).toBeLessThan(coldPasses);
+        else expect(warm.waveSolve?.passes ?? 0).toBe(coldPasses);
     });
 
     it('same layout in no more barrier passes on the 60 generated roadmaps', async () => {
