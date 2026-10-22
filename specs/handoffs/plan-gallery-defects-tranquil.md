@@ -1,7 +1,7 @@
 ```text
---- KICKOFF: begin execution at [deep] ---
+--- KICKOFF: plan complete ---
 
-  Status: 2/2 groups built, review pending | last review: wave-1 PASS 2026-10-21 | current: wave-2 review [deep] | updated 2026-10-21
+  Status: 2/2 groups done | completed 2026-10-22
 
   review: every-wave
 
@@ -31,12 +31,12 @@
 
 **Cost (API-equiv, Claude Code models)**
 
-| wave | expected tokens | expected $ |
-|---|---|---|
-| 1 [deep] s2 s3 s5 | ~9.5M | ~$5.0 |
-| 2 [exec] s1 s4 s6 s7 s8 s9 | ~4.1M | ~$1.7 |
-| kickoff | ~1.5M | ~$1.0 |
-| **Total** | ~15M | ~$7.6 |
+| wave | expected tokens | expected $ | actual tokens | actual $ |
+|---|---|---|---|---|
+| 1 [deep] s2 s3 s5 | ~9.5M | ~$5.0 | ~67M | ~$26 |
+| 2 [exec] s1 s4 s6 s7 s8 s9 | ~4.1M | ~$1.7 | ~31M | ~$6.5 |
+| kickoff | ~1.5M | ~$1.0 | ~11M | ~$4.8 |
+| **Total** | ~15M | ~$7.6 | ~110M | ~$37 |
 
 Expected values are estimates, good to about 2-3× per wave.
 
@@ -142,7 +142,7 @@ Revised twice in review. The region box's right edge is no longer the axis end. 
         headings you finished, update the Kickoff Status line, and flip the
         matching todos. Append one line per model this chat ran to the
         plan's "## Token log", counted and priced per its counting header:
-          tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~250 / cache read ~25M / cache write ~220k 1h / output ~61k | ~$4 API-equiv
+          tokens wave-2 s1-s4-s6-s7-s8-s9 (<model>): input ~X / cache read ~R / cache write ~W / output ~Y | ~$C API-equiv
     Then stop at the next REVIEW marker and report what you changed and
     any deviations from the plan.
 
@@ -224,6 +224,7 @@ Follow-up from the wave-1 review. `positionedEntry` (`packages/layout/src/nodes/
 review wave-1 (s2-s3-s5) 821d502..9b89a89: CONCERNS - s3 slip is presentation-only (after: still reads date:), reversing the plan's "slipped x drives the entity edge for downstream after:" with no recorded sign-off or test; needs Gary's pick. s2 and s5 match, make pre-commit green. Nits: stale s5 "Pending" note, region-markers positionedEntry omits slipFromX - 2026-10-21
 review wave-1 (s2-s3-s5) 9b89a89..0567a5d: PASS - Gary kept the s3 slip presentation-only; plan s3 amended to match, stale s5 note fixed. Open nit: region-markers positionedEntry omits slipFromX (masked by s5 region width) - 2026-10-21
 review wave-2 (s1-s4-s6-s7-s8-s9) 0567a5d..a4648eb: CONCERNS - wave 2 is not in the tree: no code commits past 0567a5d (only plan edits), git status clean; s1 (continuation, minimal.fr) absent from render-manifest.mjs, s9 positionedEntry still omits slipFromX, s4/s6/s7/s8 have no changes and no (done) markers; nothing to review, run wave 2 first - 2026-10-21
+review wave-2 (s1-s4-s6-s7-s8-s9) a4648eb..0a85255: PASS - all six steps match the plan and Gary's approved deviations (s4 first-track offset, s6 soft-then-hard line 1, s7 plan.floors ref, s8 filter, s9 slipFromX); every moved snapshot/hash traces to its step, s9 test fails without the fix, start-rules.ts untouched, make pre-commit green on 0a85255. Nits: s6 body omits the working-calendar hash ("Design refresh" now wraps), wave-2 chat overwrote the STOP prompt's token template (restored) - 2026-10-22
 
 
 ## Token log
@@ -241,3 +242,11 @@ tokens wave-1 s2-s3-s5 (claude-opus-5-5): input ~450 / cache read ~63M / cache w
 tokens review-wave-1 s2-s3-s5 (claude-opus-5-5): input ~34 / cache read ~2.1M / cache write ~110k 1h / output ~9.9k | ~$1.5 API-equiv
 tokens review-wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~10 / cache read ~450k / cache write ~54k 1h / output ~1.7k | ~$0.28 API-equiv
 tokens wave-2 s1-s4-s6-s7-s8-s9 (claude-sonnet-5-5): input ~250 / cache read ~25M / cache write ~220k 1h / output ~61k | ~$4 API-equiv
+tokens review-wave-2 s1-s4-s6-s7-s8-s9 (claude-opus-5-5): input ~80 / cache read ~4.7M / cache write ~115k 1h / output ~16k | ~$2.2 API-equiv
+
+## Completion summary
+
+**Completed**: 2026-10-22
+**What shipped**: The gallery defect sweep, on `claude/eager-ride-sc6bpb` (821d502..0a85255). Spilled captions get max(1 column, 160px) past the axis end before the `…` cut, and the axis grows by whole columns to hold them (s2). An overrun dated milestone shows a slip (red planned diamond, dotted span, navy diamond and cut line at the landing) instead of a back-pointing arrow, presentation-only (s3). Isolated region boxes share one right edge past the diagram's furthest content (s5). continuation and minimal.fr render in the gallery (s1). The item after a parallel or group aligns with its first track (s4). A near-miss first word wraps using the status dot's 4px gap (s6). A wave with a date floor shows a calendar glyph (s7). The wave legend lists only waves the strip doesn't name in full (s8). The region marker canvas check honours a slip (s9). Specs, changelog fragment, snapshots and determinism hashes updated per step.
+**Deviations from plan**: s3 slip kept presentation-only (downstream `after:` reads `date:`), by Gary after the wave-1 CONCERNS review; s5 revised twice in review to size regions from the diagram's content, not the axis; s9 added to wave 2 from the wave-1 review nit. Wave 2, approved by Gary in chat: s4 reads the offset off the first track (`firstTrackOffsetY`, so a wave-only group reserves 0) with `group-node.ts` unchanged; s6 tries the hard width only after the soft one fails, never for a single-line overflow, and `caption-clearance.test.ts` loosened its right-side check from 4px to no overlap; s7 reads `plan.floors[i].ref`, so a floor that opened no gap still shows the glyph. s4 did not move platform-2026 as the plan expected. A premature wave-2 review ran before wave 2 was built (CONCERNS, no code to review).
+**Follow-ups**: none blocking. Before the PR merges, remove this plan or promote what is durable to `specs/` as the last commit on the branch.
