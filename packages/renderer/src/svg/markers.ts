@@ -65,20 +65,38 @@ export function renderMilestone(
     const cx = m.center.x;
     const cy = m.center.y;
     const r = m.radius;
-    // An overrun dated milestone paints its diamond and label in the cut
-    // line's overrun colour too (specs/rendering.md, Milestones).
-    const fill = m.isOverrun
-        ? palette.milestoneDiamond.cutLineOverrun
-        : palette.milestoneDiamond.fill;
-    const flag = tag('path', {
-        d: `M${num(cx)} ${num(cy - r)} L${num(cx + r)} ${num(cy)} L${num(cx)} ${num(cy + r)} L${num(cx - r)} ${num(cy)} Z`,
-        fill,
-        stroke: fill,
-        'stroke-width': 1,
-    });
-    const labelColor = m.isOverrun
-        ? palette.milestoneDiamond.cutLineOverrun
-        : palette.milestoneDiamond.label;
+    const overrun = palette.milestoneDiamond.cutLineOverrun;
+    const diamond = (x: number, fill: string): string =>
+        tag('path', {
+            d: `M${num(x)} ${num(cy - r)} L${num(x + r)} ${num(cy)} L${num(x)} ${num(cy + r)} L${num(x - r)} ${num(cy)} Z`,
+            fill,
+            stroke: fill,
+            'stroke-width': 1,
+        });
+    // An overrun dated milestone paints its diamond in the overrun colour
+    // (specs/rendering.md, Milestones). When it slipped, that diamond marks
+    // the missed date and a dotted span runs on to a second diamond, in the
+    // normal colour, where it lands; the label sits there. When it did not
+    // slip (the two diamonds would meet), the label is red too.
+    const slipX = m.slip?.x;
+    let flag: string;
+    if (slipX !== undefined) {
+        flag =
+            diamond(cx, overrun) +
+            tag('path', {
+                d: `M${num(cx + r)} ${num(cy)} H${num(slipX - r)}`,
+                fill: 'none',
+                stroke: overrun,
+                'stroke-width': 1.1,
+                'stroke-dasharray': '3 3',
+                'stroke-linecap': 'round',
+            }) +
+            diamond(slipX, palette.milestoneDiamond.fill);
+    } else {
+        flag = diamond(cx, m.isOverrun ? overrun : palette.milestoneDiamond.fill);
+    }
+    const labelColor =
+        m.isOverrun && slipX === undefined ? overrun : palette.milestoneDiamond.label;
     // See renderAnchor — left-flipped labels use `text-anchor: end` so
     // the visual right edge sits at `diamondLeft - 6`, matching the
     // 6 px rhythm of right-side labels.
@@ -115,18 +133,22 @@ export function renderMilestoneCutLine(
     idPrefix: string,
     palette: Theme,
 ): string {
-    const stroke = m.isOverrun
-        ? palette.milestoneDiamond.cutLineOverrun
-        : palette.milestoneDiamond.cutLineNormal;
+    // A slipped milestone's cut line drops from where it lands, in the
+    // normal colour; one that overran without slipping keeps the red line.
+    const cutX = m.slip?.x ?? m.center.x;
+    const stroke =
+        m.isOverrun && m.slip === undefined
+            ? palette.milestoneDiamond.cutLineOverrun
+            : palette.milestoneDiamond.cutLineNormal;
     const parts: string[] = [];
     // A milestone on a wave boundary draws no cut line: the boundary
     // already marks that instant (specs/waves.md §9.2).
     if (!m.onWaveBoundary) {
         parts.push(
             tag('line', {
-                x1: num(m.center.x),
+                x1: num(cutX),
                 y1: num(m.center.y + m.radius + 1),
-                x2: num(m.center.x),
+                x2: num(cutX),
                 y2: num(m.cutBottomY),
                 stroke,
                 'stroke-width': 2,
@@ -136,22 +158,18 @@ export function renderMilestoneCutLine(
         );
     }
     if (m.slackArrows && m.slackArrows.length > 0) {
-        // A dated milestone's only arrow is its overrun arrow, red like the
-        // line; a floating milestone's are slack arrows in ink.
-        const slackColor = m.isOverrun
-            ? palette.milestoneDiamond.cutLineOverrun
-            : palette.milestoneDiamond.slack;
-        const marker = m.isOverrun ? 'arrow-overrun' : 'arrow-dark';
+        // Only a floating milestone draws slack arrows, in ink; a dated one
+        // slips instead.
         for (const arrow of m.slackArrows) {
             parts.push(
                 tag('path', {
                     d: `M${num(arrow.x)} ${num(arrow.y)} H${num(m.center.x - 6)}`,
                     fill: 'none',
-                    stroke: slackColor,
+                    stroke: palette.milestoneDiamond.slack,
                     'stroke-width': 1.1,
                     'stroke-dasharray': '3 3',
                     'stroke-linecap': 'round',
-                    'marker-end': `url(#${idPrefix}-${marker})`,
+                    'marker-end': `url(#${idPrefix}-arrow-dark)`,
                 }),
             );
         }

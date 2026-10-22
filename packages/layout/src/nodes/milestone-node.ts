@@ -3,9 +3,11 @@
 // and either pins to a fixed `date:` or floats to the rightmost `after:`
 // predecessor. A non-binding (second-latest) predecessor drives the
 // "slack" arrow when present. Date-pinned milestones whose predecessors
-// would push past the date are flagged `isOverrun`.
+// would push past the date are flagged `isOverrun` and slip: the diamond
+// stays on the date, and a second one sits where the latest predecessor
+// ends (`slipX`).
 //
-// Placement decides x, slack arrows and overrun only (`MilestonePlacement`).
+// Placement decides x, slip, slack arrows and overrun only (`MilestonePlacement`).
 // The marker row and label box come from the final marker pack in
 // finalize (`packMarkers`, f5, through `marker-band.ts::packMarkerRow`),
 // which runs once every centerX is known and the canvas is final;
@@ -150,9 +152,9 @@ function slackArrowStart(p: MilestonePredecessor, maxEnd: number): MilestoneArro
 }
 
 /**
- * The predecessor a dated milestone's overrun arrow starts from: the one
- * that ends latest in time and is not a wave (wave references draw no
- * slack arrows). `collectSlackCorridors` uses the same choice.
+ * The predecessor a dated milestone slips to: the one that ends latest in
+ * time and is not a wave (an overrunning wave is taken separately, by
+ * `overrunningWave`).
  */
 export function latestArrowPredecessor(preds: MilestonePredecessor[]): MilestonePredecessor | null {
     let maxPred: MilestonePredecessor | null = null;
@@ -164,34 +166,21 @@ export function latestArrowPredecessor(preds: MilestonePredecessor[]): Milestone
 }
 
 /**
- * The overrun arrow of a dated milestone `id` at `x` from `maxPred`, its
- * latest predecessor, which ends past `x`: from an item's attach y, from a
- * marker's row (none when the two diamonds meet), and from the
- * milestone's own row for a group or parallel, which has no y of its own.
- */
-function overrunArrowStart(
-    maxPred: MilestonePredecessor,
-    x: number,
-    id: string,
-): MilestoneArrowStart | null {
-    if (maxPred.y !== undefined) return { x: maxPred.endX, y: maxPred.y };
-    if (!maxPred.marker) return { x: maxPred.endX, marker: id };
-    return isOnTopOf(maxPred, x) ? null : { x: maxPred.endX, marker: maxPred.ref };
-}
-
-/**
- * The wave that overruns a dated milestone at `x`: the latest-ending
- * wave predecessor whose end lies past `x` (by more than the boundary
+ * The wave predecessor that overruns a dated milestone at `x`: the
+ * latest-ending one whose end lies past `x` (by more than the boundary
  * tolerance, so a wave ending on the date does not count). Ties keep the
  * first listed.
  */
-function overrunningWave(preds: MilestonePredecessor[], x: number): string | undefined {
+function overrunningWave(
+    preds: MilestonePredecessor[],
+    x: number,
+): MilestonePredecessor | undefined {
     let latest: MilestonePredecessor | undefined;
     for (const p of preds) {
         if (p.wave === undefined || p.endX - x < WAVE_EDGE_TOLERANCE_PX) continue;
         if (!latest || p.endX > latest.endX) latest = p;
     }
-    return latest?.wave;
+    return latest;
 }
 
 /**
@@ -209,6 +198,12 @@ export interface MilestonePlacement {
     fixed: boolean;
     slackArrows: MilestoneArrowStart[] | undefined;
     isOverrun: boolean;
+    /**
+     * Where an overrun dated milestone actually lands: the end of its
+     * latest predecessor (or overrunning wave), past `x`. Omitted when it
+     * does not overrun, or when the two diamonds would meet.
+     */
+    slipX?: number;
     style: ResolvedStyle;
     cutTopY: number;
     cutBottomY: number;
@@ -251,6 +246,7 @@ export class MilestoneNode {
         let fixed = false;
         let slackArrows: MilestoneArrowStart[] | undefined;
         let isOverrun = false;
+        let slipX: number | undefined;
         let overrunByWave: string | undefined;
 
         if (date) {
@@ -261,24 +257,26 @@ export class MilestoneNode {
             const prePacked = ctx.markerRowPlacements.get(this.id);
             if (prePacked) estimatedCenterY = prePacked.centerY;
             // Date-pinned milestones whose `after:` predecessors finish
-            // past the pinned date are flagged `isOverrun`; the latest
-            // last-of-flow predecessor draws a single overrun arrow
-            // pointing back from its visual right edge to the
-            // milestone's column. Flow-dedupe avoids stacking redundant
-            // arrows from sibling items in one chained flow.
+            // past the pinned date are flagged `isOverrun` and slip to the
+            // latest one's end: the diamond stays on the date, a second
+            // one and the cut line move to `slipX` (specs/rendering.md,
+            // Milestones). The wave-deadline idiom (specs/waves.md §5.3,
+            // Example 11) counts too: a wave listed in `after:` that ends
+            // past the date.
             const preds = collectMilestonePredecessors(afterRaw, ctx);
             const dedupedPreds = lastPredecessorPerFlow(preds);
             const maxPred = latestArrowPredecessor(dedupedPreds);
-            if (maxPred && maxPred.endX > x) {
+            const wave = overrunningWave(dedupedPreds, x);
+            overrunByWave = wave?.wave;
+            const landsAt = Math.max(
+                maxPred && maxPred.endX > x ? maxPred.endX : x,
+                wave?.endX ?? x,
+            );
+            if (landsAt > x) {
                 isOverrun = true;
-                const arrow = overrunArrowStart(maxPred, x, this.id);
-                if (arrow) slackArrows = [arrow];
+                // Two diamonds that would meet draw as one, on the date.
+                if (landsAt - x > 2 * MARKER_DIAMOND_RADIUS_PX) slipX = landsAt;
             }
-            // The wave-deadline idiom (specs/waves.md §5.3, Example 11): a
-            // wave listed in `after:` that ends past the date overruns the
-            // milestone. It gets the red cut line, but no arrow.
-            overrunByWave = overrunningWave(dedupedPreds, x);
-            if (overrunByWave !== undefined) isOverrun = true;
         } else if (afterRaw.length > 0) {
             // Float to the rightmost (binding) predecessor; every
             // last-of-flow predecessor that finishes EARLIER than the
@@ -320,10 +318,13 @@ export class MilestoneNode {
             cutTopY: ctx.chartTopY,
             cutBottomY: ctx.swimlaneBottomY,
         };
-        // On a wave boundary the boundary line carries the vertical. An
-        // overrun milestone keeps its red cut line, so it never counts as
-        // on a boundary.
-        if (ctx.waves && !isOverrun && isOnWaveBoundary(ctx.waves, centerX)) {
+        if (slipX !== undefined) placement.slipX = slipX;
+        // On a wave boundary the boundary line carries the vertical. A
+        // slipped milestone's cut line sits at `slipX`; an overrun one that
+        // did not slip keeps its red cut line, so it never counts as on a
+        // boundary.
+        const cutX = slipX ?? centerX;
+        if (ctx.waves && (slipX !== undefined || !isOverrun) && isOnWaveBoundary(ctx.waves, cutX)) {
             placement.onWaveBoundary = true;
         }
         if (overrunByWave !== undefined && date) {
@@ -389,6 +390,7 @@ export function positionMilestones(
             labelBox: row.labelBox,
             labelSide: row.labelSide,
         };
+        if (p.slipX !== undefined) positioned.slip = { x: p.slipX };
         if (p.onWaveBoundary) positioned.onWaveBoundary = true;
         if (p.overrunByWave !== undefined) positioned.overrunByWave = p.overrunByWave;
         if (p.overrunDate !== undefined) positioned.overrunDate = p.overrunDate;
@@ -403,10 +405,9 @@ export function positionMilestones(
  * `MilestoneNode.place` would emit on `slackArrows`, so the row-packer
  * and the renderer agree on every arrow's geometry.
  *
- * Each non-binding item predecessor (`x < maxEnd`) becomes one
- * corridor; date-pinned milestones whose latest predecessor is an item
- * that overruns the date contribute a single back-pointing corridor
- * between the pinned column and the predecessor's right edge. An arrow
+ * Each non-binding item predecessor (`x < maxEnd`) of an after-only
+ * milestone becomes one corridor. A date-pinned milestone draws no arrow
+ * (an overrun slips it, in the marker band), so it owns none. An arrow
  * from a marker runs in the marker band, above the lanes, so it owns no
  * corridor; nor does a wave predecessor, which draws no slack arrow (a
  * floating milestone bound by a wave still sets `maxEnd`).
@@ -417,34 +418,15 @@ export function collectSlackCorridors(
 ): SlackCorridor[] {
     const out: SlackCorridor[] = [];
     for (const [id, m] of milestones) {
-        const dateRaw = propValue(m.properties, 'date');
-        const afterRaw = propValues(m.properties, 'after');
-        const date = parseIsoDate(dateRaw);
+        // A dated milestone draws no arrow, so it owns no corridor.
+        if (parseIsoDate(propValue(m.properties, 'date'))) continue;
         // Reuse MilestoneNode's helpers so the corridor set agrees
         // exactly with the rendered slack-arrow set: same source x
         // (visual edge for items / cut-line for markers), same
         // attach y, and the same flow-dedupe rule that collapses
         // chained predecessors to one arrow per flow.
-        const preds = collectMilestonePredecessors(afterRaw, ctx);
+        const preds = collectMilestonePredecessors(propValues(m.properties, 'after'), ctx);
         const dedupedPreds = lastPredecessorPerFlow(preds);
-
-        if (date) {
-            const milestoneX = ctx.scale.forwardWithinDomain(date);
-            if (milestoneX === null) continue;
-            // Wave references draw no arrow, and a marker's arrow runs in
-            // the marker band, so neither owns a corridor.
-            const maxPred = latestArrowPredecessor(dedupedPreds);
-            if (maxPred && maxPred.endX > milestoneX && maxPred.y !== undefined) {
-                out.push({
-                    xStart: Math.min(maxPred.endX, milestoneX),
-                    xEnd: Math.max(maxPred.endX, milestoneX),
-                    y: maxPred.y,
-                    slackPredId: maxPred.ref,
-                    milestoneId: id,
-                });
-            }
-            continue;
-        }
         if (dedupedPreds.length === 0) continue;
         dedupedPreds.sort((a, b) => b.endX - a.endX);
         const maxEnd = dedupedPreds[0].endX;

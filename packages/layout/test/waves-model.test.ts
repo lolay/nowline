@@ -252,11 +252,10 @@ swimlane a
             ['ordinal', '#4'],
             ['none', undefined],
         ]);
-        // Abbreviated labels bring in the legend's wave list.
+        // Abbreviated labels bring in the legend's wave list, which names only
+        // the waves the strip doesn't spell out: #1 is shown in full, so it is not listed.
         const list = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        expect(list?.text).toBe(
-            'Waves: #1 Discovery and research · #2 Build the platform · #3 Hardening · #4 Ship · #5 Tail',
-        );
+        expect(list?.text).toBe('Waves: #2 Build the platform · #3 Hardening · #4 Ship · #5 Tail');
     });
 
     it('Example 9: the tooltip names the dates (end exclusive) and the holder', async () => {
@@ -325,6 +324,49 @@ swimlane a
         });
         expect('gapLabel' in plan.strip).toBe(false);
         expect(execute.strip.box.x).toBe(execute.startX);
+    });
+
+    it('a date floor puts a calendar glyph at the cell left, whether or not it opened a gap', async () => {
+        // `execute` starts on 2026-02-02, a week past `plan`'s end: a gap. `harden`'s floor
+        // (2026-01-12) is earlier than `execute`'s end, so it opens none.
+        const model = await lay(`nowline v1
+
+roadmap r "R" start:2026-01-05 scale:1w calendar:full
+
+wave plan "Plan"
+wave execute "Execute" after:2026-02-09
+wave harden "Harden" after:2026-01-12
+
+swimlane a
+  item a1 duration:2w wave:plan
+  item a2 duration:4w wave:execute
+  item a3 duration:2w wave:harden
+`);
+        const [, execute, harden] = wavesOf(model);
+        expect(execute.floorRef).toBe('2026-02-09');
+        expect(harden.floorRef).toBeUndefined();
+        for (const w of [execute, harden]) {
+            const pin = w.strip.inlineDatePin;
+            expect(pin?.side, w.id).toBe('after');
+            expect(pin?.spilled).toBe(false);
+            expect(pin?.glyphSize).toBe(12);
+            expect(pin?.glyphTopLeft.x).toBe((w.strip.cell?.x ?? 0) + 6);
+            const strip = w.strip.box;
+            expect(pin?.glyphTopLeft.y).toBe(strip.y + (strip.height - 12) / 2);
+            // The label starts past the glyph's right edge.
+            const halo = w.strip.labelDraw?.halo;
+            expect(halo).toBeDefined();
+            expect((halo?.x ?? 0) + 2).toBeGreaterThanOrEqual((pin?.glyphTopLeft.x ?? 0) + 12);
+        }
+        expect(execute.strip.inlineDatePin?.isoDate).toBe('2026-02-09');
+        expect(harden.strip.inlineDatePin?.isoDate).toBe('2026-01-12');
+    });
+
+    it('a floor that names an entity, and a wave with no floor, get no glyph', async () => {
+        const [plan, execute] = wavesOf(await lay(EXAMPLE_11));
+        expect(execute.floorRef).toBe('fy-budget');
+        expect('inlineDatePin' in execute.strip).toBe(false);
+        expect('inlineDatePin' in plan.strip).toBe(false);
     });
 
     it('every wave empty: only the placeholder, no markers, boundaries or crossings', async () => {
@@ -656,13 +698,11 @@ describe('wave legend (§9.5)', () => {
         expect(boundary.swatch?.x).toBeGreaterThan(bg.runs[0].x);
     });
 
-    it('Example 12: an empty wave lists every wave', async () => {
+    it('Example 12: an empty wave is listed alone, keeping its own #k', async () => {
         const model = await lay(EXAMPLE_12);
         const entries = model.waveLegend?.entries ?? [];
         expect(entries.map((e) => e.kind)).toEqual(['boundary', 'waves']);
-        expect(entries[1].text).toBe(
-            'Waves: #1 Wave 1 · #2 Hardening (TBD) (no items) · #3 Wave 3',
-        );
+        expect(entries[1].text).toBe('Waves: #2 Hardening (TBD) (no items)');
         expect('swatch' in entries[1]).toBe(false);
         expect(entries[1].runs.map((r) => r.text).join(' · ')).toBe(entries[1].text);
     });
@@ -738,7 +778,8 @@ footnote b-vendor "Vendor" on:[w1, a1]
         expect(w1.strip.footnotesShown).toBe(false);
         expect(w1.strip.labelKind).toBe('none');
         const list = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        expect(list?.text).toBe('Waves: #1 Discover ² · #2 Build');
+        // #2 Build is named in full, so only the wave whose footnote moved is listed.
+        expect(list?.text).toBe('Waves: #1 Discover ²');
     });
 });
 

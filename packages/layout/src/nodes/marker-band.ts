@@ -158,7 +158,8 @@ function workingExceptionEntries(
  * milestone, titled run or working exception) that fits neither right of
  * its x (against `chartRightX`) nor left of it (against `chartLeftX`)
  * would fall back to the left and draw over a beside header card, so the
- * canvas grows to hold it on the right instead.
+ * canvas grows to hold it on the right instead. A slipped milestone's
+ * label never fits on the left, where its span runs.
  */
 export function markerLabelsRightX(
     entries: ReadonlyArray<MarkerEntity>,
@@ -171,7 +172,8 @@ export function markerLabelsRightX(
         const labelWidth = markerLabelWidth(e, estimateTextWidth);
         const rightEnd = e.centerX + e.radius + MARKER_LABEL_GAP_PX + labelWidth;
         const leftStart = e.centerX - e.radius - MARKER_LABEL_GAP_PX - labelWidth;
-        if (rightEnd > chartRightX && leftStart < chartLeftX) {
+        const fitsLeft = leftStart >= chartLeftX && e.slipFromX === undefined;
+        if (rightEnd > chartRightX && !fitsLeft) {
             rightX = Math.max(rightX, rightEnd + GUTTER_PX);
         }
     }
@@ -185,6 +187,12 @@ export interface MarkerEntity {
     title: string;
     fontSize: number;
     bold: boolean;
+    /**
+     * A slipped milestone's planned x: its entry sits at the slipped x
+     * (`centerX`, where the label goes), and the span from the planned
+     * diamond to it is reserved on its row.
+     */
+    slipFromX?: number;
 }
 
 /** A marker label's width: bold labels widen by `MARKER_BOLD_WIDTH_FACTOR`. */
@@ -286,7 +294,12 @@ export function packMarkerRow(
         const sideXLeft = (s: Side): number => (s === 'right' ? naturalRightX : naturalLeftX);
         const sideFitsCanvas = (s: Side): boolean =>
             s === 'right' ? fitsRightCanvas : fitsLeftCanvas;
-        // The runs of e's own arrows, on e's row between the two diamonds.
+        // The runs of e's own arrows, on e's row between the two diamonds,
+        // and a slipped milestone's span from its planned diamond.
+        const slipRun: Span[] =
+            e.slipFromX === undefined
+                ? []
+                : [{ left: e.slipFromX - e.radius, right: e.centerX - e.radius }];
         const runs: Span[] = knownArrows
             .filter((a) => a.from === e.id)
             .map((a) => {
@@ -296,6 +309,7 @@ export function packMarkerRow(
                     right: Math.max(e.centerX, to.centerX) - to.radius,
                 };
             })
+            .concat(slipRun)
             .filter((r) => r.right > r.left);
         // An arrow meets its target's line only when the target sits at or
         // above the source's row (cut lines run down from a diamond).
@@ -317,13 +331,16 @@ export function packMarkerRow(
             return runs.some((r) => r.left < xLeft + labelWidth && r.right > xLeft);
         };
         const freeSide = (s: Side): boolean => sideFitsCanvas(s) && !crossesOwnRun(s);
-        const growSide: Side = freeSide('right')
-            ? 'right'
-            : freeSide('left')
-              ? 'left'
-              : fitsRightCanvas
+        // A slipped milestone's label never goes back over its span; the
+        // canvas grew for it (`markerLabelsRightX`).
+        const growSide: Side =
+            freeSide('right') || e.slipFromX !== undefined
                 ? 'right'
-                : 'left';
+                : freeSide('left')
+                  ? 'left'
+                  : fitsRightCanvas
+                    ? 'right'
+                    : 'left';
         const collidesAt = (xLeft: number, row: number): boolean => {
             const extLeft = Math.min(diamondLeft, xLeft);
             const extRight = Math.max(diamondRight, xLeft + labelWidth);

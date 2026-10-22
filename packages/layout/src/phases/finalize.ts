@@ -42,7 +42,11 @@ import {
     packMarkerRow,
     workingExceptionMarkerId,
 } from '../nodes/marker-band.js';
-import { MARKER_ROW_PITCH_PX } from '../nodes/marker-geometry.js';
+import {
+    MARKER_BOLD_WIDTH_FACTOR,
+    MARKER_LABEL_GAP_PX,
+    MARKER_ROW_PITCH_PX,
+} from '../nodes/marker-geometry.js';
 import { positionMilestones } from '../nodes/milestone-node.js';
 import { buildNowline } from '../nodes/nowline-node.js';
 import { regionMarkerCanvasRightX } from '../nodes/region-markers.js';
@@ -556,7 +560,7 @@ function growCanvasForSpill(fx: FinalizeContext): boolean {
  * see `maxLeafItemRightX`) and marker diamonds, an isolated region's own
  * included — and grow the window to
  * the next tick boundary when content overflows it. A spilled caption past
- * that end grows it by one more full column at most, labelled by the
+ * that end grows it by whole columns up to `AxisColumns.captionLimit`, labelled by the
  * same rules as any other column: the item measure capped the caption to
  * end inside it (`AxisColumns.captionCapX`). This is driven
  * purely by boxes, never by `today`, so the `length:`-as-minimum and
@@ -604,14 +608,14 @@ function extendTimeline(fx: FinalizeContext): boolean {
         overflowDays > 0
             ? tickBoundaryAtOrAfter(startDate, overflowDays, scale.unit, tickDays, calendar)
             : 0;
-    // A spilled caption past the axis end grows it by one column, the one
-    // the item measure capped the caption to; `label-every`, the default
-    // thinning and the narrow-column rules label it like any other column
-    // (specs/scheduler-unification.md §8 decision 12). Under an explicit
-    // `length:` that ends mid-column the column is the full one after the
-    // partial last column. A caption the cap could not bring inside (its
-    // meta line is never truncated) still grows the axis by that one column
-    // only.
+    // A spilled caption past the axis end grows it by the whole columns that
+    // hold it, up to `captionLimit`, the boundary the item measure capped the
+    // caption to; `label-every`, the default thinning and the narrow-column
+    // rules label them like any other column (specs/scheduler-unification.md
+    // §8 decision 12). Under an explicit `length:` that ends mid-column the
+    // columns are the full ones after the partial last column. A caption the
+    // cap could not bring inside (its meta line is never truncated) still
+    // grows the axis only to `captionLimit`.
     let captionRightX = maxSpilledCaptionRightX(swimlanes);
     for (const inc of includes) {
         captionRightX = Math.max(captionRightX, maxSpilledCaptionRightX(inc.nestedSwimlanes));
@@ -622,10 +626,7 @@ function extendTimeline(fx: FinalizeContext): boolean {
         if (columns.isPast(captionRightX, axisDays)) {
             paddedDays = Math.max(
                 paddedDays,
-                Math.min(
-                    columns.boundaryAtOrAfterX(captionRightX),
-                    columns.captionColumn(axisDays).end,
-                ),
+                Math.min(columns.boundaryAtOrAfterX(captionRightX), columns.captionLimit(axisDays)),
             );
         }
     }
@@ -675,14 +676,24 @@ function extendTimeline(fx: FinalizeContext): boolean {
  */
 function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     const timeline = fx.measured.timeline;
-    const all: MarkerEntity[] = fx.measured.markers.datePinned.map((e) => ({
-        id: e.id,
-        centerX: e.centerX,
-        radius: e.radius,
-        title: e.title,
-        fontSize: e.fontSize,
-        bold: e.bold,
-    }));
+    // A slipped milestone's entry moves to its slipped diamond, where its
+    // label goes, and reserves the span back to its date.
+    const slips = new Map<string, number>();
+    for (const m of fx.chart.milestones) {
+        if (m.slipX !== undefined) slips.set(m.id, m.slipX);
+    }
+    const all: MarkerEntity[] = fx.measured.markers.datePinned.map((e) => {
+        const slipX = e.isMilestone ? slips.get(e.id) : undefined;
+        return {
+            id: e.id,
+            centerX: slipX ?? e.centerX,
+            radius: e.radius,
+            title: e.title,
+            fontSize: e.fontSize,
+            bold: e.bold,
+            ...(slipX !== undefined ? { slipFromX: e.centerX } : {}),
+        };
+    });
     for (const m of fx.chart.milestones) {
         if (m.fixed) continue;
         all.push({
@@ -705,12 +716,58 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
     );
     // An isolated region's own marker labels grow it the same way, inside
     // the region's insets (placement packed them against the natural canvas).
+    // A region box reaches past the diagram's content by its pad
+    // (`includeRegionWidth`).
+    const contentRightX = diagramContentRightX(fx, fx.draft.markerEntries);
     for (const inc of fx.chart.includes) {
         rightX = Math.max(rightX, regionMarkerCanvasRightX(inc, fx.canvas.provisional));
+        rightX = Math.max(
+            rightX,
+            inc.box.x + includeRegionWidth(inc, Number.POSITIVE_INFINITY, contentRightX),
+        );
     }
     const grew = fx.canvas.grow(rightX);
     fx.canvas.freeze();
     return grew;
+}
+
+/**
+ * The furthest content edge anywhere in the diagram, main lanes and every
+ * isolated region: a leaf bar's right edge, a spilled caption's, an anchor
+ * or milestone with its label (a host marker's label on its right, as f3
+ * estimates it before the final pack), and the now-line. Every region box
+ * reaches past it by the same pad.
+ */
+function diagramContentRightX(
+    fx: FinalizeContext,
+    markerEntries: { all: MarkerEntity[]; calendarCount: number } | undefined,
+): number {
+    const { swimlanes, includes } = fx.chart;
+    let rightX = Math.max(maxLeafItemRightX(swimlanes), maxSpilledCaptionRightX(swimlanes));
+    for (const inc of includes) {
+        rightX = Math.max(
+            rightX,
+            maxLeafItemRightX(inc.nestedSwimlanes),
+            maxSpilledCaptionRightX(inc.nestedSwimlanes),
+        );
+        for (const m of [...(inc.anchors ?? []), ...(inc.milestones ?? [])]) {
+            rightX = Math.max(rightX, m.labelBox.x + m.labelBox.width);
+        }
+    }
+    if (markerEntries) {
+        const markers = markerEntries.all.slice(
+            0,
+            markerEntries.all.length - markerEntries.calendarCount,
+        );
+        for (const e of markers) {
+            const labelWidth =
+                estimateTextWidth(e.title, e.fontSize) * (e.bold ? MARKER_BOLD_WIDTH_FACTOR : 1);
+            rightX = Math.max(rightX, e.centerX + e.radius + MARKER_LABEL_GAP_PX + labelWidth);
+        }
+    }
+    const nowX = fx.options.today ? fx.scale.forwardWithinDomain(fx.options.today) : null;
+    if (nowX !== null) rightX = Math.max(rightX, nowX);
+    return rightX;
 }
 
 /**
@@ -724,16 +781,23 @@ function growCanvasForMarkerLabels(fx: FinalizeContext): boolean {
 function fitWidths(fx: FinalizeContext): boolean {
     const chartRightX = fx.canvas.final;
     const natural = fx.measured.naturalChartRightX;
+    const contentRightX = diagramContentRightX(
+        fx,
+        need(fx.draft.markerEntries, 'the marker entries'),
+    );
     // Changed: a width differs from the one the natural canvas would give.
     let changed = fx.chart.swimlanes.length > 0 && chartRightX !== natural;
     for (const lane of fx.chart.swimlanes) {
         lane.box.width = chartRightX;
     }
     for (const inc of fx.chart.includes) {
-        if (includeRegionWidth(inc, chartRightX) !== includeRegionWidth(inc, natural)) {
+        if (
+            includeRegionWidth(inc, chartRightX, contentRightX) !==
+            includeRegionWidth(inc, natural, contentRightX)
+        ) {
             changed = true;
         }
-        fitIncludeRegionWidth(inc, chartRightX);
+        fitIncludeRegionWidth(inc, chartRightX, contentRightX);
     }
     return changed;
 }
@@ -1069,13 +1133,13 @@ export const FINALIZE_STEPS: readonly FinalizeStep[] = [
     },
     {
         name: 'growCanvasForMarkerLabels',
-        reads: ['placement', 'calendarRuns', 'canvas'],
+        reads: ['placement', 'calendarRuns', 'canvas', 'scale'],
         writes: ['markerEntries', 'canvas'],
         run: growCanvasForMarkerLabels,
     },
     {
         name: 'fitWidths',
-        reads: ['placement', 'canvas'],
+        reads: ['placement', 'canvas', 'markerEntries', 'scale'],
         writes: ['laneWidths'],
         run: fitWidths,
     },

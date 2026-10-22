@@ -606,12 +606,13 @@ swimlane lane "Lane"
         expect(tailRightX).toBeLessThanOrEqual(timelineRightX);
     });
 
-    it('keeps an include region box within the timeline right edge despite a long trailing caption', async () => {
+    it('reaches an include region box past a long trailing caption, and grows the canvas for it', async () => {
         // `beta` is a 1-day bar inside the isolated include with a caption
-        // long enough to spill well past it. The dashed include box must
-        // shrink-wrap to the BARS (`alpha` + `beta`), not the spilled
-        // caption, so it stays inside the parent's timeline window even
-        // though the caption itself is allowed to overhang.
+        // long enough to spill well past it (the caption cap cuts it at the
+        // grown axis). The caption is the diagram's furthest content, so the
+        // region box reaches 24 px past it, not past the bars
+        // (specs/rendering.md, Included Roadmaps), and the canvas grows to
+        // hold the box.
         const parentSrc = `nowline v1
 
 include "./child.nowline" roadmap:isolate
@@ -637,8 +638,13 @@ swimlane plugin "Plugin"
         const model = layoutRoadmap(file, resolved, { theme: 'light' });
         expect(model.includes).toHaveLength(1);
         const include = model.includes[0];
-        const timelineRightX = model.timeline.box.x + model.timeline.box.width;
-        expect(include.box.x + include.box.width).toBeLessThanOrEqual(timelineRightX);
+        const beta = include.nestedSwimlanes[0].children.find((c) => c.id === 'beta');
+        expect(beta?.kind).toBe('item');
+        const captionRightX = beta?.kind === 'item' ? beta.decorationsRightX : 0;
+        const barRightX = beta ? beta.box.x + beta.box.width : 0;
+        expect(captionRightX).toBeGreaterThan(barRightX + 100);
+        expect(include.box.x + include.box.width).toBeCloseTo(captionRightX + 24, 5);
+        expect(include.box.x + include.box.width).toBeLessThanOrEqual(model.width);
     });
 
     it('stretches every swimlane band to the timeline right edge when the post-layout extension fires', async () => {
@@ -672,14 +678,13 @@ swimlane a "A"
         }
     });
 
-    it('re-fits an include region box against the extended canvas when the post-layout extension fires', async () => {
+    it('fits an include region box to the diagram content after the post-layout extension fires', async () => {
         // The child's five-week bars end where the pre-pass window ends
-        // (working-day index 25, Mon Feb 9), so the include's shrink-wrap
-        // (bars + right pad) is clamped by the pre-extension canvas width.
-        // The milestone dated Feb 9 then overflows the window and grows the
-        // canvas; the include must re-fit to its natural width rather than
-        // keep the stale clamp. A later milestone date (Fri Feb 13, index
-        // 29: no clamp in play) is the reference width.
+        // (working-day index 25, Mon Feb 9). The host milestone dated Feb 9
+        // overflows the window and grows the canvas; its label is the
+        // diagram's furthest content, so the region reaches 24 px past it,
+        // inside the final canvas. A later milestone (Fri Feb 13) carries
+        // its label, and the region, further right.
         const childSrc = `nowline v1
 
 roadmap c "C" start:2026-01-05 scale:1w calendar:business
@@ -716,8 +721,13 @@ swimlane a "A"
         expect(extended.includes).toHaveLength(1);
         expect(reference.includes).toHaveLength(1);
         const include = extended.includes[0];
-        expect(include.box.width).toBe(reference.includes[0].box.width);
+        const ext = extended.milestones[0];
+        expect(include.box.x + include.box.width).toBeCloseTo(
+            ext.labelBox.x + ext.labelBox.width + 24,
+            5,
+        );
         expect(include.box.x + include.box.width).toBeLessThanOrEqual(extended.width);
+        expect(reference.includes[0].box.width).toBeGreaterThan(include.box.width);
         for (const lane of include.nestedSwimlanes) {
             expect(lane.box.width).toBe(include.box.width);
         }

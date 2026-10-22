@@ -559,13 +559,13 @@ swimlane api
             ['ios-push', 'member'],
         ]);
         // The content ends at W6; pf-scale's caption spills past it, so the
-        // axis gains one column (rendering.md § "Caption cap at the chart's
-        // end"): W7, 35 working days, Mon Feb 23.
+        // axis gains the two columns that hold it (rendering.md § "Caption
+        // cap at the chart's end"): W8, 40 working days, Mon Mar 2.
         const { timeline } = laid.model;
         expect(laid.calendar.workingIndexOf(timeline.startDate, timeline.endDate)).toBe(
-            7 * laid.perWeek,
+            8 * laid.perWeek,
         );
-        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-02-23');
+        expect(timeline.endDate.toISOString().slice(0, 10)).toBe('2026-03-02');
         expectBarriers(laid);
     });
 
@@ -956,13 +956,15 @@ milestone m "M" after:[w1, b2, a2]
         expect(m.slackArrows?.map((a) => a.x)).toEqual([b2.dateSpan.endX]);
     });
 
-    it('a dated milestone overrun by a wave gets overrunByWave and no arrow (Example 11)', async () => {
+    it('a dated milestone overrun by a wave gets overrunByWave and slips to the wave end (Example 11)', async () => {
         const laid = await lay(EXAMPLE_11);
         const m = milestone(laid, 'exec-done');
         expect(m.overrunByWave).toBe('execute');
         expect(m.isOverrun).toBe(true);
         expect(m.slackArrows).toBeUndefined();
-        expect('onWaveBoundary' in m).toBe(false);
+        // It lands on the wave's end, a boundary, which carries its line.
+        expect(weeksAt(laid, m.slip?.x ?? 0)).toBe(11);
+        expect(m.onWaveBoundary).toBe(true);
     });
 
     it('a dated milestone met by its wave is not overrun, and on a boundary', async () => {
@@ -974,7 +976,7 @@ milestone m "M" after:[w1, b2, a2]
         expect(m.onWaveBoundary).toBe(true);
     });
 
-    it('an overrun milestone is never on a boundary, even on another wave’s edge', async () => {
+    it('an overrun milestone is judged on a boundary where it lands, not on its date', async () => {
         const laid = await lay(`nowline v1
 
 roadmap edge "Edge" start:2026-01-05 scale:1w calendar:full
@@ -988,16 +990,17 @@ swimlane a
   item a1 duration:2w wave:w1
   item a2 duration:2w wave:w2
 `);
-        // m sits at W2 = E_1 = S_2, but w2 runs to W4: it keeps its red
-        // cut line.
+        // m's date is W2 = E_1 = S_2, but w2 runs to W4: it slips there,
+        // onto w2's end, and that boundary carries its line.
         const m = milestone(laid, 'm');
         expect(weeksAt(laid, m.center.x)).toBe(2);
+        expect(weeksAt(laid, m.slip?.x ?? 0)).toBe(4);
         expect(m.overrunByWave).toBe('w2');
         expect(m.isOverrun).toBe(true);
-        expect('onWaveBoundary' in m).toBe(false);
+        expect(m.onWaveBoundary).toBe(true);
     });
 
-    it('a dated milestone overrun by a wave and an item: the item keeps its arrow and corridor', async () => {
+    it('a dated milestone overrun by a wave and an item slips to the later of the two, with no arrow or corridor', async () => {
         const laid = await lay(`nowline v1
 
 roadmap both "Both" start:2026-01-05 scale:1w calendar:full
@@ -1018,12 +1021,11 @@ swimlane b
         // w1 (W4) runs past the date and so does x (W3); w1 ends later.
         expect(m.overrunByWave).toBe('w1');
         expect(m.isOverrun).toBe(true);
-        // The arrow comes from x, the latest item, never from the wave.
-        expect(m.slackArrows?.map((a) => a.x)).toEqual([x.dateSpan.endX]);
-        // Its corridor runs left, from x's end back to W1, across z.
-        // Rows never move up, so z stays put and x drops below it, where the
-        // path is clear (specs/true-width-layout.md §3.2).
-        expect(x.box.y).toBeGreaterThan(z.box.y);
+        expect(m.slackArrows).toBeUndefined();
+        expect(weeksAt(laid, m.slip?.x ?? 0)).toBe(4);
+        expect(m.slip?.x).toBeGreaterThan(x.dateSpan.endX);
+        // No corridor, so x stays on z's row after it.
+        expect(x.box.y).toBe(z.box.y);
     });
 
     it('a milestone at the origin is not on a boundary', async () => {

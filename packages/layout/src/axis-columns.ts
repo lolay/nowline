@@ -1,12 +1,13 @@
 // Axis columns — the date axis as a run of tick columns, read off the
 // natural scale (specs/rendering.md § "Caption cap at the chart's end",
 // specs/scheduler-unification.md §8 decision 12). A spilled caption that
-// would run past the axis end is capped one full column past it (past the
-// end of a partial last column, when an explicit `length:` ends the axis
+// would run past the axis end may run on for whole columns while it stays
+// within max(one column, CAPTION_OVERHANG_BUDGET_PX) of the axis end (of a
+// partial last column's end, when an explicit `length:` ends the axis
 // mid-column): the item measure truncates the title to `captionCapX`, and
-// finalize step f2 (`extendTimeline`) grows the axis by that one column,
-// labelled by the axis's usual rules. Both read the same columns, so the
-// cap and the extension agree.
+// finalize step f2 (`extendTimeline`) grows the axis by the columns that
+// hold it, labelled by the axis's usual rules. Both read `captionLimit`,
+// so the cap and the extension agree.
 
 import type { TimeScale } from './time-scale.js';
 import { type ScaleUnit, tickBoundaryAtOrAfter } from './view-preset.js';
@@ -20,6 +21,16 @@ export interface AxisColumnsWindow {
     preset: { unit: ScaleUnit };
     calendar: WorkingCalendar;
 }
+
+/**
+ * How far (px) past the axis end a spilled caption may run before it is
+ * truncated, when one column is narrower than this: about 20 characters of
+ * a 13 px title.
+ */
+export const CAPTION_OVERHANG_BUDGET_PX = 160;
+
+/** Bounds the column walk in `captionLimit` (a day-scale axis has ~4 px columns). */
+const MAX_CAPTION_COLUMNS = 64;
 
 /** Days of float noise `isPast` ignores, as `tickBoundaryAtOrAfter` does. */
 const PAST_TOLERANCE_DAYS = 1e-6;
@@ -80,6 +91,24 @@ export class AxisColumns {
         return { start, end: this.nextBoundary(start) };
     }
 
+    /**
+     * The farthest working-day index a spilled caption past the axis end
+     * `axisDays` may reach: the end of the first column after the axis end
+     * (`captionColumn`), or further, whole columns at a time, while the
+     * overhang past the axis end stays within `CAPTION_OVERHANG_BUDGET_PX`.
+     */
+    captionLimit(axisDays: number): number {
+        const { start, end } = this.captionColumn(axisDays);
+        const startX = this.xAt(start);
+        let limit = end;
+        for (let i = 0; i < MAX_CAPTION_COLUMNS; i++) {
+            const next = this.nextBoundary(limit);
+            if (next <= limit || this.xAt(next) - startX > CAPTION_OVERHANG_BUDGET_PX) break;
+            limit = next;
+        }
+        return limit;
+    }
+
     /** The column boundary one column after the boundary `days`. */
     nextBoundary(days: number): number {
         return tickBoundaryAtOrAfter(
@@ -98,7 +127,7 @@ export class AxisColumns {
 
     /**
      * Where a spilled caption beside a bar ending at `barRightX` may end at
-     * most: one full column past the axis end (`captionColumn`). The axis
+     * most: the column boundary `captionLimit` gives past the axis end. The axis
      * end is the natural one, or the boundary f2 grows it to for this bar
      * when the bar itself runs past it.
      */
@@ -106,6 +135,6 @@ export class AxisColumns {
         const axisDays = this.isPast(barRightX, this.spanDays)
             ? Math.max(this.spanDays, this.boundaryAtOrAfterX(barRightX))
             : this.spanDays;
-        return this.xAt(this.captionColumn(axisDays).end);
+        return this.xAt(this.captionLimit(axisDays));
     }
 }

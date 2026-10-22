@@ -630,6 +630,33 @@ describe('fitItemCaption', () => {
         });
     });
 
+    it('lets line 1 use the hard width when the soft one would spill', () => {
+        // "Launch" is 45.24px: it misses a 45px first line by a hair, and fits
+        // a 49px hard width (the dot's own left edge, without its 4px gap).
+        expect(fitItemCaption('Launch page', 54, 0, 45)).toEqual({
+            textSpills: true,
+            titleLines: ['Launch page'],
+        });
+        expect(fitItemCaption('Launch page', 54, 0, 45, 49)).toEqual({
+            textSpills: false,
+            titleLines: ['Launch', 'page'],
+        });
+    });
+
+    it('keeps the soft first line when it already wraps', () => {
+        // The hard width is only a fallback: a title that wraps at the soft
+        // width wraps there, with the gap kept.
+        expect(fitItemCaption('Plan the rollout', 124, 0, 115, 119)).toEqual({
+            textSpills: false,
+            titleLines: ['Plan the', 'rollout'],
+        });
+    });
+
+    it('lets an explicit break line 1 use the hard width', () => {
+        expect(fitItemCaption('Launch\npage', 54, 0, 45).textSpills).toBe(true);
+        expect(fitItemCaption('Launch\npage', 54, 0, 45, 49).textSpills).toBe(false);
+    });
+
     it('spills when a narrower first line pushes the title to three lines', () => {
         // Greedy at 124: "Migrate legacy" / "billing service" / "to new platform".
         const title = 'Migrate legacy billing service to new platform';
@@ -647,6 +674,20 @@ describe('fitItemCaption', () => {
         });
         // Three lines: no cap.
         expect(fitItemCaption('a\nb\nc', 124, 0).titleLines).toEqual(['a', 'b', 'c']);
+    });
+});
+
+describe('measureItemCaption first-line clearance', () => {
+    it('wraps "Launch page" in a one-column bar: line 1 clears the dot by under the 4px gap', () => {
+        // 78px bar: inner 54, soft first line 45 (21px reserve), hard 49 (the
+        // dot's left edge). "Launch" is 45.24px.
+        const { fit } = measureItemCaption({ title: 'Launch page', visualWidth: 78 });
+        expect(fit).toEqual({ textSpills: false, titleLines: ['Launch', 'page'] });
+    });
+
+    it('leaves a title that cannot wrap even at the hard width spilling', () => {
+        const { fit } = measureItemCaption({ title: 'Internationalize', visualWidth: 78 });
+        expect(fit.textSpills).toBe(true);
     });
 });
 

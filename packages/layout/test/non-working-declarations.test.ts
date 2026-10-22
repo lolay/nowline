@@ -149,19 +149,20 @@ describe('Example B under hide: a holiday inside a bar pushes its end out', () =
         expect(m.hiddenDate).toBe('2026-11-28');
     });
 
-    it('ticks [0, none], [24, Nov 30], [64, Dec 07], [104, none]; width 104, ending 2026-12-14', async () => {
+    it('ticks [0, none], [24, Nov 30], [64, Dec 07], [104, Dec 14], [144, none]; width 144, ending 2026-12-21', async () => {
         const { model } = await lay(exampleB(), 'hide');
-        // QA's caption spills past the content end at 64, so the axis gains
-        // the labelled Dec 07 column (rendering.md § "Caption cap at the
-        // chart's end").
+        // QA's spill column (caption, then the spilled dot) ends at 105.3,
+        // just past the Dec 07 column, so the axis gains Dec 07 and Dec 14
+        // (rendering.md § "Caption cap at the chart's end").
         expect(ticksOf(model)).toEqual([
             [0, undefined],
             [24, 'Nov 30'],
             [64, 'Dec 07'],
-            [104, undefined],
+            [104, 'Dec 14'],
+            [144, undefined],
         ]);
-        expect(model.timeline.box.width).toBe(104);
-        expect(iso(model.timeline.endDate)).toBe('2026-12-14');
+        expect(model.timeline.box.width).toBe(144);
+        expect(iso(model.timeline.endDate)).toBe('2026-12-21');
     });
 
     it('carries the titled holiday run, and a plain weekend run with no titles key', async () => {
@@ -176,6 +177,7 @@ describe('Example B under hide: a holiday inside a bar pushes its end out', () =
             },
             { x: 64, width: 0, from: '2026-12-05', through: '2026-12-06' },
             { x: 104, width: 0, from: '2026-12-12', through: '2026-12-13' },
+            { x: 144, width: 0, from: '2026-12-19', through: '2026-12-20' },
         ]);
     });
 });
@@ -632,9 +634,9 @@ describe('Example B labels (5b)', () => {
             expect(model.timeline.markerRow.height).toBe(52);
         });
 
-        it('grows the canvas to 272.6 so the label sits on the right (it was 250.32)', async () => {
+        it('keeps the label on the right inside the 288 canvas (the axis reaches 144)', async () => {
             const { model } = await lay(exampleB(), 'hide');
-            expect(model.width).toBeCloseTo(272.6, 5);
+            expect(model.width).toBeCloseTo(288, 5);
         });
 
         it('never falls back to the left over the header card (regression pin)', async () => {
@@ -697,6 +699,7 @@ describe('Example B labels (5b)', () => {
     });
 
     it('leaves the 5a model values untouched: runs, ticks and boxes (guard)', async () => {
+        const ends = { hide: '2026-12-21', show: '2026-12-14' };
         for (const display of ['hide', 'show'] as const) {
             const { model } = await lay(exampleB(), display);
             const run = runsOf(model)[0];
@@ -706,7 +709,7 @@ describe('Example B labels (5b)', () => {
                 through: '2026-11-29',
                 titles: ['Thanksgiving'],
             });
-            expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe('2026-12-14');
+            expect(model.timeline.endDate.toISOString().slice(0, 10)).toBe(ends[display]);
         }
     });
 

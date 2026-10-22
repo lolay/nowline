@@ -398,7 +398,7 @@ export interface PositionedItem {
     titleLines?: string[];
     /**
      * True when a spilled caption that would run past the axis end was
-     * capped one column past it: `titleLines` carries the lines truncated
+     * capped at the overhang budget past it: `titleLines` carries the lines truncated
      * with `…`, and the renderer gives the bar the full `title` as its
      * `<title>` tooltip (specs/rendering.md § "Caption cap at the chart's
      * end"). Omitted otherwise.
@@ -765,6 +765,16 @@ export interface PositionedMilestone {
     // milestone has zero or one predecessor.
     slackArrows?: Array<{ x: number; y: number }>;
     isOverrun: boolean; // true when the aggregated predecessor end exceeds `date:`
+    /**
+     * Where an overrun dated milestone actually lands: the end of its
+     * latest predecessor or overrunning wave. `center` stays on the
+     * planned date; the renderer draws that diamond in the overrun colour,
+     * a dotted span on the same row to a second diamond at `slip.x`, and
+     * puts the label and the cut line there (specs/rendering.md,
+     * Milestones). Omitted when the milestone does not overrun, or when
+     * the two diamonds would meet.
+     */
+    slip?: { x: number };
     style: ResolvedStyle;
     // Vertical span of the milestone's cut line through the swimlane area.
     cutTopY: number;
@@ -993,6 +1003,13 @@ export interface PositionedWaveStrip {
      * no label or no cell.
      */
     labelDraw?: { x: number; halo: BoundingBox };
+    /**
+     * The calendar glyph for a declared date floor (`wave launch after:2026-11-02`),
+     * at the cell's left, vertically centred in the strip, whether or not the
+     * floor opened a gap. The label clears it. Omitted when the wave has no
+     * date floor, no `cell`, or the cell is too narrow to host it.
+     */
+    inlineDatePin?: InlineDatePin;
     /**
      * The footnote superscripts when `footnotesShown` and the wave has a
      * `cell`: `rightX` is the last superscript's right edge (they walk left

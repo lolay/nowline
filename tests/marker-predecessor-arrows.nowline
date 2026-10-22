@@ -1,5 +1,12 @@
 nowline v1
 
+// Marker predecessors in the marker band, on the host and in an isolated
+// region: slack arrows from anchors and milestones to after-only milestones,
+// and dated milestones that slip when a marker predecessor lands after their
+// date (Cut after Code freeze, Review after Alpha, Partner due after Partner
+// alpha): a red diamond on the date, a red dotted span along the row, and
+// the milestone, its label and cut line where it lands.
+
 include "./marker-predecessor-partner.nowline" roadmap:isolate
 
 roadmap marker-predecessor-arrows "Marker predecessor arrows" start:2026-01-05 scale:1w

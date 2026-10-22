@@ -178,13 +178,12 @@ describe('positionMilestones', () => {
     });
 });
 
-// No sample reaches this case (specs/layout-phases.md §1.2: P9 changes no
-// region on the corpus). The child's bars end on the natural window's last
-// day, so the region's shrink-wrap (bars + right pad) is wider than the
-// canvas and the canvas clamps it. The milestone on that day overflows the
-// window by its radius, so the timeline extension grows the canvas by one
-// week column after the region is placed. The region must be fitted to the
-// final canvas: clamped to the grown width, not the width at placement.
+// The child's bars end on the natural window's last day. The milestone on
+// that day overflows the window by its radius, so the timeline extension
+// grows the canvas by one week column after the region is placed. The
+// region reaches 24 px past the diagram's furthest content (here the
+// milestone's label), and the canvas grows to hold it, so the region is
+// fitted to the final canvas, not the width at placement.
 describe('include region whose bars reach the canvas edge', () => {
     const childSrc = `nowline v1
 
@@ -209,7 +208,7 @@ swimlane a "A"
     // right pad.
     const MAX_WIDTH = 400;
 
-    it('clamps the region to the canvas after the post-placement growth', async (): Promise<void> => {
+    it('fits the region to the content and grows the canvas to hold it', async (): Promise<void> => {
         const { file, resolved } = await parseAndResolve(
             parentSrc,
             '/virtual/test.nowline',
@@ -224,10 +223,13 @@ swimlane a "A"
         const region = model.includes[0];
         const [lane] = region.nestedSwimlanes;
         const [bar] = lane.children;
-        // The bars plus the right pad pass the final canvas, so the clamp
-        // decides the width, and it reads the final canvas.
-        expect(bar.box.x + bar.box.width + 32).toBeGreaterThan(model.width);
+        // The milestone's label passes the bars, so it sets the edge; the
+        // canvas ends at the padded box.
+        const [ext] = model.milestones;
+        const labelRightX = ext.labelBox.x + ext.labelBox.width;
+        expect(labelRightX).toBeGreaterThan(bar.box.x + bar.box.width);
         expect(region.box.x).toBe(0);
+        expect(region.box.width).toBeCloseTo(labelRightX + 24, 5);
         expect(region.box.width).toBe(model.width);
         expect(lane.box.width).toBe(region.box.width);
     });

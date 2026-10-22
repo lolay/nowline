@@ -3,7 +3,8 @@ nowline v1
 // Wave fixture: start floors that create gaps (an anchor floor and an
 // inline-date floor) and a dated deadline milestone `after:<wave>` that the
 // wave overruns. The inline-date gap shows its gap label (the one-week
-// anchor gap is too narrow for one), plus the red overrun cut line and NL.I1007.
+// anchor gap is too narrow for one), plus the deadline's slip to the wave's
+// end and NL.I1007.
 
 roadmap waves-gap-deadline "Gaps and deadline" start:2026-01-05 scale:1w calendar:full
 

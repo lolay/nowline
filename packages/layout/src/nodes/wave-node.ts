@@ -13,7 +13,13 @@ import type { StyleProperty } from '@nowline/core';
 import { propKey } from '@nowline/core/internal';
 import { propValue } from '../dsl-utils.js';
 import { type LocaleStrings, wavesDeclaredPlaceholder } from '../i18n.js';
-import { ITEM_FOOTNOTE_INDICATOR_STEP_PX } from '../item-bar-geometry.js';
+import { pickInlineDate } from '../inline-date-pin-geometry.js';
+import {
+    INLINE_DATE_GLYPH_GAP_PX,
+    INLINE_DATE_GLYPH_INSET_LEFT_PX,
+    INLINE_DATE_GLYPH_TILE_SIZE_PX,
+    ITEM_FOOTNOTE_INDICATOR_STEP_PX,
+} from '../item-bar-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
 import { estimateTextWidth } from '../text-measure.js';
 import { contrastRatio, hexToRgb } from '../themes/contrast.js';
@@ -37,6 +43,7 @@ import {
 } from '../themes/shared.js';
 import type {
     BoundingBox,
+    InlineDatePin,
     PositionedIncludeRegion,
     PositionedItem,
     PositionedSwimlane,
@@ -129,6 +136,22 @@ export function buildWaves(
         const cellRight = Math.min(span.end, visRight);
         const visibleWidth = Math.max(0, cellRight - cellLeft);
 
+        // A declared date floor (`after:2026-11-02`) puts a calendar glyph at
+        // the cell's left, whether or not the floor opened a gap (§9.1); the
+        // label clears it like it clears the superscripts.
+        const floorDate = pickInlineDate(
+            state.plan.floors[i]?.ref !== undefined ? [state.plan.floors[i].ref as string] : [],
+        );
+        const glyphFits =
+            floorDate !== undefined &&
+            visibleWidth >=
+                INLINE_DATE_GLYPH_INSET_LEFT_PX +
+                    INLINE_DATE_GLYPH_TILE_SIZE_PX +
+                    WAVE_STRIP_LABEL_PAD_PX;
+        const glyphReserve = glyphFits
+            ? INLINE_DATE_GLYPH_TILE_SIZE_PX + INLINE_DATE_GLYPH_GAP_PX
+            : 0;
+
         // Fit chain (§9.1): try every candidate beside the footnote
         // superscripts; when none fits with them, the superscripts move
         // to the legend and the chain runs again on the label alone.
@@ -138,10 +161,16 @@ export function buildWaves(
             if (footnoteIndicators.length > 0) {
                 const superscriptWidth =
                     footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX;
-                fit = fitStripLabel(title, span.id, i + 1, visibleWidth, superscriptWidth);
+                fit = fitStripLabel(
+                    title,
+                    span.id,
+                    i + 1,
+                    visibleWidth,
+                    superscriptWidth + glyphReserve,
+                );
                 footnotesShown = fit !== undefined;
             }
-            fit ??= fitStripLabel(title, span.id, i + 1, visibleWidth, 0);
+            fit ??= fitStripLabel(title, span.id, i + 1, visibleWidth, glyphReserve);
         }
 
         let labelX = (cellLeft + cellRight) / 2;
@@ -200,7 +229,20 @@ export function buildWaves(
         const cell = empty ? undefined : stripCellBox(stripBox, ctx.timeline.box);
         let labelDraw: PositionedWave['strip']['labelDraw'];
         let superscripts: PositionedWave['strip']['superscripts'];
+        let inlineDatePin: InlineDatePin | undefined;
         if (cell) {
+            if (glyphFits && floorDate !== undefined) {
+                inlineDatePin = {
+                    side: 'after',
+                    isoDate: floorDate,
+                    glyphTopLeft: {
+                        x: cell.x + INLINE_DATE_GLYPH_INSET_LEFT_PX,
+                        y: strip.y + (strip.height - INLINE_DATE_GLYPH_TILE_SIZE_PX) / 2,
+                    },
+                    glyphSize: INLINE_DATE_GLYPH_TILE_SIZE_PX,
+                    spilled: false,
+                };
+            }
             const paintedRight = cell.x + cell.width;
             const superscriptWidth = footnotesShown
                 ? footnoteIndicators.length * ITEM_FOOTNOTE_INDICATOR_STEP_PX
@@ -219,12 +261,21 @@ export function buildWaves(
             }
             if (fit) {
                 const textWidth = stripLabelWidth(fit.label);
-                const x = superscriptWidth
+                const rightBound = superscriptWidth
                     ? Math.min(
                           labelX,
                           paintedRight - WAVE_STRIP_LABEL_PAD_PX - superscriptWidth - textWidth / 2,
                       )
                     : labelX;
+                const x = inlineDatePin
+                    ? Math.max(
+                          rightBound,
+                          inlineDatePin.glyphTopLeft.x +
+                              INLINE_DATE_GLYPH_TILE_SIZE_PX +
+                              INLINE_DATE_GLYPH_GAP_PX +
+                              textWidth / 2,
+                      )
+                    : rightBound;
                 const haloWidth = textWidth + 2 * WAVE_LABEL_HALO_PAD_PX;
                 labelDraw = {
                     x,
@@ -264,6 +315,7 @@ export function buildWaves(
                 labelX,
                 ...(cell ? { cell } : {}),
                 ...(labelDraw ? { labelDraw } : {}),
+                ...(inlineDatePin ? { inlineDatePin } : {}),
                 ...(superscripts ? { superscripts } : {}),
                 tooltip: tooltipParts.join(' · '),
                 footnotesShown,
@@ -617,7 +669,16 @@ export function buildWaveLegend(
     if (built.boundaries.length > 0) swatchEntry('boundary', strings.waveLegendBoundary);
 
     if (abbreviated || anyEmpty || dropped) {
-        const names = waves.map((w) => {
+        // Only the waves the strip doesn't name in full: an empty one, an
+        // abbreviated label, or footnotes it dropped. The `#k` numbering stays
+        // the wave's own, so the legend still reads against the bands.
+        const unnamed = waves.filter(
+            (w) =>
+                w.empty ||
+                w.strip.labelKind !== 'title' ||
+                (w.footnoteIndicators.length > 0 && !w.strip.footnotesShown),
+        );
+        const names = unnamed.map((w) => {
             let name = `#${w.index + 1} ${w.title}`;
             if (w.footnoteIndicators.length > 0 && !w.strip.footnotesShown) {
                 name += ` ${w.footnoteIndicators.map(superscript).join(',')}`;

@@ -420,7 +420,7 @@ end(x) ≤ E_k ≤ S_{k+1} ≤ E_{k+1} ≤ … ≤ S_j ≤ start(y)
 | `after:<wave>` | `start ≥ E_k`. Use it for background work and milestones. On a member of a later wave it is redundant. On an entity whose wave is k or earlier it is NL.E1103 (Examples 8 and 14). |
 | `before:` an item, an anchor or a date | Soft; it never moves the start. A miss caused by the barrier shows the existing red overflow plus NL.I1003 (Example 10). A miss the structure guarantees also gets NL.W1100 (Example 14). |
 | Floating milestone `after:<wave>` | When a wave reference is the binding term, the diamond sits **on** the boundary at `E_k`, as it sits on an item predecessor's duration end. Wave references draw no slack arrows (Example 8). |
-| Dated milestone `after:<wave>` | Pinned to its date. If the wave ends after that date, the existing overrun treatment (red cut line, diamond and label, no arrow) applies, plus the info NL.I1007. This is the wave-deadline idiom (Example 11). |
+| Dated milestone `after:<wave>` | Pinned to its date. If the wave ends after that date, the milestone slips to the wave's end (red diamond on the date, a red dotted span to a normal diamond and label at `E_k`; [`rendering.md`](./rendering.md) Milestones), plus the info NL.I1007. This is the wave-deadline idiom (Example 11). |
 | Anchors | They are dates. They can floor a wave through its `after:`, and they are never members. |
 | Roadmap `start:` | It is the origin, so `S_1 ≥ 0`. An inline date on a wave requires `start:` (NL.E0412) and must be on or after it (NL.E0413). |
 | Roadmap `length:` | `length:` is a minimum span, not a cap. The content extent includes every `S_k` and `E_n`, so waves that run past `length:` grow the date window to the next tick boundary, like any other content. Floors are still computed from unclamped declaration dates (§5.1). |
@@ -945,12 +945,13 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
 
 - **Text.** 10 px, weight 600, in `style.text ?? wave.labelText`, centred at `labelX` (the centre of the visible part of the span).
 - **Halo.** Each label sits on a halo rect in its cell's fill, so grid lines never cut through text. The precedent is the include region's source-path halo.
-- **Fit.** The width test is `estimateTextWidth(text, 10) × MARKER_BOLD_WIDTH_FACTOR + superscript width + 2 × 6 px padding ≤ visible cell width`. Candidates, in order:
+- **Fit.** The width test is `estimateTextWidth(text, 10) × MARKER_BOLD_WIDTH_FACTOR + superscript width + date-floor glyph width + 2 × 6 px padding ≤ visible cell width`. Candidates, in order:
   1. the title;
   2. the id;
   3. the title ellipsized to 3 or more characters plus "…";
   4. the 1-based ordinal `#k`;
   5. no label.
+- **Date-floor glyph.** A wave whose declared floor is a date literal (`wave launch "Launch" after:2026-11-02`, `pickInlineDate`) paints the calendar glyph (rendering.md "Inline-date glyph") at its cell's left: `INLINE_DATE_GLYPH_INSET_LEFT_PX` (6) in from the cell's painted left edge, 12 px square, vertically centred in the 20 px strip, in `style.text`, wrapped in `<title>YYYY-MM-DD</title>` like any inline-date pin. It shows whether or not the floor opened a gap, so a floor that did not bind still reads as declared. A floor that names an entity (`after:fy-budget`) has no date to show and gets no glyph. The glyph needs `6 + 12 + 6` px of visible cell; narrower, it is dropped. The fit test below adds the glyph's `12 + 4` px (`INLINE_DATE_GLYPH_GAP_PX`) to the width, and the label is centred on the visible span but never left of the glyph's right edge plus that gap, as it is never under the superscripts. The italic gap label below stays: it dates the gap, the glyph dates the floor.
 - **Footnote superscripts** are right-aligned in the cell. When they don't fit, they move to the legend.
 - **Tooltip.** Every cell has a `<title>`, for example `Launch · 2026-02-02 – 2026-02-23 · held by i2`. The end date is exclusive, and "held by" comes from the layout `LocaleStrings` table.
 
@@ -981,7 +982,7 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
 - **Gutter.** The line sits in the gap of at least 2 px between bars of different waves (§8.4, "Visual gutter").
 - **Milestone on a boundary.** A milestone whose diamond falls on a boundary (`|center.x − boundary.x| < 0.5 px`, recorded as `onWaveBoundary`) keeps its diamond and label but **does not draw its cut line**. The boundary already marks that instant, and two vertical lines in the same place would read as a rendering bug.
   - This is the common `milestone … after:<wave>` case (the Beta and GA milestones in the mockup).
-  - A dated milestone that a wave overruns is never on a boundary, so it keeps its red cut line (and its red diamond and label).
+  - A dated milestone that a wave overruns slips to that wave's end, a boundary, so the boundary carries its line; nothing drops from the missed date.
 
 ### 9.3 Background work (`waveRole: 'background'`)
 
@@ -1043,7 +1044,7 @@ PNG and PDF have no tooltips, so the legend is the fallback for anything the pic
 
 1. A hatch swatch with `Background work (not in a wave)`, when background items exist.
 2. A boundary swatch with `Wave boundary`.
-3. Wave names whenever any label is abbreviated or any wave is empty, for example `Waves: #1 Discover · #2 Build ¹ · #3 Hardening (TBD) (no items) · #4 Launch`.
+3. Wave names whenever any label is abbreviated, any wave is empty or any footnote indicator was dropped. Only the waves the strip does not name in full are listed: an empty wave, a wave whose label is not its title (id, ellipsis or `#k`, or no label), and a wave whose footnote indicators moved here. A wave the strip spells out in full is left out. Each listed wave keeps its own `#k` (its 1-based declaration position), so the legend still reads against the bands, for example `Waves: #2 Build ¹ · #3 Hardening (TBD) (no items)` when wave 1 shows `Discover` and wave 4 shows `Launch` in full.
 
 ### 9.6 Distinctness
 
@@ -1712,7 +1713,7 @@ Waves: w1 [W0, W2]; w2 [W2, W2], empty; w3 [W2, W4].
 
 - **The W2 boundary** is drawn once, and the hollow w2 diamond sits on it in the strip.
 - **Strip alternation** follows the visible ordinal, so w1 uses `stripFill` and w3 uses `stripFillAlt`.
-- **Legend.** It reads `Wave boundary` · `Waves: #1 Wave 1 · #2 Hardening (TBD) (no items) · #3 Wave 3`.
+- **Legend.** It reads `Wave boundary` · `Waves: #2 Hardening (TBD) (no items)`: waves 1 and 3 are named in full in the strip, so only the empty wave is listed.
 
 Diagnostic (layout insight): `NL.I1006 Wave "w2" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.`
 

@@ -5,7 +5,6 @@
 
 import type {
     BoundingBox,
-    PositionedMilestone,
     PositionedRoadmap,
     PositionedSwimlane,
     PositionedTimelineScale,
@@ -35,6 +34,7 @@ import {
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
 } from '@nowline/layout';
+import { renderInlineDatePins } from './item.js';
 import { intersectBox } from './primitives.js';
 import type { FontFamilies } from './render.js';
 import { escText, num, tag, textTag } from './xml.js';
@@ -87,15 +87,6 @@ export function waveHatchPatternDef(idPrefix: string, kind: WaveHatchKind, palet
             'stroke-width': WAVE_HATCH_STROKE_PX,
             opacity: WAVE_HATCH_OPACITY,
         }),
-    );
-}
-
-/** True when a dated milestone, on the host or in a region, draws an overrun arrow. */
-export function hasOverrunArrow(model: PositionedRoadmap): boolean {
-    const draws = (m: PositionedMilestone): boolean =>
-        m.isOverrun && (m.slackArrows?.length ?? 0) > 0;
-    return (
-        model.milestones.some(draws) || model.includes.some((r) => (r.milestones ?? []).some(draws))
     );
 }
 
@@ -411,7 +402,8 @@ export function renderWaveLabels(
         // Layout placed the label and superscript halos in the painted
         // cell; a wave without one draws neither.
         if (!w.strip.cell) continue;
-        const { labelDraw, superscripts } = w.strip;
+        const { labelDraw, superscripts, inlineDatePin } = w.strip;
+        if (inlineDatePin) parts.push(renderInlineDatePins([inlineDatePin], w.style.text));
         if (superscripts) {
             // The superscripts' own halo in the cell's fill, first so the
             // label's halo never covers them.
