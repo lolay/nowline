@@ -5,7 +5,6 @@
 
 import type {
     BoundingBox,
-    PositionedMilestone,
     PositionedRoadmap,
     PositionedSwimlane,
     PositionedTimelineScale,
