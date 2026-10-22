@@ -336,7 +336,7 @@ The repo uses [Biome](https://biomejs.dev) as a single tool for linting, formatt
 | Lint only | `pnpm lint` / `pnpm lint:fix` |
 | Type-check the vscode-extension | `pnpm typecheck` |
 
-`pnpm check` is the gate: lint + format-drift + import organization, all in one Biome invocation. CI fails the PR if it isn't clean.
+`pnpm check` is the gate: lint + format-drift + import organization, all in one Biome invocation, run with `--error-on-warnings` so a warning fails it like an error. CI fails the PR if it isn't clean.
 
 `pnpm typecheck` is a separate step because most packages type-check as part of `pnpm -r build` (via `tsc -b`); the VS Code extension bundles via esbuild and skips that, so its `tsc --noEmit` runs under `typecheck` instead. Run it after a build: packages like `@nowline/browser` resolve sibling `@nowline/*` types from their built `dist/`, so on a fresh clone it fails with TS2307. `make ci` orders `build` before `typecheck` for this reason.
 

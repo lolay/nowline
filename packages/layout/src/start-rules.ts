@@ -5,12 +5,7 @@
 // `after:` date that reports NL.I1008 when it set an item's start on a
 // non-working day (specs/working-calendar.md §6).
 
-import {
-    type EntityProperty,
-    type GroupBlock,
-    type ItemDeclaration,
-    type ParallelBlock,
-} from '@nowline/core';
+import type { EntityProperty, GroupBlock, ItemDeclaration, ParallelBlock } from '@nowline/core';
 import { formatIsoDate } from './dsl-utils.js';
 import type { LayoutContext } from './layout-context.js';
 import { startTermsOf } from './start-terms.js';
