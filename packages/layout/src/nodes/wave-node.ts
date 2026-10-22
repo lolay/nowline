@@ -79,8 +79,11 @@ export interface BuiltWaves {
     regionCrossings: PositionedWaveCrossing[][];
     /** True when any placed item (main lanes or regions) is background work. */
     hasBackground: boolean;
-    /** The strip placeholder, set only when every wave is empty. */
-    placeholder?: string;
+    /**
+     * The strip placeholder, set only when every wave is empty: its text,
+     * centred on the timeline at `x`, on `halo` in the backing panel's fill.
+     */
+    placeholder?: { text: string; x: number; halo: BoundingBox };
 }
 
 /**
@@ -340,10 +343,18 @@ export function buildWaves(
         hasBackground: mainBackground.length + regionBackground.flat().length > 0,
     };
     if (allEmpty) {
-        built.placeholder = wavesDeclaredPlaceholder(
+        const text = wavesDeclaredPlaceholder(
             strings,
             waves.map((w) => w.title),
         );
+        const x = visLeft + ctx.timeline.box.width / 2;
+        const haloWidth =
+            estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) + 2 * WAVE_LABEL_HALO_PAD_PX;
+        built.placeholder = {
+            text,
+            x,
+            halo: { x: x - haloWidth / 2, y: haloY, width: haloWidth, height: haloHeight },
+        };
     }
     return built;
 }

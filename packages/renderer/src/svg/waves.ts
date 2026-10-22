@@ -19,7 +19,6 @@ import type {
 } from '@nowline/layout';
 import {
     CORNER_RADIUS_PX,
-    estimateTextWidth,
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
     WAVE_BOUNDARY_WIDTH_PX,
     WAVE_CELL_INSET_PX,
@@ -28,8 +27,6 @@ import {
     WAVE_HATCH_OPACITY,
     WAVE_HATCH_STROKE_PX,
     WAVE_HATCH_TILE_PX,
-    WAVE_LABEL_HALO_INSET_Y_PX,
-    WAVE_LABEL_HALO_PAD_PX,
     WAVE_STRIP_LABEL_FONT_SIZE_PX,
     WAVE_STYLED_STRIP_MIX_OPACITY,
     WAVE_STYLED_TINT_OPACITY,
@@ -357,19 +354,8 @@ export function renderWaveLabels(
         );
     };
 
-    if (strip.placeholder !== undefined) {
-        // Layout keeps no halo for the placeholder (survey F1), so it is
-        // measured here with layout's estimator.
-        const x = t.box.x + t.box.width / 2;
-        const haloWidth =
-            estimateTextWidth(strip.placeholder, WAVE_STRIP_LABEL_FONT_SIZE_PX) +
-            2 * WAVE_LABEL_HALO_PAD_PX;
-        const halo: BoundingBox = {
-            x: x - haloWidth / 2,
-            y: strip.y + WAVE_LABEL_HALO_INSET_Y_PX,
-            width: haloWidth,
-            height: strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX,
-        };
+    if (strip.placeholder !== undefined && strip.placeholderDraw) {
+        const { x, halo } = strip.placeholderDraw;
         parts.push(mutedText(x, strip.placeholder, halo));
     }
 

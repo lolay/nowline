@@ -196,10 +196,17 @@ export interface PositionedTimelineScale {
      * high, directly under the top tick panel (under the now-pill row
      * with `timeline-position:bottom`) and above the marker rows, which
      * move down by its height. `placeholder` is set when every wave is
-     * empty: the strip then shows only that text. Present only when the
-     * roadmap declares waves; the mirrored bottom panel never has one.
+     * empty: the strip then shows only that text, centred at
+     * `placeholderDraw.x` on `placeholderDraw.halo`, its backing box in the
+     * timeline panel's fill. Present only when the roadmap declares waves;
+     * the mirrored bottom panel never has one.
      */
-    waveStrip?: { y: number; height: number; placeholder?: string };
+    waveStrip?: {
+        y: number;
+        height: number;
+        placeholder?: string;
+        placeholderDraw?: { x: number; halo: BoundingBox };
+    };
     // When `true`, the renderer draws a faint dotted line at every tick
     // boundary (not just major ticks) using `theme.timeline.minorGridLine`.
     // Mirrors the roadmap's resolved `minor-grid` style property. Default
