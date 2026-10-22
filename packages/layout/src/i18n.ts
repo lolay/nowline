@@ -36,6 +36,11 @@ export interface LocaleStrings {
      * `wavesDeclaredPlaceholder`.
      */
     wavesDeclaredPlaceholder: string;
+    /**
+     * The placeholder's short form, without the wave names, when not even
+     * an ellipsized name list fits the timeline (the legend lists them).
+     */
+    wavesDeclaredPlaceholderShort: string;
 }
 
 // Bundle entries keyed by language tag. The fallback chain strips the
@@ -57,6 +62,7 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
         waveLegendBoundary: 'Wave boundary',
         waveLegendPrefix: 'Waves:',
         wavesDeclaredPlaceholder: 'Waves declared: {names} — no items assigned yet',
+        wavesDeclaredPlaceholderShort: 'No items assigned to waves yet',
     },
     fr: {
         // Short form of "maintenant"; keeps the pill compact while staying
@@ -75,6 +81,7 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
         waveLegendPrefix: 'Vagues\u00A0:',
         wavesDeclaredPlaceholder:
             'Vagues déclarées\u00A0: {names} — aucun élément affecté pour l’instant',
+        wavesDeclaredPlaceholderShort: 'Aucun élément affecté aux vagues pour l’instant',
     },
 };
 
@@ -136,8 +143,13 @@ export function localeStrings(locale: string): LocaleStrings {
  * `Waves declared: Discover, Build — no items assigned yet`.
  */
 export function wavesDeclaredPlaceholder(strings: LocaleStrings, names: readonly string[]): string {
+    return fillWaveNames(strings, names.join(', '));
+}
+
+/** The placeholder template with `{names}` replaced by `list` verbatim. */
+export function fillWaveNames(strings: LocaleStrings, list: string): string {
     // A replacer function, so a `$` in a title is never read as a pattern.
-    return strings.wavesDeclaredPlaceholder.replace('{names}', () => names.join(', '));
+    return strings.wavesDeclaredPlaceholder.replace('{names}', () => list);
 }
 
 /**

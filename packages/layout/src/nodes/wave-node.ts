@@ -12,7 +12,7 @@
 import type { StyleProperty } from '@nowline/core';
 import { propKey } from '@nowline/core/internal';
 import { propValue } from '../dsl-utils.js';
-import { type LocaleStrings, wavesDeclaredPlaceholder } from '../i18n.js';
+import { fillWaveNames, type LocaleStrings, wavesDeclaredPlaceholder } from '../i18n.js';
 import { pickInlineDate } from '../inline-date-pin-geometry.js';
 import {
     INLINE_DATE_GLYPH_GAP_PX,
@@ -21,7 +21,7 @@ import {
     ITEM_FOOTNOTE_INDICATOR_STEP_PX,
 } from '../item-bar-geometry.js';
 import type { LayoutContext } from '../layout-context.js';
-import { estimateTextWidth } from '../text-measure.js';
+import { estimateTextWidth, wrapText } from '../text-measure.js';
 import { contrastRatio, hexToRgb } from '../themes/contrast.js';
 import { resolveColor } from '../themes/index.js';
 import type { Theme } from '../themes/shape.js';
@@ -342,16 +342,18 @@ export function buildWaves(
         regionCrossings: regionBackground.map((items) => crossingsOver(items, boundaries)),
         hasBackground: mainBackground.length + regionBackground.flat().length > 0,
     };
-    if (allEmpty) {
-        const text = wavesDeclaredPlaceholder(
-            strings,
-            waves.map((w) => w.title),
-        );
+    const placeholder = allEmpty
+        ? fitPlaceholder(
+              strings,
+              waves.map((w) => w.title),
+              ctx.timeline.box.width - 2 * WAVE_CELL_INSET_PX - 2 * WAVE_LABEL_HALO_PAD_PX,
+          )
+        : undefined;
+    if (placeholder !== undefined) {
         const x = visLeft + ctx.timeline.box.width / 2;
-        const haloWidth =
-            estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) + 2 * WAVE_LABEL_HALO_PAD_PX;
+        const haloWidth = placeholderWidth(placeholder) + 2 * WAVE_LABEL_HALO_PAD_PX;
         built.placeholder = {
-            text,
+            text: placeholder,
             x,
             halo: { x: x - haloWidth / 2, y: haloY, width: haloWidth, height: haloHeight },
         };
@@ -392,6 +394,44 @@ interface LabelFit {
 }
 
 /** A strip label's estimated width: 10 px text, widened for its bold weight. */
+function placeholderWidth(text: string): number {
+    return estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX);
+}
+
+/**
+ * The all-empty placeholder (§9.1) that fits `room` px, the timeline's
+ * width less the halo padding: the full text; the text with the name list
+ * ellipsized to 3 or more characters plus "…"; the short form without names
+ * (every wave is empty, so the legend lists them all); the short form
+ * ellipsized to 3 or more characters plus "…". Undefined: no placeholder.
+ */
+export function fitPlaceholder(
+    strings: LocaleStrings,
+    names: readonly string[],
+    room: number,
+): string | undefined {
+    const fits = (text: string): boolean => placeholderWidth(text) <= room;
+    const full = wavesDeclaredPlaceholder(strings, names);
+    if (fits(full)) return full;
+    const list = Array.from(names.join(', '));
+    for (let n = list.length - 1; n >= 3; n--) {
+        const prefix = list.slice(0, n).join('').trimEnd().replace(/,$/, '');
+        if (Array.from(prefix).length < 3) break;
+        const text = fillWaveNames(strings, `${prefix}…`);
+        if (fits(text)) return text;
+    }
+    const short = strings.wavesDeclaredPlaceholderShort;
+    if (fits(short)) return short;
+    const chars = Array.from(short);
+    for (let n = chars.length - 1; n >= 3; n--) {
+        const prefix = chars.slice(0, n).join('').trimEnd();
+        if (Array.from(prefix).length < 3) break;
+        const text = `${prefix}…`;
+        if (fits(text)) return text;
+    }
+    return undefined;
+}
+
 function stripLabelWidth(text: string): number {
     return estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) * MARKER_BOLD_WIDTH_FACTOR;
 }
@@ -698,21 +738,50 @@ export function buildWaveLegend(
             return name;
         });
         const sep = ' · ';
-        const first = `${strings.waveLegendPrefix} ${names[0]}`;
-        const runs: WaveLegendEntry['runs'] = [
-            { text: first, x: startUnit(textWidth(first)), y: baseline(line) },
-        ];
+        const noItems = ` (${strings.waveNoItems})`;
+        const runs: WaveLegendEntry['runs'] = [];
+        const newLine = (): void => {
+            line++;
+            cursor = left;
+            lineUsed = false;
+        };
+        // A name that would run past the canvas edge wraps at its spaces
+        // (`wrapText`) to the gutter, each piece on a line of its own, so a
+        // long title is never clipped: the legend is where PNG and PDF read
+        // the full title. One that only reaches into the gutter stays whole,
+        // as before: the width estimate is pessimistic.
+        // The `(no items)` suffix is never split: it ends the last line when
+        // it fits there, else it takes a line of its own.
+        const wrapName = (text: string): string[] => {
+            const width = maxRight - left;
+            const suffix = text.endsWith(noItems) ? noItems : '';
+            const pieces = wrapText(text.slice(0, text.length - suffix.length), width, fontSize);
+            if (!suffix) return pieces;
+            const last = pieces.length - 1;
+            if (textWidth(pieces[last] + suffix) <= width) pieces[last] += suffix;
+            else pieces.push(suffix.trimStart());
+            return pieces;
+        };
+        const startRuns = (text: string): void => {
+            const pieces = left + textWidth(text) > chartRightX ? wrapName(text) : [text];
+            pieces.forEach((piece, i) => {
+                if (i > 0) newLine();
+                runs.push({ text: piece, x: startUnit(textWidth(piece)), y: baseline(line) });
+            });
+            // The next name starts a fresh line, not the tail of a wrapped one.
+            closed = pieces.length > 1;
+        };
+        let closed = false;
+        startRuns(`${strings.waveLegendPrefix} ${names[0]}`);
         for (const name of names.slice(1)) {
             const run = runs[runs.length - 1];
-            if (cursor + textWidth(sep + name) <= maxRight) {
+            if (!closed && cursor + textWidth(sep + name) <= maxRight) {
                 run.text += sep + name;
                 cursor += textWidth(sep + name);
                 widest = Math.max(widest, cursor - left);
             } else {
-                line++;
-                cursor = left;
-                lineUsed = false;
-                runs.push({ text: name, x: startUnit(textWidth(name)), y: baseline(line) });
+                newLine();
+                startRuns(name);
             }
         }
         entries.push({

@@ -1370,7 +1370,7 @@ swimlane a
         const svg = await renderSvg(
             await parseToModel(`nowline v1
 
-roadmap r "R" start:2026-01-05 scale:1w
+roadmap r "R" start:2026-01-05 length:12w scale:1w
 
 wave discover "Discover"
 wave build "Build"

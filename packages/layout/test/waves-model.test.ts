@@ -6,18 +6,23 @@
 import * as path from 'node:path';
 import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
+import { localeStrings, wavesDeclaredPlaceholder } from '../src/i18n.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { MARKER_ROW_CENTER_OFFSET_PX } from '../src/nodes/marker-geometry.js';
-import { fitStripLabel, readableLabelText } from '../src/nodes/wave-node.js';
+import { fitPlaceholder, fitStripLabel, readableLabelText } from '../src/nodes/wave-node.js';
+import { estimateTextWidth } from '../src/text-measure.js';
 import { contrastRatio } from '../src/themes/contrast.js';
 import { darkTheme, grayscaleTheme, lightTheme, resolveColor } from '../src/themes/index.js';
 import {
     FOOTNOTE_PANEL_PADDING_PX,
+    GUTTER_PX,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
     WAVE_EMPTY_MARKER_STEP_PX,
+    WAVE_LABEL_HALO_PAD_PX,
     WAVE_LEGEND_GAP_PX,
     WAVE_LEGEND_LINE_PX,
     WAVE_STRIP_HEIGHT_PX,
+    WAVE_STRIP_LABEL_FONT_SIZE_PX,
 } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
@@ -372,7 +377,7 @@ swimlane a
     it('every wave empty: only the placeholder, no markers, boundaries or crossings', async () => {
         const model = await lay(`nowline v1
 
-roadmap r "R" start:2026-01-05 scale:1w
+roadmap r "R" start:2026-01-05 length:12w scale:1w
 
 wave discover "Discover"
 wave build "Build"
@@ -408,6 +413,86 @@ swimlane a
         expect(model.waveLegend?.entries[1].text).toBe(
             'Waves: #1 Discover (no items) · #2 Build (no items)',
         );
+    });
+
+    // tests/waves-all-empty.nowline: centred on a 5-week timeline, the full
+    // placeholder ran under the title box and past the canvas edge.
+    const ALL_EMPTY = (length: string, build: string): string => `nowline v1
+
+roadmap r "All waves empty" start:2026-01-05${length} scale:1w
+
+wave discover "Discover"
+wave build "${build}"
+wave launch "Launch"
+
+swimlane a "Lane A"
+  item a1 "Item A1" duration:2w
+  item a2 "Item A2" duration:1w
+
+swimlane b "Lane B"
+  item b1 "Item B1" duration:3w
+`;
+    const LONG_BUILD = 'Build and harden the platform for general availability';
+
+    it.each([
+        ['a long title', '', LONG_BUILD],
+        ['short titles', '', 'Build'],
+        ['a long title on a wider timeline', ' length:16w', LONG_BUILD],
+    ])('every wave empty, %s: the placeholder fits the timeline', async (_, length, build) => {
+        const model = await lay(ALL_EMPTY(length, build));
+        const strip = model.timeline.waveStrip;
+        const draw = strip?.placeholderDraw;
+        const box = model.timeline.box;
+        expect(strip?.placeholder).toBeDefined();
+        expect(draw?.halo.x).toBeGreaterThanOrEqual(box.x);
+        expect((draw?.halo.x ?? 0) + (draw?.halo.width ?? 0)).toBeLessThanOrEqual(
+            box.x + box.width,
+        );
+        expect(draw?.halo.width).toBeCloseTo(
+            estimateTextWidth(strip?.placeholder ?? '', WAVE_STRIP_LABEL_FONT_SIZE_PX) +
+                2 * WAVE_LABEL_HALO_PAD_PX,
+        );
+    });
+
+    it('every wave empty: the placeholder falls back from the names to the short form', () => {
+        const strings = localeStrings('en-US');
+        const names = ['Discover', LONG_BUILD, 'Launch'];
+        const width = (text: string): number =>
+            estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX);
+        const full = wavesDeclaredPlaceholder(strings, names);
+        expect(fitPlaceholder(strings, names, width(full))).toBe(full);
+        expect(fitPlaceholder(strings, names, width(full) - 1)).toBe(
+            'Waves declared: Discover, Build and harden the platform for general availability, Laun… — no items assigned yet',
+        );
+        // Not even three characters of names fit: the short form, then it ellipsized.
+        const short = 'No items assigned to waves yet';
+        expect(fitPlaceholder(strings, names, width(short))).toBe(short);
+        expect(fitPlaceholder(strings, names, width('No items…'))).toBe('No items…');
+        expect(fitPlaceholder(strings, names, width('No…') - 1)).toBeUndefined();
+    });
+
+    it('the legend wraps a wave name that would pass the canvas edge', async () => {
+        const model = await lay(ALL_EMPTY('', LONG_BUILD));
+        const waves = model.waveLegend?.entries.find((e) => e.kind === 'waves');
+        expect(waves?.text).toBe(
+            `Waves: #1 Discover (no items) · #2 ${LONG_BUILD} (no items) · #3 Launch (no items)`,
+        );
+        const runs = waves?.runs ?? [];
+        for (const run of runs) {
+            expect(
+                run.x + estimateTextWidth(run.text, WAVE_STRIP_LABEL_FONT_SIZE_PX),
+            ).toBeLessThanOrEqual(model.width - GUTTER_PX);
+        }
+        // Every word survives, the `(no items)` suffix is never split, and the
+        // wave after a wrapped name starts a line of its own.
+        expect(runs.map((r) => r.text).join(' ')).toBe(
+            `Waves: #1 Discover (no items) #2 ${LONG_BUILD} (no items) #3 Launch (no items)`,
+        );
+        expect(runs.some((r) => r.text === '(no items)' || r.text.endsWith(' (no items)'))).toBe(
+            true,
+        );
+        expect(runs.at(-1)?.text).toBe('#3 Launch (no items)');
+        expect(new Set(runs.map((r) => r.y)).size).toBe(runs.length);
     });
 
     it('a roadmap with members has no placeholder', async () => {
@@ -717,7 +802,12 @@ describe('wave legend (§9.5)', () => {
         expect(entries.map((e) => e.kind)).toEqual(['boundary', 'waves']);
         expect(entries[1].text).toBe('Waves: #2 Hardening (TBD) (no items)');
         expect('swatch' in entries[1]).toBe(false);
-        expect(entries[1].runs.map((r) => r.text).join(' · ')).toBe(entries[1].text);
+        // On this narrow chart the name would pass the canvas edge, so it
+        // wraps, keeping `(no items)` whole.
+        expect(entries[1].runs.map((r) => r.text)).toEqual([
+            'Waves: #2 Hardening (TBD)',
+            '(no items)',
+        ]);
     });
 
     it('sits below the bottom tick panel and pushes the footnotes down', async () => {

@@ -966,7 +966,12 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
 - The gap has no cell; the backing panel shows through.
 - The floor reference (`fy-budget` or `2026-02-02`) is drawn centred in the gap in 10 px italic `wave.labelMuted`, when it fits.
 
-**All waves empty.** This is the typical first render after adding `wave` lines. No cells, markers, boundaries or crossings are drawn. The strip shows one muted placeholder: `Waves declared: Discover, Build — no items assigned yet`.
+**All waves empty.** This is the typical first render after adding `wave` lines. No cells, markers, boundaries or crossings are drawn. The strip shows one muted placeholder, centred on the timeline: `Waves declared: Discover, Build — no items assigned yet`. Its halo must fit inside the timeline, measured with the plain 10 px width estimate plus 2 px padding on each side. Candidates, in order:
+  1. the full text;
+  2. the text with the name list ellipsized to 3 or more characters plus "…" (`Waves declared: Discover, Bui… — no items assigned yet`);
+  3. the short form without names, `No items assigned to waves yet` (every wave is empty, so the legend lists them all);
+  4. the short form ellipsized to 3 or more characters plus "…";
+  5. no placeholder.
 
 ### 9.2 Boundary lines (`data-layer="wave-boundary"`)
 
@@ -1031,7 +1036,7 @@ There is no `default wave` and no `Theme.entities.wave`. `wave-node.ts` reads th
 
 ### 9.5 Wave legend (`data-layer="wave-legend"`)
 
-PNG and PDF have no tooltips, so the legend is the fallback for anything the picture abbreviates. It is one or more lines of 10 px `wave.labelText`, wrapped at entry boundaries.
+PNG and PDF have no tooltips, so the legend is the fallback for anything the picture abbreviates. It is one or more lines of 10 px `wave.labelText`, wrapped at entry boundaries. A single wave name whose estimated width would pass the canvas edge wraps at its spaces to the gutter, never truncated, since the legend is where the full title is read; its `(no items)` suffix stays whole (on the last line when it fits, else on a line of its own), and the next wave starts a fresh line.
 
 **When it is drawn.** It appears when any of the following holds:
 

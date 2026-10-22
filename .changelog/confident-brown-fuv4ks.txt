@@ -1,0 +1,3 @@
+```release-note:fixed
+The wave strip's all-empty placeholder fits the timeline instead of running under the title and past the canvas edge: it ellipsizes the wave names, then falls back to `No items assigned to waves yet` (the legend lists every wave). A wave name in the legend that would pass the canvas edge wraps instead of clipping.
+```
