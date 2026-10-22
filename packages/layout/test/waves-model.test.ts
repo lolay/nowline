@@ -383,6 +383,18 @@ swimlane a
         expect(model.timeline.waveStrip?.placeholder).toBe(
             'Waves declared: Discover, Build — no items assigned yet',
         );
+        // Layout places the placeholder on the timeline's centre and its halo
+        // around it, inside the strip, so the renderer measures nothing.
+        const strip = model.timeline.waveStrip;
+        const draw = strip?.placeholderDraw;
+        const box = model.timeline.box;
+        expect(draw?.x).toBe(box.x + box.width / 2);
+        expect(draw?.halo.width).toBeGreaterThan(0);
+        expect((draw?.halo.x ?? 0) + (draw?.halo.width ?? 0) / 2).toBeCloseTo(draw?.x ?? -1);
+        expect(draw?.halo.y).toBeGreaterThan(strip?.y ?? 0);
+        expect((draw?.halo.y ?? 0) + (draw?.halo.height ?? 0)).toBeLessThan(
+            (strip?.y ?? 0) + (strip?.height ?? 0),
+        );
         for (const w of wavesOf(model)) {
             expect(w.empty).toBe(true);
             expect('marker' in w.strip).toBe(false);
@@ -401,6 +413,7 @@ swimlane a
     it('a roadmap with members has no placeholder', async () => {
         const model = await lay(EXAMPLE_12);
         expect('placeholder' in (model.timeline.waveStrip ?? {})).toBe(false);
+        expect('placeholderDraw' in (model.timeline.waveStrip ?? {})).toBe(false);
     });
 });
 

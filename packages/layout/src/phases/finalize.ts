@@ -973,7 +973,9 @@ function waves(fx: FinalizeContext): boolean {
         if (crossings.length > 0) fx.chart.includes[i].waveCrossings = crossings;
     });
     if (built.placeholder !== undefined && ctx.timeline.waveStrip) {
-        ctx.timeline.waveStrip.placeholder = built.placeholder;
+        const { text, x, halo } = built.placeholder;
+        ctx.timeline.waveStrip.placeholder = text;
+        ctx.timeline.waveStrip.placeholderDraw = { x, halo };
     }
     fx.draft.waves = built;
     return true;
