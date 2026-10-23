@@ -34,6 +34,8 @@ function inspectorBin() {
  * @param {string} [opts.toolName]
  * @param {Record<string, unknown>} [opts.toolArgs] - tool arguments, passed as one JSON object
  *   via --tool-args-json so booleans and numbers keep their types
+ * @param {boolean} [opts.advertiseApps=false] - advertise the MCP Apps UI extension at initialize
+ *   (Inspector 2.12+ leaves it off unless --advertise-apps is passed)
  * @returns {unknown} Parsed JSON from inspector stdout
  */
 export function runInspectorCli({
@@ -43,6 +45,7 @@ export function runInspectorCli({
     method,
     toolName,
     toolArgs = {},
+    advertiseApps = false,
 }) {
     const workDir = cwd ?? mkdtempSync(path.join(tmpdir(), 'nowline-mcp-inspector-'));
     const configDir = mkdtempSync(path.join(tmpdir(), 'nowline-mcp-inspector-cfg-'));
@@ -69,6 +72,9 @@ export function runInspectorCli({
         '--method',
         method,
     ];
+    if (advertiseApps) {
+        args.push('--advertise-apps');
+    }
     if (toolName) {
         args.push('--tool-name', toolName);
         if (Object.keys(toolArgs).length > 0) {

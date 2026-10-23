@@ -2,10 +2,11 @@
 // Deterministic cross-process MCP smoke via MCP Inspector CLI.
 // Exercises real stdio framing against packages/mcp/dist/index.js.
 //
-// Inspector 2.x advertises the MCP Apps UI capability, so a plain `render`
-// takes the apps-host path and returns the lean nowline.preview payload
-// instead of inline SVG. Both branches are covered below: the default call
-// must hand back the preview payload, and `preview: false` must force SVG.
+// The render calls pass --advertise-apps so Inspector claims the MCP Apps UI
+// capability, and a plain `render` takes the apps-host path and returns the
+// lean nowline.preview payload instead of inline SVG. Both branches are
+// covered below: the default call must hand back the preview payload, and
+// `preview: false` must force SVG.
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,7 @@ function main() {
         serverEntry,
         method: 'tools/call',
         toolName: 'render',
+        advertiseApps: true,
         toolArgs: {
             source: MINIMAL,
             format: 'svg',
@@ -75,6 +77,7 @@ function main() {
         serverEntry,
         method: 'tools/call',
         toolName: 'render',
+        advertiseApps: true,
         toolArgs: {
             source: MINIMAL,
             format: 'svg',
