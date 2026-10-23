@@ -1,3 +1,0 @@
-```release-note:fixed
-**Mermaid export: an item with `after:` still waits for its lane.** Its `after:` used to replace the item before it in its lane (or every track of a parallel it follows), so Mermaid started it as soon as its `after:` reference ended. It now starts after both, at the latest end, the date the chart and the XLSX export give. A group's or parallel's own `after:` ids, which were dropped, now hold its first children too. The bundled `showcase` (`Ship`, `Announcement`) and `sizing` (`Search v2`) samples' Mermaid exports start later; four others name the extra predecessor with no date change, or a later but still early one where an inline-date `after:` remains unsupported.
-```

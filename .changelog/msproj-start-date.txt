@@ -1,3 +1,0 @@
-```release-note:fixed
-**MS Project export: `<StartDate>` now matches the roadmap's `start:`, the date every task is scheduled from.** Before, it ignored `start:` and wrote the `--now` date (or a hard-coded `2026-01-05` from the library API with no `today`), so the project's start disagreed with its own tasks. An explicit `--start` (or the `startDate` option, the MCP `msprojStart` argument, or the VS Code `nowline.export.msproj.start` setting) still wins; with no `start:`, the default is today.
-```

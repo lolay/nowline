@@ -1,3 +1,0 @@
-```release-note:fixed
-**TextMate grammar + VS Code extension — `timeline-position` values highlight**: `top`, `bottom` and `both` were missing from the grammar's enum list, so `timeline-position:bottom` coloured its value as a plain identifier. They now get the same colour as the other style enum values. A new test checks that every word keyword in the Langium grammar (including `wave`, `non-working` and `working`) is coloured, so a new declaration keyword cannot be added without its highlighting.
-```

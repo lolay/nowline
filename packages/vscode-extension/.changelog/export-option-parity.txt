@@ -1,7 +1,0 @@
-```release-note:changed
-`nowline.export.width` follows the same rule as the preview and the CLI: `0` fits the content, and any other value must be an integer of at least 320. A bad value is reported before the export starts, on both the in-process and the external-CLI export paths, instead of one path drawing at that width and the other failing.
-```
-
-```release-note:fixed
-In-process exports (the Export… command and the preview's Save button) load logo and image assets from the same asset root as the preview: the `nowline.preview.assetRoot` setting, then the `.nowlinerc` `assetRoot`, then the source file's directory. Before, they always used the source file's directory, so a logo the preview found could be missing from the exported file.
-```

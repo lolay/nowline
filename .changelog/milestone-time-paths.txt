@@ -1,3 +1,0 @@
-```release-note:fixed
-A milestone with `after:` and no `date:` now sits on its latest predecessor's end date, the same day the xlsx, msproj and mermaid exports give it. It used to sit on the predecessor bar's painted right edge, up to a day early. A milestone on the chart's last day can now add one axis column for its diamond, as a dated milestone on that day already did.
-```

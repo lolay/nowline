@@ -1,3 +1,0 @@
-```release-note:fixed
-**TextMate grammar: the `locale:` directive and scale `label:` highlight.** A `nowline v1 locale:fr-CA` line lost all directive colouring, because the directive pattern only matched a line that ended after the version; `nowline` and `v1` now colour as on a bare `nowline v1` line, and `locale:` colours as a key. The `label:` key of a `scale` block now colours like its neighbour `label-every:`. New tests check that every value and key in core's tables (statuses, style keys and enum values, calendar and include modes, the non-working display values, entity, calendar, scale and directive keys) gets its TextMate colour, and that LSP completion offers exactly core's status, icon, capacity-icon, weekday and non-working values.
-```

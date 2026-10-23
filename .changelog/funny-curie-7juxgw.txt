@@ -1,3 +1,0 @@
-```release-note:fixed
-An isolated region's anchor or milestone on the chart's last day grows the timeline by one column, as one in the main chart does, so its diamond no longer hangs past the axis end and across the region's border.
-```

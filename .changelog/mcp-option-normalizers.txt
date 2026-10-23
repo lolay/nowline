@@ -1,3 +1,0 @@
-```release-note:fixed
-MCP `export` rejects an invalid `pageSize` for every format, not only PDF, and `render` and `export` accept `theme` spellings such as `Greyscale`; an unknown theme is rejected with the list of theme names.
-```

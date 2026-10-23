@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.0] - 2026-10-23
 
 ### Added
 
@@ -30,6 +30,13 @@
   when the value is `hide` or `show`. `non-working:` is highlighted as a style
   key with `hide` and `show` as its values. Files without the key render
   exactly as before.
+- Completion offers the values of every enumerated style key (`border:`, `shadow:`, `font:`, `corner-radius:` and the rest), the built-in color names after `bg:`, `fg:` and `text:`, the modes after `calendar:`, and the modes after `config:` and `roadmap:` on an `include` line.
+
+### Changed
+
+- A `nowline.preview.width` setting or `.nowlinerc` `width` that is not an integer of at least 320 now shows a warning in the preview's problems table and the preview fits its content, instead of drawing at that width. Use `0` (or omit the setting) for fit-to-content.
+- `nowline.export.width` follows the same rule as the preview and the CLI: `0` fits the content, and any other value must be an integer of at least 320. A bad value is reported before the export starts, on both the in-process and the external-CLI export paths, instead of one path drawing at that width and the other failing.
+- Requires VS Code 1.128 or later (Cursor has embedded 1.128 since 3.12.10). Editors on an older engine keep the extension version they already have.
 
 ### Fixed
 
@@ -44,6 +51,14 @@
 - Keywords, keys and enum values no longer highlight inside a hyphenated
   word: in `#fff-team` or `2w-item` the tail is no longer coloured as the
   `team` or `item` keyword.
+- The preview and exports now draw the roadmap's `logo:` in the header card, sized by `logo-size:`. A missing or unreadable logo is skipped (an error in the diagnostics table when `nowline.preview.strict` is on).
+- A relative `assetRoot` in `.nowlinerc` resolves against the directory of that file instead of the extension host's working directory, matching `nowline --asset-root`. An `assetRoot` that is not a string is ignored.
+- An impossible now-line date such as `2026-02-30` no longer moves the preview's now-line to March 2. A `nowline.preview.now` setting that names no real day falls back to today, like any other value the setting can't read, and the same date from the toolbar is ignored.
+- In-process exports (the Export… command and the preview's Save button) load logo and image assets from the same asset root as the preview: the `nowline.preview.assetRoot` setting, then the `.nowlinerc` `assetRoot`, then the source file's directory. Before, they always used the source file's directory, so a logo the preview found could be missing from the exported file.
+- MS Project export writes the roadmap's `start:` as the project start date when `nowline.export.msproj.start` is empty, instead of today, so the project start matches its tasks. The setting still overrides it.
+- A `nowline v1 locale:fr-CA` directive line highlights again: `nowline` and `v1` lost their colour whenever the line carried a `locale:` property, and `locale:` now colours as a key. The `label:` key of a `scale` block colours like `label-every:`.
+- `depends:` and `team:` no longer offer id completions, go-to-definition or rename. Neither is a Nowline property; both draw an unknown-property warning.
+- `icon:` completion offers the built-in `calendar` icon, and the `timeline-position` values `top`, `bottom` and `both` highlight like the other style values.
 
 ## [0.8.6] - 2026-10-01
 

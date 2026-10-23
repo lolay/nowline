@@ -1,7 +1,0 @@
-```release-note:changed
-Every item bar now spans exactly its scheduled dates. A bar used to give up 6 px on each side and be drawn at least 8 px wide, so a one-day task at weekly scale looked two and a half days long and a short bar could overlap the next day's work. Bars now keep a 1 px seam on each side and a 1 px floor, and a bar's corner radius shrinks with it, so short bars become pills and then lines. Chained bars sit 2 px apart instead of 12. The xlsx, msproj and mermaid exports do not change.
-```
-
-```release-note:changed
-Each item in a swimlane or group now sits on the same row as the one before it or on a row below, never above, so a track reads top to bottom in file order. A short item whose caption does not fit drops a row instead of moving up beside earlier work.
-```

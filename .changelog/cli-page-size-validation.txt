@@ -1,3 +1,0 @@
-```release-note:fixed
-**`@nowline/cli` — an invalid `--page-size` or `.nowlinerc` `pdfPageSize` is a usage error for every format**: the value was only parsed inside the PDF exporter, so SVG and PNG renders ignored a bad one and `-f pdf` failed with `nowline: pdf export failed: invalid page size "..."` (exit 3) without naming where the value came from. It now parses alongside `--orientation` and `--margin`, after validation, as exit 2 naming its source, for example `nowline: invalid .nowlinerc pdfPageSize "huge": expected preset (...)`. A valid flag still wins over an invalid rc value. `@nowline/export`'s `RenderInputs.pageSize` also accepts an already-parsed `PdfPageSize`; strings work as before.
-```

@@ -1,3 +1,0 @@
-```release-note:fixed
-Inline SVG logos no longer keep their `class` attributes after the sanitizer folds their `<style>` rules into attributes, so CSS on the page that embeds a diagram cannot restyle the logo.
-```

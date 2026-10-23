@@ -1,3 +1,0 @@
-```release-note:fixed
-MCP `render` and `validate` take their layout `insights` from the layout the render draws, header logo included. A roadmap with a `logo:` was measured without it, so under a narrow `width` the logo's chrome shrank the bars in the picture but not in the insights, which missed the caption and marker spills it caused. Each call now parses and lays the roadmap out once, instead of twice.
-```

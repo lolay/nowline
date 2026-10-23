@@ -1,3 +1,0 @@
-```release-note:fixed
-`--serve` honours `--width`, `--no-links` and `--strict`, and reads `.nowlinerc` `width` and `assetRoot`: it ignored all of them, so a served chart could differ from `nowline <file>`'s. It now resolves its options the way a plain render does and draws the same SVG for the same flags. `--strict` shows a render warning, such as a missing logo, as an error in the browser instead of a chart, and an invalid `--width` or rc value is the same usage error (exit 2) as for a render.
-```

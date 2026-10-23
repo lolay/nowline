@@ -1,3 +1,0 @@
-```release-note:fixed
-Swimlane frame tabs keep a consistent gap between the lane name and the owner or capacity badge that follows. The name's width is now estimated per character, so names with wide letters (`Headcount`) no longer run into the badge and names with narrow letters (`Sprint pts`) no longer leave a wide hole.
-```

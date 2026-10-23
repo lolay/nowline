@@ -1,3 +1,0 @@
-```release-note:fixed
-**`after:` a `parallel` or a `group` waits for its work to end, in the chart and the XLSX export.** An item or milestone that names a parallel now starts at the parallel's latest track end, and one that names a group at the group's last item end. The XLSX export used to date it on the roadmap start, as if the reference were not there, and the chart started work `after:` a group at the right edge of the group's box, so a caption spilled past the group's last bar pushed it later. No bundled sample uses the shape, so none of their charts or exports changes.
-```

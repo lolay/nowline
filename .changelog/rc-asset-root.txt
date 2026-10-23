@@ -1,3 +1,0 @@
-```release-note:added
-`.nowlinerc` accepts an `assetRoot` key, the default for `--asset-root`. A relative value resolves against the directory of the `.nowlinerc` that holds it, so it means the same directory wherever `nowline` runs; a relative `--asset-root` still resolves against the working directory, and the flag wins. A value that is not a string is a usage error (exit 2). `--serve` reads it too.
-```

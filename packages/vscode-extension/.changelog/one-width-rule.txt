@@ -1,3 +1,0 @@
-```release-note:changed
-A `nowline.preview.width` setting or `.nowlinerc` `width` that is not an integer of at least 320 now shows a warning in the preview's problems table and the preview fits its content, instead of drawing at that width. Use `0` (or omit the setting) for fit-to-content.
-```

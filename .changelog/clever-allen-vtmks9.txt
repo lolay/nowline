@@ -1,7 +1,0 @@
-```release-note:fixed
-A milestone's slack arrow from an anchor or milestone now starts on that marker's own row, even when the marker band grows, and in an isolated region on the region's own marker row instead of a host lane. A region milestone `after:` a region anchor now draws its arrow, and no arrow is drawn when the two diamonds touch.
-```
-
-```release-note:changed
-The marker band packs around arrows between anchors and milestones: other markers move off an arrow's row, the target sits at or above the arrow so it meets the target's line, and a marker's label takes the side its arrow does not run along. This can add a row to the band.
-```
