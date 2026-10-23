@@ -1,10 +1,10 @@
 {
     "private": true,
     "name": "nowline-monorepo",
-    "packageManager": "pnpm@12.8.1",
+    "packageManager": "pnpm@12.10.1",
     "engines": {
         "node": ">=22",
-        "pnpm": ">=11"
+        "pnpm": ">=11.28.5"
     },
     "scripts": {
         "build": "pnpm -r run build && node scripts/render.mjs",
