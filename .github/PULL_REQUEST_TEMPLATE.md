@@ -38,6 +38,7 @@ Describe what you ran and what you saw. For example:
 - [ ] I added or updated tests where the change affects observable behavior.
 - [ ] I updated documentation (READMEs, `specs/`, inline comments) where the change affects observable behavior.
 - [ ] I added a `.changelog/` fragment for any user-observable change, or the PR is labelled `no-changelog` (see [`.changelog/README.md`](../.changelog/README.md)).
+- [ ] If this changes or removes behaviour a pending `.changelog/` fragment or `[Unreleased]` entry describes, I edited or deleted that entry instead of adding a contradicting one.
 - [ ] I have disclosed any AI assistance below with an `Assisted-by:` line (see [AI_POLICY.md](../AI_POLICY.md)).
 - [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md) and agree to license my contribution under Apache 2.0.
 
