@@ -63,6 +63,17 @@
             "description": "Microsoft releases these together and a protocol/types patch can pin the next vscode-jsonrpc major, so they move as one reviewed PR. One release age for the group keeps a patch from landing weeks ahead of the majors it depends on."
         },
         {
+            "matchPackageNames": [
+                "vscode-jsonrpc",
+                "vscode-languageclient",
+                "vscode-languageserver",
+                "vscode-languageserver-*"
+            ],
+            "matchUpdateTypes": ["major"],
+            "dependencyDashboardApproval": true,
+            "description": "Langium pins vscode-languageserver (langium 4.4 needs ~10.1) and our connection is handed to its types, so a major ahead of Langium's range fails the lsp build with two copies of the protocol types (lolay/nowline#222). A major waits under Pending Approval on the Dependency Dashboard until a Langium release accepts it; tick it then. Patches inside the current major still flow without approval."
+        },
+        {
             "matchPackageNames": ["@types/vscode"],
             "enabled": false,
             "description": "Floor tracks Cursor's embedded VS Code engine + 30-day grace; driven by .github/workflows/vscode-extension-engine-bump.yml (weekly, opens an issue when the floor should advance) + editor-release-monitor.yml (daily, writes cursor-release-history.json), not Renovate. Renovate would otherwise bump @types/vscode past engines.vscode and break vsce package (see v0.3.0 release-run #26337633859)."
