@@ -8,7 +8,8 @@ name: Publish MCP
 #   1. verify npm @nowline/mcp@version is live (registry checks npm ownership)
 #   2. attach nowline.mcpb to the GitHub Release
 #   3. MCP registry publish (remote pointer — last)
-#   4. open a maintainer-only tracking issue for manual Claude Desktop + Gemini steps
+#   4. attach the release notes and open a maintainer-only tracking issue for
+#      manual Claude Desktop + Gemini steps that links them
 on:
   workflow_call:
     inputs:
@@ -172,12 +173,28 @@ jobs:
           Cursor Marketplace and VS Code MCP gallery auto-surface from the registry entry — no action needed.
 
           Manual channels (no public API):
-          - [ ] **Claude Desktop Extensions directory** — download \`nowline.mcpb\` from the [${tag} release](https://github.com/${repo}/releases/tag/${tag}) and submit to the Extensions directory
+          - [ ] **Claude Desktop Extensions directory** — download [\`nowline.mcpb\`](https://github.com/${repo}/releases/download/${tag}/nowline.mcpb) from the [${tag} release](https://github.com/${repo}/releases/tag/${tag}) and submit to the Extensions directory
           - [ ] **Gemini CLI extension channel** — submit the extension bundle per the runbook
 
           Runbook: [ops/mcp-marketplace.md](https://github.com/${repo}/blob/main/ops/mcp-marketplace.md)
           EOF
           )
+
+          # The submissions ask for release notes. Attach them to the release
+          # as Markdown and link the asset from the issue; a tag cut before
+          # make release-notes existed (a standalone re-run for an old
+          # version) links the tag's CHANGELOG.md instead.
+          notes_asset="nowline-${tag}-release-notes.md"
+          notes_link="https://github.com/${repo}/blob/${tag}/CHANGELOG.md"
+          if make --no-print-directory release-notes VERSION="${VERSION}" \
+               LINK_BASE="https://github.com/${repo}/blob/${tag}" > "${notes_asset}" 2>/dev/null \
+             && [ -s "${notes_asset}" ] \
+             && gh release upload "${tag}" "${notes_asset}" --clobber; then
+            notes_link="https://github.com/${repo}/releases/download/${tag}/${notes_asset}"
+          else
+            echo "::warning::release notes not attached to ${tag}; the issue links CHANGELOG.md"
+          fi
+          body="${body}"$'\n\n'"Release assets for the submissions:"$'\n'"- [nowline.mcpb](https://github.com/${repo}/releases/download/${tag}/nowline.mcpb)"$'\n'"- Release notes: [${notes_link##*/}](${notes_link})"
           gh issue create \
             --repo "${repo}" \
             --title "MCP marketplace manual submissions — v${VERSION}" \
