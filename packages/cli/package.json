@@ -63,6 +63,7 @@
         "citty": "^0.2.2",
         "consola": "^3.4.2",
         "js-yaml": "^5.4.2",
+        "jsonc-parser": "^3.3.1",
         "langium": "~4.4.0"
     },
     "devDependencies": {

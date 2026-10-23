@@ -3,6 +3,7 @@ import { parseArgv } from './cli/args.js';
 import { renderHelp, renderVersion } from './cli/help.js';
 import { initHandler } from './commands/init.js';
 import { mcpHandler } from './commands/mcp.js';
+import { mcpInstallHandler } from './commands/mcp-install.js';
 import { renderHandler } from './commands/render.js';
 import { serveHandler } from './commands/serve.js';
 import { CliError, ExitCode } from './io/exit-codes.js';
@@ -33,6 +34,8 @@ async function run(): Promise<number> {
             await serveHandler({ args: parsed });
         } else if (parsed.mode === 'mcp') {
             await mcpHandler({ args: parsed });
+        } else if (parsed.mode === 'mcp-install' || parsed.mode === 'mcp-uninstall') {
+            await mcpInstallHandler({ args: parsed });
         } else {
             await renderHandler({ args: parsed });
         }

@@ -94,7 +94,7 @@ m4.8 adds `@nowline/mcp` — a separate npm package (`packages/mcp/`) that ships
 - **MCP CLI** — harnesses reference `npx @nowline/mcp` in their MCP config (Cursor `mcp.json`, VS Code settings, Claude Code). The harness spawns the server as a child process and communicates over stdin/stdout.
 - **MCP Desktop** — the same `@nowline/mcp` package bundled as a `.mcpb` file, which Claude Desktop installs one-click from its Extensions directory and runs locally.
 
-Neither form requires a separate binary download. The `nowline` CLI binary's `--mcp` flag is the power-user path for users who already have the CLI installed; `npx @nowline/mcp` is the canonical path for harness configs.
+Neither form requires a separate binary download. The `nowline` CLI binary's `--mcp` flag serves the same server for users who already have the CLI installed, and `nowline --mcp-install [<client>]` registers it with their harnesses; `npx @nowline/mcp` is the canonical path for hand-written harness configs.
 
 ### Distribution channels (marketplace-first)
 
@@ -109,8 +109,9 @@ Where a harness has an official marketplace, publish there and **only** there. S
 | GitHub Release | `nowline.mcpb` | Built in `pack-mcp-mcpb`; attached by `publish-mcp.yml` | Automated |
 | Claude Desktop Extensions directory | `.mcpb` | Manual submission; artifact from release | Manual (tracked issue) |
 | Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Manual submission per Gemini CLI process | Manual (tracked issue) |
-| Claude Code | MCP CLI (manual) | `claude mcp add npx @nowline/mcp` or `.mcp.json`; no marketplace | n/a (user config) |
-| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry; no marketplace | n/a (user config) |
+| Claude Code | MCP CLI (manual) | `nowline --mcp-install claude-code`, `claude mcp add nowline -- npx -y @nowline/mcp`, or `.mcp.json`; no marketplace | n/a (user config) |
+| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry; no marketplace | n/a (user config) |
+| Other local harnesses | MCP CLI (manual) | `nowline --mcp-install <client>` (Antigravity, Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose; [`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 
 Note: Cursor Marketplace and VS Code MCP gallery are both fed by the public MCP registry. Updating the registry entry is the single action that surfaces the MCP server in both IDEs.
 

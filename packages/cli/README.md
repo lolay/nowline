@@ -52,6 +52,8 @@ nowline <input> [options]              # render (default)
 nowline <input> --serve [-p <port>]    # live HTTP preview
 nowline --init [<name>]                # scaffold a starter file
 nowline <input> --dry-run              # validate-only (no write)
+nowline --mcp                          # MCP stdio server for AI agents
+nowline --mcp-install [<client>]       # register that server with your agents
 nowline --help                         # print help
 nowline --version                      # print version
 nowline                                # no args → print help
@@ -99,6 +101,9 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | `--serve`           | Live HTTP preview. Opt-in `-o <path>` writes on each rebuild.     |
 | `--init [<name>]`   | Scaffold a starter `.nowline` in cwd. Auto-appends `.nowline`.    |
 | `-n, --dry-run`     | Run pipeline; skip the write. Replaces the old `validate` verb.   |
+| `--mcp`             | MCP stdio server (`--port <n>` for local HTTP), same as `npx @nowline/mcp`. |
+| `--mcp-install [<client>]` | Register the MCP server with an agent; omit the client for every agent found. `-n` previews. |
+| `--mcp-uninstall [<client>]` | Remove it again.                                       |
 
 ### Render options
 
@@ -135,6 +140,16 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | `-w, --width <px>`   | `.nowlinerc` `width`, else fit content |
 | `--no-links`         | (off)       |
 | `--strict`           | (off)       |
+
+### MCP options
+
+`nowline --mcp-install` edits each agent's own config: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `antigravity`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`. Re-running is safe, and comments in JSON configs survive. Details: [`specs/cli.md` § `--mcp-install`](../../specs/cli.md).
+
+| Flag                 | Default | Meaning |
+|----------------------|---------|---------|
+| `--root <dir>`       | cwd     | Folder the MCP file tools may use; with `--mcp-install`, written into the registered command. |
+| `--scope <s>`        | `user`  | `user` (every project) or `project` (config files in cwd, for committing). |
+| `--server <s>`       | `self`  | `self` registers this `nowline` binary, so a Homebrew install needs no Node; `npx` registers `npx -y @nowline/mcp`. |
 
 ### Logging (mutually exclusive)
 
