@@ -11,9 +11,10 @@
 //     reference; all packages are kept lock-step).
 //   - Computes the new version per SemVer.
 //   - Rewrites every packages/<pkg>/package.json with the new version.
-//   - Syncs the new version into packages/mcp/manifest.json and
-//     packages/mcp/server.json (scripts/sync-mcp-metadata.mjs) so the
-//     release commit carries them and they never lag package.json.
+//   - Syncs the new version into the MCP metadata (packages/mcp/server.json,
+//     packages/mcp/manifest.json, gemini-extension.json, and the plugin
+//     manifests under plugins/nowline) via scripts/sync-mcp-metadata.mjs, so
+//     the release commit carries them and they never lag package.json.
 //   - Prints the new version (without `v` prefix) to stdout so the
 //     calling shell can capture it (e.g. `NEW=$(node ...)`).
 //   - Anything else (warnings, etc.) goes to stderr.

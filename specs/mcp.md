@@ -224,16 +224,34 @@ The OSS local server ships wherever a harness can run a **local** stdio server w
 |---------|------------------|----------------------|-----------|
 | Cursor | MCP CLI (stdio) | Cursor Marketplace → `io.nowline/nowline` (registry-sourced) or manual `mcp.json` | Registry automated |
 | VS Code | MCP CLI (stdio) | VS Code MCP gallery → `io.nowline/nowline` (registry-sourced) or manual MCP config | Registry automated |
-| Claude Code | MCP CLI (stdio) | `nowline --mcp-install claude-code`, `claude mcp add`, or `.mcp.json` — no marketplace | npm only |
+| Claude Code | MCP CLI (stdio) via plugin | `/plugin install nowline --marketplace lolay/nowline` ([plugin bundle](#plugin-bundle)), or `nowline --mcp-install claude-code`, `claude mcp add`, `.mcp.json` | Version synced at release cut |
 | Claude Desktop | MCP Desktop (`.mcpb`) | Claude Desktop Extensions directory (one-click) | `.mcpb` built in CI; directory submission manual |
 | Gemini CLI | MCP CLI (stdio) + extension bundle | Gemini CLI extension channel (`name: nowline`) | Manual submission |
-| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry | npm only |
-| Antigravity, Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose | MCP CLI (stdio) | `nowline --mcp-install <client>` or the harness's own config ([`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
+| GitHub Copilot CLI | MCP CLI (stdio) via plugin | `copilot plugin marketplace add lolay/nowline`, then `copilot plugin install nowline@nowline` ([plugin bundle](#plugin-bundle)), or `nowline --mcp-install copilot` | Version synced at release cut |
+| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry. The [plugin bundle](#plugin-bundle) installs, but Codex starts plugin servers in the plugin cache, not the project | npm only |
+| Antigravity, Muse Code, OpenCode, Windsurf, Zed, Amp, Goose | MCP CLI (stdio) | `nowline --mcp-install <client>` or the harness's own config ([`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 | ChatGPT / Gemini app / MS Copilot | — | not supported (no local stdio) | — |
 
 Marketplace distribution status and the release pipeline: [`specs/milestones.md`](./milestones.md) § m4.9, [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts, [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
 Marketplace-first: where a harness has an official marketplace, publish there and **only** there — no community directories (`cursor.directory`). Unlike a `.vsix` Marketplace item, an MCP server has no public per-server *record* page to link to (Cursor and VS Code surface MCP servers through an in-editor, registry-backed gallery only). Official-client install deep links — `Add to Cursor` (`cursor://anysphere.cursor-deeplink/mcp/install`) and `Install in VS Code` (`vscode:mcp/install`) — **are** therefore permitted on Nowline-owned surfaces (e.g. the `nowline.io/install/mcp` page) as a one-click shortcut to the same registry/`npx @nowline/mcp` config. Manual config is the fallback where neither a marketplace listing nor a deep link applies.
+
+### Plugin bundle
+
+[`plugins/nowline/`](../plugins/nowline/) packages the OSS server as an agent plugin, listed by the repo-root marketplace [`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) (marketplace `nowline`, plugin `nowline`, so the plugin id is `nowline@nowline`). The marketplace is the repo itself: there is no submission step and no registry. Users add `lolay/nowline` as a marketplace in their harness and install from it.
+
+The plugin carries the server in two formats so one directory loads in every harness that reads plugins:
+
+| Files | Format | Read by |
+|-------|--------|---------|
+| `.claude-plugin/plugin.json` + `.mcp.json` | Claude Code plugin | Claude Code; Copilot CLI and Codex as a legacy fallback |
+| `plugin.json` + `mcp.json` | [Agent Plugins 1.0.0](https://agent-plugins.org) | Codex and Cursor natively; Copilot CLI prefers it when present |
+
+Both launch `npx -y @nowline/mcp@latest`, like `gemini-extension.json`, so the server tracks npm without a manifest change. The two manifests' `version` is the `@nowline/mcp` version, synced at the release cut by [`scripts/sync-mcp-metadata.mjs`](../scripts/sync-mcp-metadata.mjs); a changed `version` is what tells an installed plugin there is an update. [`packages/integration-tests/test/mcp-metadata.test.ts`](../packages/integration-tests/test/mcp-metadata.test.ts) keeps the versions in lock-step and the two formats from drifting apart.
+
+Where each harness starts the server matters, because the OSS server resolves file paths against its working directory ([Shared tool contract](#shared-tool-contract)). Claude Code starts plugin stdio servers in the project directory, which is what the server expects. Codex starts them in the plugin's install cache, so in Codex `read`/`list`/`create` see the cache rather than the project; Codex users should register the server with `nowline --mcp-install codex` until the server takes its root from the client's MCP roots. A plugin manifest can't set a platform-specific command, so on native Windows, where a harness can't spawn `npx` without `cmd /c`, `nowline --mcp-install` is the fallback.
+
+The OSS plugin is not submitted to Anthropic's plugin directory; the repo marketplace is its only listing. The plugin id `nowline` is taken by the OSS plugin, so a Nowline Cloud plugin, if one ships, needs a different id (`nowline-cloud`): two plugins with the same name can't be installed side by side, because each one's MCP servers and skills are namespaced by its name.
 
 Distribution detail (release pipeline, naming ids, `.mcpb` build): [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution and [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts.
 

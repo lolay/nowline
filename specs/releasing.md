@@ -231,7 +231,7 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 
 Curated marketplace submissions (Claude Desktop Extensions, public MCP registry, Gemini CLI extension channel) may require a review period of hours to days for initial acceptance. Subsequent updates to the same publisher id generally receive faster approval. **Lead time:** plan for at least one sprint of buffer between tagging a release and these marketplace listings going live.
 
-Manual config harnesses (Claude Code's `claude mcp add`, Codex CLI's `~/.codex/config.toml`) do not require a submission step — users reference `npx @nowline/mcp` directly, which resolves from npm.
+Manual config harnesses (Claude Code's `claude mcp add`, Codex CLI's `~/.codex/config.toml`) do not require a submission step — users reference `npx @nowline/mcp` directly, which resolves from npm. Neither does the agent plugin: the repo is its own marketplace (`.claude-plugin/marketplace.json`), so the release cut's version sync of `plugins/nowline/` is the whole release step for it.
 
 ### Naming and publishing-id convention
 
@@ -239,7 +239,7 @@ This section is the canonical record for how Nowline MCP artifacts are named and
 
 **Two independent levers:**
 
-- **Publishing id (stable, default `nowline`):** every OSS MCP artifact uses the bare `nowline` id. The `-cloud` suffix is added only where the cloud artifact would collide with the OSS one in the same namespace or store (currently only the public MCP registry). The OSS id is never suffixed (no `-oss`).
+- **Publishing id (stable, default `nowline`):** every OSS MCP artifact uses the bare `nowline` id. The `-cloud` suffix is added only where the cloud artifact would collide with the OSS one in the same namespace or store (the public MCP registry, and agent plugin names). The OSS id is never suffixed (no `-oss`).
 - **Display name (phased):** "Nowline" today (OSS only); when Nowline Cloud launches, OSS becomes "Nowline OSS" and the cloud "Nowline Cloud". "Pro"/"Enterprise" are account tiers that gate Nowline Cloud, never connector or display names.
 
 **Concrete ids per channel:**
@@ -253,6 +253,7 @@ This section is the canonical record for how Nowline MCP artifacts are named and
 | Cursor Marketplace | `nowline` (local) | `nowline-cloud` (remote OAuth) | One store, two listings |
 | VS Code MCP gallery | `nowline` (local) | `nowline-cloud` (remote OAuth) | Sourced from public MCP registry |
 | Gemini CLI extension | `name: nowline` | remote http entry (same channel) | |
+| Agent plugin | `nowline` (`nowline@nowline`, repo marketplace) | `nowline-cloud` | Plugins sharing a name can't be installed side by side; see [`specs/mcp.md`](./mcp.md) § Plugin bundle |
 
 **Hard rules:**
 - OSS stays `@nowline/mcp` (Apache-2.0) on npm + public MCP registry (`io.nowline/nowline`) + `.mcpb` (`name: nowline`).

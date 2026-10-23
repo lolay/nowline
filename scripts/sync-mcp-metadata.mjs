@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-// Sync semver version from packages/mcp/package.json into server.json and
-// manifest.json (registry + .mcpb metadata must match the published npm tag).
+// Sync semver version from packages/mcp/package.json into the metadata that
+// ships @nowline/mcp elsewhere: server.json (MCP registry), manifest.json
+// (.mcpb), gemini-extension.json, and the two plugin manifests under
+// plugins/nowline (Claude Code / Copilot CLI format and Agent Plugins format).
 //
 // Usage:
 //   node scripts/sync-mcp-metadata.mjs [version]          rewrite stale files
 //   node scripts/sync-mcp-metadata.mjs --check [version]  exit 1 if any is stale
 //
 // The release cut (.github/scripts/bump-version.mjs) runs the write mode and
-// commits the result, so on main both files always match package.json.
+// commits the result, so on main every file always matches package.json.
 // `make pack-mcpb` runs --check so a local gate run never rewrites tracked files.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -66,9 +68,16 @@ syncJson('packages/mcp/server.json', (server) => {
     }
 });
 
-syncJson('packages/mcp/manifest.json', (manifest) => {
-    manifest.version = version;
-});
+for (const relPath of [
+    'packages/mcp/manifest.json',
+    'gemini-extension.json',
+    'plugins/nowline/.claude-plugin/plugin.json',
+    'plugins/nowline/plugin.json',
+]) {
+    syncJson(relPath, (manifest) => {
+        manifest.version = version;
+    });
+}
 
 if (stale.length > 0) {
     console.error(

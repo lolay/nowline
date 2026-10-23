@@ -1,0 +1,14 @@
+{
+    "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+    "name": "nowline",
+    "version": "0.9.0",
+    "description": "Create and edit your roadmaps in a plain-text format.",
+    "author": {
+        "name": "Nowline",
+        "url": "https://nowline.io"
+    },
+    "homepage": "https://nowline.io",
+    "repository": "https://github.com/lolay/nowline",
+    "license": "Apache-2.0",
+    "keywords": ["roadmap", "planning", "gantt", "dsl", "mcp"]
+}

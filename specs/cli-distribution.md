@@ -109,8 +109,9 @@ Where a harness has an official marketplace, publish there and **only** there. S
 | GitHub Release | `nowline.mcpb` | Built in `pack-mcp-mcpb`; attached by `publish-mcp.yml` | Automated |
 | Claude Desktop Extensions directory | `.mcpb` | Manual submission; artifact from release | Manual (tracked issue) |
 | Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Manual submission per Gemini CLI process | Manual (tracked issue) |
-| Claude Code | MCP CLI (manual) | `nowline --mcp-install claude-code`, `claude mcp add nowline -- npx -y @nowline/mcp`, or `.mcp.json`; no marketplace | n/a (user config) |
-| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry; no marketplace | n/a (user config) |
+| Repo plugin marketplace (`lolay/nowline`) | Agent plugin (`plugins/nowline/`) | Claude Code `/plugin install nowline --marketplace lolay/nowline`; Copilot CLI `copilot plugin marketplace add lolay/nowline`; Codex reads the same marketplace. See [`specs/mcp.md`](./mcp.md) § Plugin bundle | Version synced at release cut; no publish step |
+| Claude Code | MCP CLI (manual) | `nowline --mcp-install claude-code`, `claude mcp add nowline -- npx -y @nowline/mcp`, or `.mcp.json` when not using the plugin | n/a (user config) |
+| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry (preferred over the plugin; see [`specs/mcp.md`](./mcp.md) § Plugin bundle) | n/a (user config) |
 | Other local harnesses | MCP CLI (manual) | `nowline --mcp-install <client>` (Antigravity, Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose; [`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 
 Note: Cursor Marketplace and VS Code MCP gallery are both fed by the public MCP registry. Updating the registry entry is the single action that surfaces the MCP server in both IDEs.
@@ -128,12 +129,13 @@ This section is the authoritative record for artifact ids. Already-published VS 
 | Cursor Marketplace | `nowline` (local/stdio entry) | `nowline-cloud` (remote/OAuth entry) |
 | VS Code MCP gallery | `nowline` (local/stdio entry) | `nowline-cloud` (remote/OAuth entry) |
 | Gemini CLI extension | `name: nowline` | remote http entry (same channel) |
+| Agent plugin (Claude Code, Copilot CLI, Codex, Cursor) | `nowline` in marketplace `nowline` (`nowline@nowline`) | `nowline-cloud`, if a cloud plugin ships (plugins that share a name can't be installed side by side) |
 | VS Code / Cursor `.vsix` | `nowline.vscode-nowline` (unchanged) | n/a |
 
 **Display name:** "Nowline" today (OSS only, no differentiation needed). When Nowline Cloud launches, the OSS display name becomes "Nowline OSS" and the cloud "Nowline Cloud". "Pro"/"Enterprise" are account tiers, never connector names.
 
 **Hard rules:**
-- The OSS id is never suffixed `-oss`. The cloud id is suffixed `-cloud` only where both tiers share the same namespace (the MCP registry).
+- The OSS id is never suffixed `-oss`. The cloud id is suffixed `-cloud` only where both tiers share the same namespace (the MCP registry and agent plugin names).
 - Tool names stay identical across OSS and Cloud (`validate`, `render`, `read`, `create`, `update`, `delete`, `list`, `export`); cloud adds `search` + push/pull.
 - Cloud artifacts ship only from the proprietary side (`lolay/nowline-api`), never from `lolay/nowline`.
 
