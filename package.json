@@ -1,7 +1,7 @@
 {
     "private": true,
     "name": "nowline-monorepo",
-    "packageManager": "pnpm@12.10.1",
+    "packageManager": "pnpm@12.11.2",
     "engines": {
         "node": ">=22",
         "pnpm": ">=11"
