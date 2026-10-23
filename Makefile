@@ -60,7 +60,7 @@ GALLERY_OPEN_PRS ?=
 
 # The review gallery's scripts are plain Node, outside the pnpm workspace,
 # so their node:test specs run beside the Vitest suites.
-SCRIPT_TESTS := node --test "scripts/gallery/test/*.test.mjs"
+SCRIPT_TESTS := node --test "scripts/gallery/test/*.test.mjs" "scripts/test/*.test.mjs"
 
 # $(call confirm,VAR,what-this-touches)
 #
