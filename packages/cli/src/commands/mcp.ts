@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { createMcpHttpHandler } from '@nowline/mcp/http';
 import { createMcpServer } from '@nowline/mcp/server';
 import type { ParsedArgs } from '../cli/args.js';
 import { createLog } from '../io/log.js';
@@ -19,7 +19,6 @@ import { createLog } from '../io/log.js';
  */
 export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> {
     const root = args.root ?? process.cwd();
-    const server = createMcpServer({ allowedRoot: root });
 
     const portStr = args.port;
     if (portStr !== undefined) {
@@ -30,14 +29,9 @@ export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> 
             );
         }
 
-        const transport = new NodeStreamableHTTPServerTransport({
-            sessionIdGenerator: undefined,
-        });
-        await server.connect(transport);
-
-        const httpServer = createServer(async (req, res) => {
-            await transport.handleRequest(req, res);
-        });
+        const httpServer = createServer(
+            createMcpHttpHandler(() => createMcpServer({ allowedRoot: root })),
+        );
 
         await new Promise<void>((resolve) => {
             httpServer.listen(port, '127.0.0.1', () => {
@@ -51,7 +45,7 @@ export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> 
         });
     } else {
         const transport = new StdioServerTransport();
-        await server.connect(transport);
+        await createMcpServer({ allowedRoot: root }).connect(transport);
         await new Promise<void>((resolve) => {
             transport.onclose = resolve;
         });

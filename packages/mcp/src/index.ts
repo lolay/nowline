@@ -15,8 +15,8 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { createMcpHttpHandler } from './http.js';
 import { expandRootPath } from './root-path.js';
 import { createMcpServer } from './server.js';
 
@@ -96,22 +96,15 @@ if (help) {
 // (optional field left unset) collapses to undefined → cwd fallback, inline.
 const expandedRoot = expandRootPath(root);
 
-const server = createMcpServer({
+const serverOptions = {
     allowedRoot: expandedRoot,
     rootConfigured: expandedRoot !== undefined,
     version: PKG_VERSION,
-});
+};
 
 if (port !== undefined) {
-    // Streamable HTTP transport — stateless (no session management).
-    const transport = new NodeStreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-    });
-    await server.connect(transport);
-
-    const httpServer = createServer(async (req, res) => {
-        await transport.handleRequest(req, res);
-    });
+    // Streamable HTTP transport — stateless, one server per request.
+    const httpServer = createServer(createMcpHttpHandler(() => createMcpServer(serverOptions)));
 
     httpServer.listen(port, '127.0.0.1', () => {
         process.stderr.write(
@@ -127,5 +120,5 @@ if (port !== undefined) {
 } else {
     // Default: stdio transport.
     const transport = new StdioServerTransport();
-    await server.connect(transport);
+    await createMcpServer(serverOptions).connect(transport);
 }
