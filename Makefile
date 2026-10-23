@@ -29,7 +29,7 @@ SHELL := bash
         gallery gallery-collect gallery-publish gallery-serve gallery-e2e \
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
-        compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog \
+        compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog release-notes \
         changelog-check changelog-preview \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
 
@@ -312,6 +312,11 @@ snapshot-version: ## [pkg] Compute and write 0.0.0-dev.<ts>.g<sha> to every pack
 
 release-changelog: ## [pkg] Fold .changelog/ fragments into a dated [X.Y.Z] section in both CHANGELOGs (VERSION=X.Y.Z)
 	@python3 scripts/changelog.py release $(VERSION)
+
+# LINK_BASE turns the section's relative links into absolute ones; release.yml
+# passes the tag's blob URL so ./specs/ links work on the release page.
+release-notes: ## [pkg] Print the root CHANGELOG's [X.Y.Z] section body for a release page (VERSION=X.Y.Z, LINK_BASE=<url>)
+	@python3 scripts/changelog.py notes $(VERSION) $(if $(LINK_BASE),--link-base $(LINK_BASE))
 
 # BASE is the ref the branch is diffed against (CI passes the PR base SHA);
 # REQUIRE=1 also fails when the branch adds no fragment. Without BASE it only

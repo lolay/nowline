@@ -147,7 +147,7 @@ A single job with one matrix of four cells. `needs: build` means every cell of t
 |---|---|
 | `npm` | Downloads `npm-tarballs`, runs `npm publish <tarball> --access public` for each tarball in dependency order. Uses `NPM_TOKEN`. |
 | `vscode` | Downloads `nowline-vscode.vsix`, runs `vsce publish --packagePath …` then `ovsx publish …`. Uses `VSCE_PAT` and `OVSX_PAT`. |
-| `github-release` | Downloads binary + deb artifacts, stages them with the man page (`nowline.1`) and any `nowline.<locale>.1` overlays, publishes the GitHub Release via `softprops/action-gh-release@v3`, **then** commits a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) using `HOMEBREW_TAP_TOKEN`. The formula references the release-asset URLs that the same cell just published and embeds SHA256s computed on the fly. The cell fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap. |
+| `github-release` | Downloads binary + deb artifacts, stages them with the man page (`nowline.1`) and any `nowline.<locale>.1` overlays, publishes the GitHub Release via `softprops/action-gh-release@v3` with the release's `CHANGELOG.md` section as its text (`make release-notes`, relative links made absolute against the tag; GitHub's generated PR list only when the section is missing or empty), **then** commits a refreshed `Formula/nowline.rb` to [`lolay/homebrew-tap`](https://github.com/lolay/homebrew-tap) using `HOMEBREW_TAP_TOKEN`. The formula references the release-asset URLs that the same cell just published and embeds SHA256s computed on the fly. The cell fails loudly if any expected artifact is missing rather than emitting an all-zero SHA. See [`specs/homebrew-tap.md`](./homebrew-tap.md) for the formula structure and seed-repo bootstrap. |
 
 | `action-mirror` | Downloads `action-mirror` bundle, syncs to `lolay/nowline-action`, tags, and publishes a GitHub Release on the mirror. Uses `MARKETPLACE_MIRROR_PAT`. |
 
@@ -162,7 +162,7 @@ The job checks out `refs/tags/v$VERSION` rather than the caller's ref, so a stan
 1. Verify `npm view @nowline/mcp@$VERSION` resolves (waits out npm propagation lag).
 2. Attach `nowline.mcpb` to the GitHub Release (`gh release upload --clobber`).
 3. `make publish-mcp-registry` — DNS domain auth + `mcp-publisher publish` (**last** automated step).
-4. Open a `maintainer-only` + `release-ops` GitHub issue with the Claude Desktop + Gemini manual submission checklist.
+4. Attach `nowline-vX.Y.Z-release-notes.md` (`make release-notes` on the tag) to the GitHub Release, and open a `maintainer-only` + `release-ops` GitHub issue with the Claude Desktop + Gemini manual submission checklist and a link to that asset. A tag cut before `make release-notes` existed links its `CHANGELOG.md` instead.
 
 Uses `MCP_PRIVATE_KEY`. Operator runbook: [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
@@ -180,6 +180,7 @@ GitHub Actions matrix cells cannot depend on each other (no intra-matrix `needs:
 - `nowline_amd64.deb`, `nowline_arm64.deb`
 - `nowline.1` (man page; referenced as a Homebrew resource), plus any `nowline.<locale>.1` overlays.
 - `nowline.mcpb` (Claude Desktop Extensions bundle; attached by `publish-mcp.yml` after the main publish matrix is green).
+- `nowline-vX.Y.Z-release-notes.md` (the release's `CHANGELOG.md` section as Markdown, for the manual marketplace submissions; attached by `publish-mcp.yml`).
 
 ## Hotfix flow
 
@@ -265,6 +266,7 @@ See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribut
 - **Contributors** add `.changelog/<name>.txt` (branch slug or PR number) holding one ` ```release-note:<kind> ` block per entry, `<kind>` being `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`. VS Code extension entries go in `packages/vscode-extension/.changelog/`. The format is in [`.changelog/README.md`](../.changelog/README.md).
 - **The `Changelog` check** ([`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml), `make changelog-check`) validates every fragment and fails a PR that adds none unless it carries the `no-changelog` label, or that adds an entry or heading to a `CHANGELOG.md` above its latest release. Fixing a released entry is allowed, and so is editing a legacy `## [Unreleased]` entry in place: within a diff hunk, an entry or heading line that replaces a removed one counts as an edit, and only the surplus counts as new.
 - **`cut-release`** runs [`scripts/changelog.py`](../scripts/changelog.py) `release X.Y.Z` (the `release-changelog` Make target), which writes a new `## [X.Y.Z] - YYYY-MM-DD` section into each `CHANGELOG.md` that has a `.changelog/` beside it, grouped by kind and in merge order, then deletes the fragments it used. `.changelog/` therefore holds exactly what's pending. No manual edit is required.
+- **The GitHub Release page** shows the root `CHANGELOG.md`'s new section: the `github-release` publish cell runs `make release-notes` ([`scripts/changelog.py`](../scripts/changelog.py) `notes X.Y.Z`) on the tag, so what `make changelog-preview` printed before the cut is what the page says.
 
 Entries still under a `## [Unreleased]` heading from before fragments were adopted are folded into the next release ahead of the fragments, under the same headings, and the heading is dropped. Edit them in place until then; don't move them into fragments.
 

@@ -48,6 +48,7 @@ graph LR
     bundle_size["bundle-size"]
     bump
     release_changelog["release-changelog"]
+    release_notes["release-notes"]
     changelog_check["changelog-check"]
     changelog_preview["changelog-preview"]
     gh_runs_list["gh-runs-list"]
@@ -114,6 +115,7 @@ by any CI workflow. Requires `gh` on PATH and authentication (`gh auth login`).
 | `vsix` | Package the VS Code / Cursor extension into a `.vsix` |
 | `bump` | Bump every package version (`LEVEL=patch\|minor\|major`); prints the new version |
 | `release-changelog` | Fold every `.changelog/` fragment into a dated `## [X.Y.Z]` section of the `CHANGELOG.md` beside it, then delete the fragments (`VERSION=X.Y.Z`) |
+| `release-notes` | Print the body of the root `CHANGELOG.md`'s `[X.Y.Z]` section, the GitHub Release page's text (`VERSION=X.Y.Z`; `LINK_BASE=<url>` makes relative links absolute) |
 | `changelog-check` | Validate `.changelog/` fragments; `BASE=<ref>` also fails on new entries in a `CHANGELOG.md`, and `REQUIRE=1` on a branch with no fragment |
 | `changelog-preview` | Print the section each `CHANGELOG.md` would gain at the next release |
 
@@ -169,7 +171,7 @@ keeps per-step logs and the matrix while sourcing the command from one place.
 |----------|---------|--------------|--------------|
 | [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests, merge queue | Strict env doctor on the `.nvmrc` pin; lint workflows; lint man pages; the full `make ci` gate (lint + build + typecheck + test) on a clean checkout on `ubuntu-latest` Node 26, and `make ci-platform` (build-fast + Vitest) on the Node 22, macOS, and Windows cells (macOS and Windows only in the merge queue and on `main`; a PR runs the Linux cells); embed bundle-size gate; export-determinism and MCP harness gates; release-build smoke (calls `build.yml`, in parallel with the test matrix; Linux cells only on a PR); a docs-only PR or queue entry (Markdown outside `packages/` and `.github/`, except `specs/dsl.md`) skips every build and test job, while push to `main` always runs everything; the aggregate `CI gate` job, the only check the `main` ruleset requires | `doctor` (as `MODE=ci STRICT=1`, through `lolay/triage-action`), `lint-workflows`, `lint-man`, `ci`, `ci-platform`, `bundle-size`, `build-fast`, `compile`, `determinism`, `determinism-browser`, `mcp-inspector-smoke`, `mcp-app-e2e` |
 | [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries and smoke each on a runner that can execute it (native `ubuntu-24.04-arm` / `windows-11-arm` for arm64, Rosetta for macOS x64), build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
-| [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `release-changelog`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
+| [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `release-changelog`, `release-notes`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
 | [`changelog.yml`](./.github/workflows/changelog.yml) | pull requests (including label changes), merge queue | Validate `.changelog/` fragments; on a PR, require one unless it's labelled `no-changelog`, and reject new entries written straight into a `CHANGELOG.md`. The `Changelog` check is required by the `main` ruleset | `changelog-check` |
 | [`embed-cdn.yml`](./.github/workflows/embed-cdn.yml) | push to `main`, pull requests, manual dispatch | Build the dev IIFE; continuous-deploy `embed.nowline.dev`; per-PR ephemeral preview channel | `publish-cdn` (guarded with `CONFIRM_DEPLOY=1`, embed-dev job) |
 

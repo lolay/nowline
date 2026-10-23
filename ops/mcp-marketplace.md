@@ -20,7 +20,7 @@ Manual-only channels (no public submission API):
 
 - Claude Desktop Extensions directory (`.mcpb` upload)
 
-Each release opens a tracking issue linking here so these steps do not silently fall behind.
+Each release opens a tracking issue linking here so these steps do not silently fall behind. The issue links the release notes the submissions ask for: `nowline-vX.Y.Z-release-notes.md`, attached to the GitHub Release by the same job.
 
 ## One-time: MCP registry credentials
 
@@ -128,7 +128,7 @@ When a non-MCP publish cell failed but the release is otherwise green:
 
 1. Go to **Actions → Publish MCP (standalone) → Run workflow**.
 2. Enter the semver version (e.g. `0.6.0`).
-3. Confirm the run: npm live check → `.mcpb` attach → registry publish → tracking issue.
+3. Confirm the run: npm live check → `.mcpb` attach → registry publish → release-notes attach and tracking issue.
 
 Dispatching from `main` is fine for any version: the reusable workflow checks out the `v<version>` tag, so the registry entry is stamped from that release's `packages/mcp/package.json`, not main's.
 
