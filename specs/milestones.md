@@ -529,7 +529,7 @@ MCP server milestone. Ships one TypeScript package (`@nowline/mcp`, `packages/mc
 
 Why this exists: today an agent calling the CLI passes untyped arguments and parses unstructured text output. `@nowline/mcp` exposes a typed, discoverable tool surface so harnesses get IDE-quality type hints on inputs, machine-readable structured output (every tool declares an `outputSchema`), behavior hints via standard tool annotations (`readOnlyHint` / `idempotentHint` / `destructiveHint`), and an optional in-chat rendered preview instead of raw SVG text. Three resources prime models to emit valid `.nowline` unprompted, and three prompts script the common create / fix / convert workflows.
 
-**Tool surface** (the eight shared tools share names with the Nowline Cloud MCP contract — identical across local and cloud so agents graduate with zero relearning; cloud adds `search` + push/pull. `convert`, `capabilities`, and the `list-*` discovery family are OSS conveniences the cloud may mirror):
+**Tool surface** (the eight shared tools share names with the Nowline Pro MCP contract — identical across local and cloud so agents graduate with zero relearning; Pro adds `search` + push/pull. `convert`, `capabilities`, and the `list-*` discovery family are OSS conveniences Pro may mirror):
 
 | Tool | Input | Output |
 |------|-------|--------|
@@ -561,7 +561,7 @@ Why this exists: today an agent calling the CLI passes untyped arguments and par
 
 **CLI integration (`--mcp` mode flag):** the `nowline` binary adds `--mcp` as a mode flag alongside `--serve` and `--init` to start the MCP server in stdio mode. `npx @nowline/mcp` is the canonical harness-install path; `nowline --mcp` is the power-user equivalent that reuses the installed binary without a separate package.
 
-**Open-core boundary:** `@nowline/mcp` is purely local — no network, no auth, no cloud endpoints. At most a docs-only "upgrade to Nowline Cloud" text pointer. Cloud `search` + push/pull and OAuth-gated access to cloud-stored roadmaps live in the proprietary Nowline Cloud MCP server (`nowline-api/services/mcp`, Go, OAuth).
+**Open-core boundary:** `@nowline/mcp` is purely local — no network, no auth, no cloud endpoints. At most a docs-only "upgrade to Nowline Pro" text pointer. Pro `search` + push/pull and OAuth-gated access to cloud-stored roadmaps live in the proprietary Nowline Pro MCP server (`nowline-api/services/mcp`, Go, OAuth).
 
 **Distribution (marketplace-first, from `lolay/nowline` via `release.yml`, independent of the `.vsix`):**
 
@@ -575,7 +575,7 @@ Why this exists: today an agent calling the CLI passes untyped arguments and par
 
 Harnesses with no marketplace (Claude Code, Codex CLI) use the MCP CLI form via `claude mcp add` / `~/.codex/config.toml`. See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP distribution.
 
-**Branding:** display name "Nowline" (local OSS, no account); publishing id `nowline` (bare, no `-oss` suffix); registry id `io.nowline/nowline`; `.mcpb` manifest `name: nowline`. Relabeled "Nowline OSS" when Nowline Cloud launches. "Pro"/"Enterprise" are account tiers that gate Nowline Cloud, never MCP connector names. See [`specs/mcp.md`](./mcp.md) and [`specs/releasing.md`](./releasing.md) for the full naming/publishing-id convention.
+**Branding:** display name "Nowline" (local OSS, no account); publishing id `nowline` (bare, no `-oss` suffix); registry id `io.nowline/nowline`; `.mcpb` manifest `name: nowline`. The display name stays "Nowline" after the hosted server ships; that server is "Nowline Pro" (id `nowline-pro`). See [`specs/mcp.md`](./mcp.md) and [`specs/releasing.md`](./releasing.md) for the full naming/publishing-id convention.
 
 Depends on: m1 (DSL + parser + validator), m2a (CLI binary for `--mcp` flag), m2b (layout + renderer — `render` + `export` tools), m3a (LSP — optional, enables richer navigation tools via LSP-backed results), m4.7 (`@nowline/browser` + `@nowline/preview-shell` — required only for the optional MCP Apps UI variant; basic stdio operation is independent of m4.7).
 

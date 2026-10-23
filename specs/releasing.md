@@ -239,31 +239,31 @@ This section is the canonical record for how Nowline MCP artifacts are named and
 
 **Two independent levers:**
 
-- **Publishing id (stable, default `nowline`):** every OSS MCP artifact uses the bare `nowline` id. The `-cloud` suffix is added only where the cloud artifact would collide with the OSS one in the same namespace or store (the public MCP registry, and agent plugin names). The OSS id is never suffixed (no `-oss`).
-- **Display name (phased):** "Nowline" today (OSS only); when Nowline Cloud launches, OSS becomes "Nowline OSS" and the cloud "Nowline Cloud". "Pro"/"Enterprise" are account tiers that gate Nowline Cloud, never connector or display names.
+- **Publishing id (stable):** every OSS MCP artifact uses the bare `nowline` id, never suffixed (no `-oss`). The hosted server uses `nowline-pro` on every channel.
+- **Display name:** "Nowline" for OSS, permanently (no "OSS" suffix, before or after Pro ships); "Nowline Pro" for the hosted server, matching the `pro.nowline.io` web app. Enterprise naming is deferred.
 
 **Concrete ids per channel:**
 
-| Channel | OSS id | Cloud id | Notes |
-|---------|--------|----------|-------|
-| npm | `@nowline/mcp` | n/a (Go server) | OSS package; cloud is remote-only |
-| Public MCP registry | `io.nowline/nowline` | `io.nowline/nowline-cloud` | Only channel where both tiers share a namespace, so cloud is suffixed |
-| Claude Desktop Extensions | `name: nowline` (`.mcpb` manifest) | n/a (Connectors directory, separate store) | Connectors directory = separate store; no collision |
-| Claude Connectors Directory | n/a (Extensions directory, separate store) | `nowline` | Each store holds only one tier |
-| Cursor Marketplace | `nowline` (local) | `nowline-cloud` (remote OAuth) | One store, two listings |
-| VS Code MCP gallery | `nowline` (local) | `nowline-cloud` (remote OAuth) | Sourced from public MCP registry |
-| Gemini CLI extension | `name: nowline` | remote http entry (same channel) | |
-| Agent plugin | `nowline` (`nowline@nowline`, repo marketplace) | `nowline-cloud` | Plugins sharing a name can't be installed side by side; see [`specs/mcp.md`](./mcp.md) § Plugin bundle |
+| Channel | OSS id | Pro id | Notes |
+|---------|--------|--------|-------|
+| npm | `@nowline/mcp` | n/a (Go server) | OSS package; Pro is remote-only |
+| Public MCP registry | `io.nowline/nowline` | `io.nowline/nowline-pro` | |
+| Claude Desktop Extensions | `name: nowline` (`.mcpb` manifest) | n/a | Pro is remote; no `.mcpb` |
+| Anthropic's directory (plugins and connectors) | n/a | `nowline-pro` | OSS isn't submitted; it lists only in this repo's marketplace |
+| Cursor Marketplace | `nowline` (local) | `nowline-pro` (remote OAuth) | One store, two listings |
+| VS Code MCP gallery | `nowline` (local) | `nowline-pro` (remote OAuth) | Sourced from public MCP registry |
+| Gemini CLI extension | `name: nowline` | `name: nowline-pro` | Separate extension, shipped from the proprietary side |
+| Agent plugin | `nowline` (`nowline@nowline`, repo marketplace) | `nowline-pro` (proprietary side only) | Plugins sharing a name can't be installed side by side; see [`specs/mcp.md`](./mcp.md) § Plugin bundle |
 
 **Hard rules:**
 - OSS stays `@nowline/mcp` (Apache-2.0) on npm + public MCP registry (`io.nowline/nowline`) + `.mcpb` (`name: nowline`).
-- The cloud artifact and any bundle that wires it are proprietary "Nowline Cloud" artifacts shipped only from the proprietary side — never from `lolay/nowline`.
-- Tool names stay identical across OSS and Cloud (`validate`, `render`, `read`, etc.); only the server display name + id differ.
+- The Pro artifact and any bundle that wires it are proprietary "Nowline Pro" artifacts shipped only from the proprietary side — never from `lolay/nowline`, and never listed in this repo's plugin marketplace.
+- Tool names stay identical across OSS and Pro (`validate`, `render`, `read`, etc.); only the server display name + id differ.
 - Do NOT re-publish or rename the already-published `.vsix` (`nowline.vscode-nowline`) or Cursor extension to apply this convention. It is a going-forward-only change.
 
 **Operand-first descriptions on every listing (regardless of phase):**
 - OSS: "Create and edit your roadmaps in a plain-text format."
-- Cloud: "Reads/writes your Nowline roadmaps in the cloud. Requires a Nowline account; cloud features depend on your plan (Pro/Enterprise)."
+- Pro: "Reads/writes your Nowline roadmaps in the cloud. Requires a Nowline Pro account."
 
 See [`specs/mcp.md`](./mcp.md) and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP distribution for the full harness coverage matrix.
 

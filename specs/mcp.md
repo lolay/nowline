@@ -8,7 +8,7 @@ The Nowline MCP server exposes the CLI's capabilities to AI agent harnesses thro
 **License:** Apache 2.0.
 **Milestone:** m4.8. Depends on m1 (core), m2a/m2b (CLI/layout/renderer), m3a (LSP — optional for richer navigation tools), m4.7 (`@nowline/browser` + `@nowline/preview-shell` + `@nowline/preview` — required only for the optional MCP Apps UI variant). See [`specs/milestones.md`](./milestones.md) § m4.8.
 
-> **Naming.** Display name **Nowline** today (local OSS, no account). Relabels to **Nowline OSS** once the hosted **Nowline Cloud** MCP ships. Publishing id `nowline` (bare — never `-oss`); registry id `io.nowline/nowline`; `.mcpb` manifest `name: nowline`. **Pro** and **Enterprise** are account tiers that gate Nowline Cloud — never connector names. Full convention: [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution.
+> **Naming.** Display name **Nowline** (local OSS, no account), now and after the hosted server ships; no "OSS" suffix. Publishing id `nowline` (bare — never `-oss`); registry id `io.nowline/nowline`; `.mcpb` manifest `name: nowline`. The hosted server is **Nowline Pro** (id `nowline-pro`), the same name as the `pro.nowline.io` web app. Enterprise naming is deferred. Full convention: [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts and [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution.
 
 ## Why MCP (not "just call the CLI")
 
@@ -19,7 +19,7 @@ Shelling out to `nowline` works, but agent harnesses lose:
 - **Resources** — no way to prime the model with the DSL grammar, canonical examples, or conversion guidance before it writes `.nowline`.
 - **Prompts** — no reusable, server-authored workflow templates (create-a-roadmap, fix-these-diagnostics, convert-this-Gantt) the harness can surface as slash-commands.
 
-`@nowline/mcp` wraps `@nowline/core` and the same export capabilities the human-facing `nowline` binary exposes, behind the stable tool names shared with the Nowline Cloud MCP contract (see [Shared tool contract](#shared-tool-contract)), with [tool annotations](#tool-annotations) and [structured outputs](#structured-output) so harnesses can reason about each tool's risk and parse results without guessing. It also ships MCP [resources](#resources) (to prime the model) and [prompts](#prompts) (to script the common create / fix / convert workflows). Cloud adds `search` and push/pull over remote storage; the OSS server stays purely local per [Open core](#open-core-boundary).
+`@nowline/mcp` wraps `@nowline/core` and the same export capabilities the human-facing `nowline` binary exposes, behind the stable tool names shared with the Nowline Pro MCP contract (see [Shared tool contract](#shared-tool-contract)), with [tool annotations](#tool-annotations) and [structured outputs](#structured-output) so harnesses can reason about each tool's risk and parse results without guessing. It also ships MCP [resources](#resources) (to prime the model) and [prompts](#prompts) (to script the common create / fix / convert workflows). Nowline Pro adds `search` and push/pull over remote storage; the OSS server stays purely local per [Open core](#open-core-boundary).
 
 **In-process, not a CLI shell-out.** `@nowline/mcp` runs as a Node process (`npx @nowline/mcp`), the same runtime as the CLI and the VS Code extension host, so it imports the shared `@nowline/export` kernel and `@nowline/core` directly and produces every artifact in-process — there is no `nowline` binary dependency on the canonical path. This is what lets `render`/`export` honor the byte-for-byte [export-determinism](./export-determinism.md) precedent: the MCP server, the CLI, and the extension all run the *same* kernel, so identical source + inputs yield identical bytes. The `nowline --mcp` power-user path is the one exception — it *is* the CLI hosting the same server code (see [MCP CLI vs MCP Desktop](#mcp-cli-vs-mcp-desktop)).
 
@@ -52,7 +52,7 @@ The Nowline mark appears on every MCP surface that supports icons (MCP spec `202
 
 ## Shared tool contract
 
-Tool names are **identical** to the Nowline Cloud MCP server so agents and users graduate from local files to cloud storage with zero relearning. The OSS server addresses **local file paths**; cloud addresses **diagram ids** and adds `search`.
+Tool names are **identical** to the Nowline Pro MCP server so agents and users graduate from local files to cloud storage with zero relearning. The OSS server addresses **local file paths**; cloud addresses **diagram ids** and adds `search`.
 
 | Tool | Args (OSS) | Returns | Notes |
 |------|------------|---------|-------|
@@ -65,11 +65,11 @@ Tool names are **identical** to the Nowline Cloud MCP server so agents and users
 | `list` | `{ directory?: string, recursive?: boolean = false }` | `{ paths: string[] }` | Lists `.nowline` files under `directory` (default: cwd). |
 | `export` | `{ source?: string, path?: string, format: 'svg' \| 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', now?, timezone?, delivery?: 'file' \| 'inline' \| 'both', nonWorking?: 'hide' \| 'show', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). `svg` is accepted here (in addition to `render`) so agents can save a vector file via `delivery:"file"`. `now` and `timezone` have the same meaning and validation as on `render`. The optional `delivery` parameter controls file vs. inline delivery (see [Structured output](#structured-output) § export delivery). `nonWorking` has the same meaning and validation as on `render` and changes only the picture formats (`svg`, `png`, `pdf`, `html`); `mermaid`, `xlsx` and `msproj` bytes are identical for `show` and `hide`, because the schedule does not depend on the view. `validate` takes no `nonWorking`. `convert` takes neither `now` nor `timezone`: its JSON does not depend on today's date. |
 
-Cloud-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
+Pro-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
 
 ### Additional OSS tools
 
-Tools beyond the shared contract. They lean on capabilities the CLI already has (`convert` is m2a; the option vocabularies are the same enums the renderer and exporters consume), so none widens OSS scope. The Cloud server may mirror them, but they are not part of the shared-name guarantee.
+Tools beyond the shared contract. They lean on capabilities the CLI already has (`convert` is m2a; the option vocabularies are the same enums the renderer and exporters consume), so none widens OSS scope. The Nowline Pro server may mirror them, but they are not part of the shared-name guarantee.
 
 | Tool | Args | Returns | Notes |
 |------|------|---------|-------|
@@ -218,7 +218,7 @@ gh secret set ANTHROPIC_API_KEY --repo lolay/nowline --env claude-mcp
 
 ## Harness coverage (OSS tier only)
 
-The OSS local server ships wherever a harness can run a **local** stdio server with filesystem access. Web-only harnesses (ChatGPT web, Gemini app/Spark, MS Copilot) have no local runtime and are out of scope here — they use Nowline Cloud instead.
+The OSS local server ships wherever a harness can run a **local** stdio server with filesystem access. Web-only harnesses (ChatGPT web, Gemini app/Spark, MS Copilot) have no local runtime and are out of scope here — they use Nowline Pro instead.
 
 | Harness | OSS install form | Config / marketplace | CI (m4.9) |
 |---------|------------------|----------------------|-----------|
@@ -251,7 +251,7 @@ Both launch `npx -y @nowline/mcp@latest`, like `gemini-extension.json`, so the s
 
 Where each harness starts the server matters, because the OSS server resolves file paths against its working directory ([Shared tool contract](#shared-tool-contract)). Claude Code starts plugin stdio servers in the project directory, which is what the server expects. Codex starts them in the plugin's install cache, so in Codex `read`/`list`/`create` see the cache rather than the project; Codex users should register the server with `nowline --mcp-install codex` until the server takes its root from the client's MCP roots. A plugin manifest can't set a platform-specific command, so on native Windows, where a harness can't spawn `npx` without `cmd /c`, `nowline --mcp-install` is the fallback.
 
-The OSS plugin is not submitted to Anthropic's plugin directory; the repo marketplace is its only listing. The plugin id `nowline` is taken by the OSS plugin, so a Nowline Cloud plugin, if one ships, needs a different id (`nowline-cloud`): two plugins with the same name can't be installed side by side, because each one's MCP servers and skills are namespaced by its name.
+The OSS plugin is not submitted to Anthropic's plugin directory; the repo marketplace is its only listing. The repo marketplace lists OSS plugins only. Nowline Pro, and any other hosted Nowline service (such as the free viewer at `free.nowline.io`, which consumes the OSS packages but isn't part of OSS), publishes from the proprietary side: Anthropic's directory or a proprietary marketplace, never this one. A Nowline Pro plugin takes the id `nowline-pro`, which also keeps it installable next to the OSS plugin: two plugins with the same name can't be installed side by side, because each one's MCP servers and skills are namespaced by its name.
 
 Distribution detail (release pipeline, naming ids, `.mcpb` build): [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution and [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts.
 
@@ -293,13 +293,13 @@ Capabilities other diagram MCP servers ship that Nowline's OSS server deliberate
 Per [`specs/principles.md`](./principles.md) § Open core:
 
 - `@nowline/mcp` is **purely local** — no network code, no auth, no proprietary dependencies, no cloud endpoints.
-- Push/pull to cloud is **not** implemented inside this package. A user who needs both local files and cloud storage runs **two connectors**: Nowline (this server) and Nowline Cloud (remote, OAuth). The agent `read`s locally and `create`/`update`s on the cloud connector with the returned `source` — or opens the file in the Nowline Cloud web editor. See [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md) § Push/pull.
+- Push/pull to cloud is **not** implemented inside this package. A user who needs both local files and cloud storage runs **two connectors**: Nowline (this server) and Nowline Pro (remote, OAuth). The agent `read`s locally and `create`/`update`s on the cloud connector with the returned `source` — or opens the file in the Nowline Pro web editor. See [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md) § Push/pull.
 
-The OSS package may carry a **docs-only** forward pointer ("upgrade to Nowline Cloud for OAuth-gated cloud roadmaps") — text only, no commercial wiring.
+The OSS package may carry a **docs-only** forward pointer ("upgrade to Nowline Pro for OAuth-gated cloud roadmaps") — text only, no commercial wiring.
 
-## Nowline Cloud (forward pointer)
+## Nowline Pro (forward pointer)
 
-Lolay also ships a hosted MCP server — **Nowline Cloud** — that exposes the same tool names over remote HTTP with OAuth, operates on cloud-stored roadmaps, and adds `search`. It requires a Nowline account; cloud capabilities depend on plan (Pro/Enterprise). Spec, cross-tier matrix, and commercial distribution ownership: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md).
+Lolay also ships a hosted MCP server — **Nowline Pro** — that exposes the same tool names over remote HTTP with OAuth, operates on cloud-stored roadmaps, and adds `search`. It requires a Nowline Pro account. Spec, cross-tier matrix, and commercial distribution ownership: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md).
 
 ## Local development
 
@@ -323,5 +323,5 @@ No account, no API keys, no cloud project. Operates on the developer's local `.n
 - CLI `--mcp` mode flag: [`specs/cli.md`](./cli.md)
 - Release + naming convention: [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts
 - Per-channel distribution: [`specs/cli-distribution.md`](./cli-distribution.md) § MCP server distribution
-- Cloud counterpart + full OSS-vs-Cloud matrix: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md)
+- Pro counterpart + full OSS-vs-Pro matrix: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md)
 - Export delivery prior art + per-client behavior matrix (so we don't re-research it): [`specs/mcp-export-references.md`](./mcp-export-references.md)
