@@ -162,7 +162,7 @@ The job checks out `refs/tags/v$VERSION` rather than the caller's ref, so a stan
 1. Verify `npm view @nowline/mcp@$VERSION` resolves (waits out npm propagation lag).
 2. Attach `nowline.mcpb` to the GitHub Release (`gh release upload --clobber`).
 3. `make publish-mcp-registry` — DNS domain auth + `mcp-publisher publish` (**last** automated step).
-4. Open a `maintainer-only` + `release-ops` GitHub issue with the Claude Desktop + Gemini manual submission checklist.
+4. Attach `nowline-vX.Y.Z-release-notes.md` (`make release-notes` on the tag) to the GitHub Release, and open a `maintainer-only` + `release-ops` GitHub issue with the Claude Desktop + Gemini manual submission checklist and a link to that asset. A tag cut before `make release-notes` existed links its `CHANGELOG.md` instead.
 
 Uses `MCP_PRIVATE_KEY`. Operator runbook: [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).
 
@@ -180,6 +180,7 @@ GitHub Actions matrix cells cannot depend on each other (no intra-matrix `needs:
 - `nowline_amd64.deb`, `nowline_arm64.deb`
 - `nowline.1` (man page; referenced as a Homebrew resource), plus any `nowline.<locale>.1` overlays.
 - `nowline.mcpb` (Claude Desktop Extensions bundle; attached by `publish-mcp.yml` after the main publish matrix is green).
+- `nowline-vX.Y.Z-release-notes.md` (the release's `CHANGELOG.md` section as Markdown, for the manual marketplace submissions; attached by `publish-mcp.yml`).
 
 ## Hotfix flow
 
