@@ -972,11 +972,6 @@ function waves(fx: FinalizeContext): boolean {
     built.regionCrossings.forEach((crossings, i) => {
         if (crossings.length > 0) fx.chart.includes[i].waveCrossings = crossings;
     });
-    if (built.placeholder !== undefined && ctx.timeline.waveStrip) {
-        const { text, x, halo } = built.placeholder;
-        ctx.timeline.waveStrip.placeholder = text;
-        ctx.timeline.waveStrip.placeholderDraw = { x, halo };
-    }
     fx.draft.waves = built;
     return true;
 }
@@ -1044,7 +1039,6 @@ function waveLegend(fx: FinalizeContext): boolean {
         fx.ctx,
         localeStrings(fx.scope.locale),
         fx.chartY.bottom + WAVE_LEGEND_GAP_PX,
-        fx.canvas.final,
     );
     if (!legend) return false;
     fx.chartY.bottom += WAVE_LEGEND_GAP_PX + legend.box.height;

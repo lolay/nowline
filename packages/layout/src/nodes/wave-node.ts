@@ -12,7 +12,7 @@
 import type { StyleProperty } from '@nowline/core';
 import { propKey } from '@nowline/core/internal';
 import { propValue } from '../dsl-utils.js';
-import { type LocaleStrings, wavesDeclaredPlaceholder } from '../i18n.js';
+import type { LocaleStrings } from '../i18n.js';
 import { pickInlineDate } from '../inline-date-pin-geometry.js';
 import {
     INLINE_DATE_GLYPH_GAP_PX,
@@ -26,13 +26,10 @@ import { contrastRatio, hexToRgb } from '../themes/contrast.js';
 import { resolveColor } from '../themes/index.js';
 import type { Theme } from '../themes/shape.js';
 import {
-    GUTTER_PX,
     WAVE_CELL_INSET_PX,
-    WAVE_EMPTY_MARKER_STEP_PX,
     WAVE_LABEL_HALO_INSET_Y_PX,
     WAVE_LABEL_HALO_PAD_PX,
     WAVE_LEGEND_BASELINE_OFFSET_PX,
-    WAVE_LEGEND_ENTRY_GAP_PX,
     WAVE_LEGEND_LINE_PX,
     WAVE_LEGEND_SWATCH_GAP_PX,
     WAVE_LEGEND_SWATCH_HEIGHT_PX,
@@ -79,19 +76,15 @@ export interface BuiltWaves {
     regionCrossings: PositionedWaveCrossing[][];
     /** True when any placed item (main lanes or regions) is background work. */
     hasBackground: boolean;
-    /**
-     * The strip placeholder, set only when every wave is empty: its text,
-     * centred on the timeline at `x`, on `halo` in the backing panel's fill.
-     */
-    placeholder?: { text: string; x: number; halo: BoundingBox };
 }
 
 /**
  * Build the positioned waves, boundaries and crossings. `state` must be
  * frozen: its `pass` is the pass that ran with the solved `S`/`E`, so its
  * member counts cover the main lanes and the first-level regions exactly
- * once (later placements never accumulate). `ctx.timeline.waveStrip` must
- * be set (it is whenever the roadmap declares waves).
+ * once (later placements never accumulate). `ctx.timeline.waveStrip` is
+ * set whenever some wave has items; when none does, nothing is drawn and the
+ * waves carry their spans only (specs/waves.md §9.1).
  */
 export function buildWaves(
     state: WaveLayoutState,
@@ -103,8 +96,6 @@ export function buildWaves(
     if (!state.frozen || !state.solve) {
         throw new Error('buildWaves: the wave barrier has not settled');
     }
-    const strip = ctx.timeline.waveStrip;
-    if (!strip) throw new Error('buildWaves: the timeline has no wave strip');
     const spans = summarizeWaves(
         state.plan,
         state.solve,
@@ -114,15 +105,21 @@ export function buildWaves(
         WAVE_EDGE_TOLERANCE_PX,
     );
     const allEmpty = spans.every((s) => s.memberCount === 0);
+    // With every wave empty the roadmap draws no strip: the waves keep a
+    // zero-height one under the tick panel, for their boxes only.
+    const strip = ctx.timeline.waveStrip ?? {
+        y: ctx.timeline.tickPanelY + ctx.timeline.tickPanelHeight,
+        height: 0,
+    };
+    if (!ctx.timeline.waveStrip && !allEmpty) {
+        throw new Error('buildWaves: the timeline has no wave strip');
+    }
     // The visible part of a span is its overlap with the timeline.
     const visLeft = ctx.timeline.box.x;
     const visRight = visLeft + ctx.timeline.box.width;
-    const stripMidY = strip.y + strip.height / 2;
     // Every strip halo spans the strip less a vertical inset.
     const haloY = strip.y + WAVE_LABEL_HALO_INSET_Y_PX;
     const haloHeight = strip.height - 2 * WAVE_LABEL_HALO_INSET_Y_PX;
-    // Empty-wave diamonds placed so far, by their unstepped x.
-    const emptyXs: number[] = [];
     let ordinal = 0;
 
     const waves = spans.map((span, i): PositionedWave => {
@@ -176,19 +173,8 @@ export function buildWaves(
             fit ??= fitStripLabel(title, span.id, i + 1, visibleWidth, glyphReserve);
         }
 
-        let labelX = (cellLeft + cellRight) / 2;
-        let marker: PositionedWave['strip']['marker'];
-        if (empty) {
-            labelX = span.start;
-            if (!allEmpty) {
-                const sameX = emptyXs.filter(
-                    (x) => Math.abs(x - span.start) < WAVE_EDGE_TOLERANCE_PX,
-                ).length;
-                emptyXs.push(span.start);
-                labelX = span.start + sameX * WAVE_EMPTY_MARKER_STEP_PX;
-                marker = { x: labelX, y: stripMidY };
-            }
-        }
+        // An empty wave is not drawn (§9.1); the NL.I1006 insight names it.
+        const labelX = empty ? span.start : (cellLeft + cellRight) / 2;
 
         const range = empty ? isoDay(startDate) : `${isoDay(startDate)} – ${isoDay(endDate)}`;
         const tooltipParts = [title, range];
@@ -322,7 +308,6 @@ export function buildWaves(
                 ...(superscripts ? { superscripts } : {}),
                 tooltip: tooltipParts.join(' · '),
                 footnotesShown,
-                ...(marker ? { marker } : {}),
                 ...(gapLabel ? { gapLabel } : {}),
             },
             style,
@@ -342,20 +327,6 @@ export function buildWaves(
         regionCrossings: regionBackground.map((items) => crossingsOver(items, boundaries)),
         hasBackground: mainBackground.length + regionBackground.flat().length > 0,
     };
-    if (allEmpty) {
-        const text = wavesDeclaredPlaceholder(
-            strings,
-            waves.map((w) => w.title),
-        );
-        const x = visLeft + ctx.timeline.box.width / 2;
-        const haloWidth =
-            estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX) + 2 * WAVE_LABEL_HALO_PAD_PX;
-        built.placeholder = {
-            text,
-            x,
-            halo: { x: x - haloWidth / 2, y: haloY, width: haloWidth, height: haloHeight },
-        };
-    }
     return built;
 }
 
@@ -598,138 +569,38 @@ function crossingsOver(
     return out;
 }
 
-const SUPERSCRIPT_DIGITS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
-
-function superscript(n: number): string {
-    return String(n).replace(/[0-9]/g, (d) => SUPERSCRIPT_DIGITS[Number(d)]);
-}
-
 /**
- * The wave legend (§9.5), or undefined when none of its triggers holds:
- * background work, a label that is not its full title, dropped footnote
- * indicators, or an empty wave. Entries: the hatch swatch (background
- * work), the boundary swatch (when any boundary is drawn), and the wave
- * names (when a label is abbreviated, a wave is empty, or a wave's
- * footnotes moved here). Lines are `WAVE_LEGEND_LINE_PX` high from `topY`
- * at the chart origin, wrapped at entry boundaries (the wave list also
- * between waves) to the canvas width (`chartRightX`, final) less the gutter.
+ * The wave legend (§9.5), or undefined without background work (which there
+ * is only when some wave is drawn): one hatch swatch, `Background work (not
+ * in a wave)`, `WAVE_LEGEND_LINE_PX` high from `topY` at the chart origin.
  */
 export function buildWaveLegend(
     built: BuiltWaves,
     ctx: LayoutContext,
     strings: LocaleStrings,
     topY: number,
-    chartRightX: number,
 ): PositionedWaveLegend | undefined {
-    const { waves } = built;
-    const abbreviated = waves.some((w) => !w.empty && w.strip.labelKind !== 'title');
-    const anyEmpty = waves.some((w) => w.empty);
-    const dropped = waves.some((w) => w.footnoteIndicators.length > 0 && !w.strip.footnotesShown);
-    if (!built.hasBackground && !abbreviated && !anyEmpty && !dropped) return undefined;
-
-    const fontSize = WAVE_STRIP_LABEL_FONT_SIZE_PX;
-    const textWidth = (text: string): number => estimateTextWidth(text, fontSize);
+    if (!built.hasBackground) return undefined;
     const left = ctx.timeline.originX;
-    const maxRight = Math.max(left, chartRightX - GUTTER_PX);
-    let line = 0;
-    let cursor = left;
-    let lineUsed = false;
-    let widest = 0;
-    const baseline = (l: number): number =>
-        topY + l * WAVE_LEGEND_LINE_PX + WAVE_LEGEND_BASELINE_OFFSET_PX;
-    // Start a unit `width` wide: on this line after the entry gap, or on a
-    // fresh line when it would overflow (a first unit never wraps).
-    const startUnit = (width: number): number => {
-        if (lineUsed && cursor + WAVE_LEGEND_ENTRY_GAP_PX + width > maxRight) {
-            line++;
-            cursor = left;
-            lineUsed = false;
-        }
-        const x = lineUsed ? cursor + WAVE_LEGEND_ENTRY_GAP_PX : cursor;
-        cursor = x + width;
-        lineUsed = true;
-        widest = Math.max(widest, cursor - left);
-        return x;
-    };
-
-    const entries: WaveLegendEntry[] = [];
-    const swatchEntry = (kind: 'background' | 'boundary', text: string): void => {
-        const textX0 = WAVE_LEGEND_SWATCH_WIDTH_PX + WAVE_LEGEND_SWATCH_GAP_PX;
-        const x = startUnit(textX0 + textWidth(text));
-        const y = baseline(line);
-        entries.push({
-            kind,
-            text,
-            swatch: {
-                x,
-                y:
-                    y -
-                    WAVE_LEGEND_BASELINE_OFFSET_PX +
-                    (WAVE_LEGEND_LINE_PX - WAVE_LEGEND_SWATCH_HEIGHT_PX) / 2,
-                width: WAVE_LEGEND_SWATCH_WIDTH_PX,
-                height: WAVE_LEGEND_SWATCH_HEIGHT_PX,
-            },
-            // The hatched swatch is a default item bar.
-            ...(kind === 'background'
-                ? { hatch: waveHatchKind(ctx.styleCtx.theme.entities.item.bg) }
-                : {}),
-            runs: [{ text, x: x + textX0, y }],
-        });
-    };
-    if (built.hasBackground) swatchEntry('background', strings.waveLegendBackground);
-    if (built.boundaries.length > 0) swatchEntry('boundary', strings.waveLegendBoundary);
-
-    if (abbreviated || anyEmpty || dropped) {
-        // Only the waves the strip doesn't name in full: an empty one, an
-        // abbreviated label, or footnotes it dropped. The `#k` numbering stays
-        // the wave's own, so the legend still reads against the bands.
-        const unnamed = waves.filter(
-            (w) =>
-                w.empty ||
-                w.strip.labelKind !== 'title' ||
-                (w.footnoteIndicators.length > 0 && !w.strip.footnotesShown),
-        );
-        const names = unnamed.map((w) => {
-            let name = `#${w.index + 1} ${w.title}`;
-            if (w.footnoteIndicators.length > 0 && !w.strip.footnotesShown) {
-                name += ` ${w.footnoteIndicators.map(superscript).join(',')}`;
-            }
-            if (w.empty) name += ` (${strings.waveNoItems})`;
-            return name;
-        });
-        const sep = ' · ';
-        const first = `${strings.waveLegendPrefix} ${names[0]}`;
-        const runs: WaveLegendEntry['runs'] = [
-            { text: first, x: startUnit(textWidth(first)), y: baseline(line) },
-        ];
-        for (const name of names.slice(1)) {
-            const run = runs[runs.length - 1];
-            if (cursor + textWidth(sep + name) <= maxRight) {
-                run.text += sep + name;
-                cursor += textWidth(sep + name);
-                widest = Math.max(widest, cursor - left);
-            } else {
-                line++;
-                cursor = left;
-                lineUsed = false;
-                runs.push({ text: name, x: startUnit(textWidth(name)), y: baseline(line) });
-            }
-        }
-        entries.push({
-            kind: 'waves',
-            text: `${strings.waveLegendPrefix} ${names.join(sep)}`,
-            runs,
-        });
-    }
-
-    return {
-        box: {
+    const text = strings.waveLegendBackground;
+    const textX0 = WAVE_LEGEND_SWATCH_WIDTH_PX + WAVE_LEGEND_SWATCH_GAP_PX;
+    const width = textX0 + estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX);
+    const entry: WaveLegendEntry = {
+        kind: 'background',
+        text,
+        swatch: {
             x: left,
-            y: topY,
-            width: widest,
-            height: (line + 1) * WAVE_LEGEND_LINE_PX,
+            y: topY + (WAVE_LEGEND_LINE_PX - WAVE_LEGEND_SWATCH_HEIGHT_PX) / 2,
+            width: WAVE_LEGEND_SWATCH_WIDTH_PX,
+            height: WAVE_LEGEND_SWATCH_HEIGHT_PX,
         },
-        entries,
+        // The hatched swatch is a default item bar.
+        hatch: waveHatchKind(ctx.styleCtx.theme.entities.item.bg),
+        runs: [{ text, x: left + textX0, y: topY + WAVE_LEGEND_BASELINE_OFFSET_PX }],
+    };
+    return {
+        box: { x: left, y: topY, width, height: WAVE_LEGEND_LINE_PX },
+        entries: [entry],
     };
 }
 

@@ -218,7 +218,7 @@ swimlane b
         expect(insights[0].lspSeverity).toBe(3);
         expect(insights[0].entityId).toBe('w2');
         expect(insights[0].message).toBe(
-            'Wave "w2" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.',
+            'Wave "w2" won\'t be displayed: it has no items assigned.',
         );
     });
 
@@ -239,9 +239,9 @@ swimlane a
         expect(insights).toHaveLength(1);
         expect(insights[0].code).toBe('NL.I1006');
         expect(insights[0].entityId).toBeUndefined();
-        expect(insights[0].data.args).toEqual({ reason: 'many', names: ['w2', 'w3'] });
+        expect(insights[0].data.args).toEqual({ names: ['w2', 'w3'] });
         expect(insights[0].message).toBe(
-            'Waves "w2", "w3" have no items, so they span no time; they are drawn as markers in the wave strip and listed in the wave legend.',
+            'Waves "w2" and "w3" won\'t be displayed: they have no items assigned.',
         );
     });
 
@@ -257,9 +257,9 @@ swimlane a
   item a1 duration:2w
 `);
         expect(insights).toHaveLength(1);
-        expect(insights[0].data.args).toEqual({ reason: 'all', names: ['discover', 'build'] });
+        expect(insights[0].data.args).toEqual({ names: ['discover', 'build'] });
         expect(insights[0].message).toBe(
-            'None of the declared waves ("discover", "build") has items yet. The wave strip shows a placeholder until work is assigned with wave:<id>.',
+            'Waves "discover" and "build" won\'t be displayed: they have no items assigned.',
         );
     });
 

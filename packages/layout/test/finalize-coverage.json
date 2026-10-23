@@ -305,14 +305,11 @@
             ]
         },
         "waveLegend": {
-            "count": 6,
+            "count": 3,
             "samples": [
                 "examples/waves-program.nowline",
                 "examples/waves.nowline",
-                "tests/waves-all-empty.nowline",
-                "tests/waves-coarse.nowline",
-                "tests/waves-empty.nowline",
-                "tests/waves-isolate-team.nowline"
+                "tests/waves-coarse.nowline"
             ]
         },
         "footnotePanel": {

@@ -428,7 +428,7 @@ end(x) ≤ E_k ≤ S_{k+1} ≤ E_{k+1} ≤ … ≤ S_j ≤ start(y)
 | `status:done`, `remaining:` | No scheduling effect. Done items keep their planned span and still count toward `E_k`. |
 | Capacity and utilization | Computed from the shifted positions. Barrier idle time shows as zero load. There is no leveling. |
 | Now-line | Unchanged; it is drawn over everything, including the strip. |
-| Footnotes `on:` | Waves are valid targets. The indicator renders in the wave's strip cell, or in the legend when it does not fit. |
+| Footnotes `on:` | Waves are valid targets. The indicator renders in the wave's strip cell, and is dropped when it does not fit (the footnote panel still lists the footnote). |
 | `roadmap:merge` includes | Merged lanes take part automatically. Waves must agree (§7). |
 | `roadmap:isolate` includes | Region lanes are members and are floored. Region ids stay invisible to the parent, and wave identity is shared through the agreement rule (Example 19). |
 | Dependency arrows | Wave references draw no arrow, the same as inline dates. |
@@ -487,7 +487,7 @@ The layout emits L (WV15–WV18).
 | WV14 | An included wave's presentation differs from the parent's. | warning | **NL.W0701** | I |
 | WV15 | *Retired with item pins* ([`dsl.md` § Pinning is not supported](./dsl.md#pinning-is-not-supported)): a barrier moved an item pin. | — | ~~NL.W1001~~ | L |
 | WV16 | The barrier driver hit its pass cap. This is defensive and unreachable for valid input. | warning | **NL.W1002** | L |
-| WV17 | One or more waves have no members. Reported once per roadmap. | info | **NL.I1006** | L |
+| WV17 | One or more waves have no members, so they are not drawn. Reported once per roadmap, naming them all. | info | **NL.I1006** | L |
 | WV18 | A wave overruns a dated milestone whose `after:` includes it. | info | **NL.I1007** | L |
 
 **Code ranges.**
@@ -607,9 +607,8 @@ violation: an item x with ew(x) = k and lbS(x) ≥ k    // forced to start at or
 | NL.E0202 `floor` | `Wave "{id}" in "{path}" opens no earlier than {childFloor}, but this file's wave "{id}" opens no earlier than {parentFloor}. A wave must have the same start floor in every included roadmap.` (`{…Floor}` is an ISO date. When the included file has no floor, the first clause reads `Wave "{id}" in "{path}" has no start floor`; when this file has none, the second reads `this file's wave "{id}" has no start floor`.) |
 | NL.W0701 | `Wave "{id}" in "{path}" differs from this file's definition ({fields}); this file's definition is used.` (`{fields}`, for example `title "Discovery" there, "Discover" here`) |
 | NL.W1002 | `Wave barriers did not settle after {passes} layout passes, so the drawn schedule may not respect the wave order. The roadmap probably has an ordering conflict that validation did not catch.` |
-| NL.I1006 `one` | `Wave "{name}" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.` |
-| NL.I1006 `many` | `Waves {names} have no items, so they span no time; they are drawn as markers in the wave strip and listed in the wave legend.` |
-| NL.I1006 `all` | `None of the declared waves ({names}) has items yet. The wave strip shows a placeholder until work is assigned with wave:<id>.` |
+| NL.I1006 (one) | `Wave "{name}" won't be displayed: it has no items assigned.` |
+| NL.I1006 (several) | `Waves {names} won't be displayed: they have no items assigned.` (`{names}`: `"abc", "xyz" and "123"`; past five, `"a", "b", "c", "d", "e" and 2 more`) |
 | NL.I1007 | `Milestone "{name}" ({date}) is overrun: wave "{wave}" ends {end}.` |
 
 **Other message changes.**
@@ -875,8 +874,8 @@ export interface PositionedWaveCrossing { x: number; topY: number; bottomY: numb
 // PositionedRoadmap.waveBoundaries?: PositionedWaveBoundary[]
 // PositionedRoadmap.waveCrossings?: PositionedWaveCrossing[]
 // PositionedRoadmap.waveLegend?: { box: BoundingBox; entries: WaveLegendEntry[] }
-// PositionedTimelineScale.waveStrip?: { y: number; height: number; placeholder?: string }
-// PositionedItem.waveRole?: 'member' | 'background'      // set on every item when the roadmap has waves
+// PositionedTimelineScale.waveStrip?: { y: number; height: number }   // only when some wave has items
+// PositionedItem.waveRole?: 'member' | 'background'      // set on every item when some wave has items
 // PositionedItem.waveTooltip?: string                  // 'Background (no wave)', localized; background items only (§9.3)
 // PositionedGroup.waveOnly?: true                       // the §9.7 no-bracket case
 // PositionedMilestone.onWaveBoundary?: boolean            // suppresses the cut line (§9.2)
@@ -902,7 +901,7 @@ export interface PositionedWaveCrossing { x: number; topY: number; bottomY: numb
 - **Geometry.**
   - `waveStrip.y = tickPanelY + tickPanelHeight`.
   - The marker-row panel moves down by 20.
-  - The strip height is added to `HeaderBands.rowsHeight` (the measure phase, `phases/measure.ts`) only when waves exist.
+  - The strip height is added to `HeaderBands.rowsHeight` (the measure phase, `phases/measure.ts`) only when some wave has items (`hasVisibleWaves`, read off the schedule's member counts). With every wave empty the header is laid out as if no waves were declared.
 - **Why the strip never moves.** Its height is fixed, so `chartTopY` is known before the passes run. It sits above the marker rows, so the post-hoc marker re-pack growth never moves it.
 - **`timeline-position:bottom`.** The tick panel height is 0, so the strip sits directly under the now-pill row. The mirrored bottom panel carries no waves, the same as markers.
 - **Legend.** When it is shown (§9.5), it sits below the chart (and below the bottom tick panel, if any) and above the footnote panel. `ctx.chartBottomY` grows by `WAVE_LEGEND_GAP_PX` plus its line heights before `buildFootnotePanel` runs (`indexFootnotes` runs earlier, once, in the place phase).
@@ -952,21 +951,17 @@ Rendering [`examples/waves.nowline`](../examples/waves.nowline) shows the light-
   4. the 1-based ordinal `#k`;
   5. no label.
 - **Date-floor glyph.** A wave whose declared floor is a date literal (`wave launch "Launch" after:2026-11-02`, `pickInlineDate`) paints the calendar glyph (rendering.md "Inline-date glyph") at its cell's left: `INLINE_DATE_GLYPH_INSET_LEFT_PX` (6) in from the cell's painted left edge, 12 px square, vertically centred in the 20 px strip, in `style.text`, wrapped in `<title>YYYY-MM-DD</title>` like any inline-date pin. It shows whether or not the floor opened a gap, so a floor that did not bind still reads as declared. A floor that names an entity (`after:fy-budget`) has no date to show and gets no glyph. The glyph needs `6 + 12 + 6` px of visible cell; narrower, it is dropped. The fit test below adds the glyph's `12 + 4` px (`INLINE_DATE_GLYPH_GAP_PX`) to the width, and the label is centred on the visible span but never left of the glyph's right edge plus that gap, as it is never under the superscripts. The italic gap label below stays: it dates the gap, the glyph dates the floor.
-- **Footnote superscripts** are right-aligned in the cell. When they don't fit, they move to the legend.
+- **Footnote superscripts** are right-aligned in the cell. When they don't fit, they are not drawn; the footnote panel still lists the footnote.
 - **Tooltip.** Every cell has a `<title>`, for example `Launch · 2026-02-02 – 2026-02-23 · held by i2`. The end date is exclusive, and "held by" comes from the layout `LocaleStrings` table.
 
-**Empty wave.**
-
-- It is drawn as a hollow 7 px diamond at x, centred in the strip and stroked in `wave.boundary`.
-- Several empty waves at the same x step 9 px to the right.
-- It always appears in the legend.
+**Empty wave.** It is not drawn: no cell, marker, label or boundary, and no legend entry. It still schedules: its span is `[S_k, S_k]`, its `after:` floor still holds back the waves after it, and a gap its floor opens is still drawn with its floor label (below), so the delay is explained. NL.I1006 names every empty wave in one message.
 
 **Gap** (`S_{k+1} > E_k`).
 
 - The gap has no cell; the backing panel shows through.
 - The floor reference (`fy-budget` or `2026-02-02`) is drawn centred in the gap in 10 px italic `wave.labelMuted`, when it fits.
 
-**All waves empty.** This is the typical first render after adding `wave` lines. No cells, markers, boundaries or crossings are drawn. The strip shows one muted placeholder: `Waves declared: Discover, Build — no items assigned yet`.
+**All waves empty.** This is the typical first render after adding `wave` lines. Nothing about waves is drawn: no strip (the header rows close up as if no waves were declared), no boundaries or crossings, no hatch on unassigned items (no item is background work while no wave is drawn) and no legend. The barrier still runs, so a floor still sets `E_k` for `after:<wave>`. NL.I1006 names the waves.
 
 ### 9.2 Boundary lines (`data-layer="wave-boundary"`)
 
@@ -1031,20 +1026,7 @@ There is no `default wave` and no `Theme.entities.wave`. `wave-node.ts` reads th
 
 ### 9.5 Wave legend (`data-layer="wave-legend"`)
 
-PNG and PDF have no tooltips, so the legend is the fallback for anything the picture abbreviates. It is one or more lines of 10 px `wave.labelText`, wrapped at entry boundaries.
-
-**When it is drawn.** It appears when any of the following holds:
-
-- the roadmap has a background item;
-- any wave's label is not its full title;
-- any wave's footnote indicators were dropped;
-- any wave is empty.
-
-**Entries**, in this order:
-
-1. A hatch swatch with `Background work (not in a wave)`, when background items exist.
-2. A boundary swatch with `Wave boundary`.
-3. Wave names whenever any label is abbreviated, any wave is empty or any footnote indicator was dropped. Only the waves the strip does not name in full are listed: an empty wave, a wave whose label is not its title (id, ellipsis or `#k`, or no label), and a wave whose footnote indicators moved here. A wave the strip spells out in full is left out. Each listed wave keeps its own `#k` (its 1-based declaration position), so the legend still reads against the bands, for example `Waves: #2 Build ¹ · #3 Hardening (TBD) (no items)` when wave 1 shows `Discover` and wave 4 shows `Launch` in full.
+One line of 10 px `wave.labelText` at the chart origin: a hatch swatch with `Background work (not in a wave)`. It is drawn only when the roadmap has background work, which it has only while some wave is drawn. Nothing else about waves is listed: an abbreviated strip label keeps its full title in the cell's tooltip, and an empty wave is reported by NL.I1006.
 
 ### 9.6 Distinctness
 
@@ -1085,7 +1067,7 @@ The strip stays global.
 5. **wave-bg** (styled tints only)
 6. grid
 7. **wave-boundary**
-8. **wave-labels** (labels, empty-wave markers, gap floor labels, superscripts, placeholder)
+8. **wave-labels** (labels, gap floor labels, superscripts)
 9. under-bar edges
 10. lanes (background bars carry their hatch overlay)
 11. include regions (each re-emits tints, boundaries, crossings and hatch)
@@ -1683,7 +1665,7 @@ b    ###|.|#######
 
 ### Example 12: an empty wave
 
-Shows a placeholder wave: zero width, drawn as a marker, listed in the legend, and no delay to later waves.
+Shows a placeholder wave: zero width, not drawn, and no delay to later waves.
 
 ```nowline
 nowline v1
@@ -1711,11 +1693,11 @@ swimlane b
 
 Waves: w1 [W0, W2]; w2 [W2, W2], empty; w3 [W2, W4].
 
-- **The W2 boundary** is drawn once, and the hollow w2 diamond sits on it in the strip.
+- **The W2 boundary** is drawn once, between w1 and w3; w2 draws nothing.
 - **Strip alternation** follows the visible ordinal, so w1 uses `stripFill` and w3 uses `stripFillAlt`.
-- **Legend.** It reads `Wave boundary` · `Waves: #2 Hardening (TBD) (no items)`: waves 1 and 3 are named in full in the strip, so only the empty wave is listed.
+- **Legend.** None: there is no background work.
 
-Diagnostic (layout insight): `NL.I1006 Wave "w2" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.`
+Diagnostic (layout insight): `NL.I1006 Wave "w2" won't be displayed: it has no items assigned.`
 
 ```
 wk  01|23

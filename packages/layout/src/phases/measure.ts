@@ -24,6 +24,7 @@ import {
     packMarkerRow,
 } from '../nodes/marker-band.js';
 import { MARKER_ROW_CENTER_OFFSET_PX, MARKER_ROW_PITCH_PX } from '../nodes/marker-geometry.js';
+import { hasVisibleWaves } from '../schedule.js';
 import { resolveStyle } from '../style-resolution.js';
 import { estimateTextWidth } from '../text-measure.js';
 import {
@@ -103,7 +104,8 @@ export function measureRoadmap(
     const { locale, styleCtx } = scope;
     const { calendar, preset: scale, startDate, timelineDays, nonWorking } = window;
     const endDate = window.naturalEndDate;
-    const plan = window.schedule.plan;
+    // Waves only draw when one has items (specs/waves.md §9.1).
+    const plan = hasVisibleWaves(window.schedule) ? window.schedule.plan : undefined;
     const headerStyle = scope.roadmapStyle;
 
     // `top` (default) keeps the legacy single-strip header; `bottom`

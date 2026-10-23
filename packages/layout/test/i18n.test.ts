@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    fallbackChain,
-    localeStrings,
-    resolveLocale,
-    wavesDeclaredPlaceholder,
-} from '../src/i18n.js';
+import { fallbackChain, localeStrings, resolveLocale } from '../src/i18n.js';
 
 describe('resolveLocale precedence (file wins for content)', () => {
     it('directive wins over override (the artifact owns its locale)', () => {
@@ -81,8 +76,6 @@ describe('localeStrings — waves (specs/waves.md §9)', () => {
         expect(s.waveNoItems).toBe('no items');
         expect(s.waveBackgroundItem).toBe('Background (no wave)');
         expect(s.waveLegendBackground).toBe('Background work (not in a wave)');
-        expect(s.waveLegendBoundary).toBe('Wave boundary');
-        expect(s.waveLegendPrefix).toBe('Waves:');
     });
 
     it('returns the fr wave strings, with a no-break space before colons', () => {
@@ -91,8 +84,6 @@ describe('localeStrings — waves (specs/waves.md §9)', () => {
         expect(s.waveNoItems).toBe('aucun élément');
         expect(s.waveBackgroundItem).toBe('Travail de fond (hors vague)');
         expect(s.waveLegendBackground).toBe('Travail de fond (dans aucune vague)');
-        expect(s.waveLegendBoundary).toBe('Limite de vague');
-        expect(s.waveLegendPrefix).toBe('Vagues :');
     });
 
     it('every fr string differs from en-US (nothing falls through by accident)', () => {
@@ -101,20 +92,5 @@ describe('localeStrings — waves (specs/waves.md §9)', () => {
         for (const key of Object.keys(en) as (keyof typeof en)[]) {
             expect(fr[key], key).not.toBe(en[key]);
         }
-    });
-
-    it('fills the all-empty placeholder with the wave titles', () => {
-        expect(wavesDeclaredPlaceholder(localeStrings('en-US'), ['Discover', 'Build'])).toBe(
-            'Waves declared: Discover, Build — no items assigned yet',
-        );
-        expect(wavesDeclaredPlaceholder(localeStrings('fr-CA'), ['Découvrir'])).toBe(
-            'Vagues déclarées : Découvrir — aucun élément affecté pour l’instant',
-        );
-    });
-
-    it('inserts titles verbatim, even ones that look like replacement patterns', () => {
-        expect(wavesDeclaredPlaceholder(localeStrings('en-US'), ['$& cost', "$'"])).toBe(
-            "Waves declared: $& cost, $' — no items assigned yet",
-        );
     });
 });

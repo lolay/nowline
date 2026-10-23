@@ -26,7 +26,7 @@ import {
     type MilestonePlacement,
 } from '../nodes/milestone-node.js';
 import { SwimlaneNode } from '../nodes/swimlane-node.js';
-import type { RoadmapSchedule } from '../schedule.js';
+import { hasVisibleWaves, type RoadmapSchedule } from '../schedule.js';
 import { isScheduleWarmStart } from '../start-rules.js';
 import { resolveStyle } from '../style-resolution.js';
 import { SPACING_PX } from '../themes/shared.js';
@@ -99,6 +99,7 @@ export function placeChart(
                       timeScale,
                       originX,
                       localeStrings(scope.locale).waveBackgroundItem,
+                      hasVisibleWaves(schedule),
                   )
                 : undefined,
         },

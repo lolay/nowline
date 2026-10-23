@@ -192,10 +192,8 @@ export type W0701Args = {
 
 export type W1002Args = { passes: number };
 
-export type I1006Args =
-    | { reason: 'one'; name: string }
-    | { reason: 'many'; names: string[] }
-    | { reason: 'all'; names: string[] };
+/** The empty waves, in declaration order (at least one). */
+export type I1006Args = { names: string[] };
 
 export type I1007Args = { name: string; date: string; wave: string; end: string };
 
