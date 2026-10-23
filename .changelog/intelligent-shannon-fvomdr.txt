@@ -1,3 +1,0 @@
-```release-note:fixed
-A dated milestone overrun by an `after:` predecessor now paints its diamond and label red along with its cut line, as the spec describes, and the dotted arrow from the overrunning item, anchor or milestone is red with a red head instead of ink. A milestone overrun by a wave gets the red diamond and label too (still no arrow). In the grayscale theme the overrun colour is the theme's overrun grey.
-```

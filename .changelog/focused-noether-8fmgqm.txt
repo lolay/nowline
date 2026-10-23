@@ -1,3 +1,0 @@
-```release-note:removed
-The layout no longer reads `unit` from a `scale` config block. The key was never documented and the validator already rejected it; the axis unit comes from the roadmap's `scale:` alone.
-```
