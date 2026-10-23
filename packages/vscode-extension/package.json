@@ -28,7 +28,7 @@
     ],
     "engines": {
         "node": ">=22",
-        "pnpm": ">=11.28.5",
+        "pnpm": ">=12.6.0",
         "vscode": "^1.141.0"
     },
     "icon": "dist/icons/icon.png",
