@@ -39,10 +39,28 @@
             "description": "Node majors (the .nvmrc and setup-node major, and the consumer floor) are policy changes governed by nowline/CONTRIBUTING.md § Toolchain & Supported Versions, not Renovate. Minor and patch bumps of the .nvmrc pin stay enabled."
         },
         {
-            "matchPackageNames": ["node"],
             "matchDepTypes": ["engines"],
             "enabled": false,
-            "description": "engines.node is the consumer floor; tightening it is a breaking change (nowline/CONTRIBUTING.md § Toolchain & Supported Versions), never a Renovate bump."
+            "description": "Every engines field (node, pnpm, vscode) is a consumer floor; tightening one is a breaking change (nowline/CONTRIBUTING.md § Toolchain & Supported Versions), never a Renovate bump. engines.vscode follows the Cursor engine via vscode-extension-engine-bump.yml. Scoped to node alone, this let #213 raise engines.vscode past every shipping Cursor. The packageManager pin is a separate dep type and stays enabled."
+        },
+        {
+            "matchFileNames": [".github/workflows/*.lock.yml"],
+            "enabled": false,
+            "description": "gh-aw compiles these from the sibling .md sources; edits here are overwritten or conflict on the next gh aw compile. Update the gh-aw toolchain instead."
+        },
+        {
+            "matchPackageNames": [
+                "vscode-jsonrpc",
+                "vscode-languageclient",
+                "vscode-languageserver",
+                "vscode-languageserver-*"
+            ],
+            "groupName": "vscode-languageserver-node",
+            "groupSlug": "vscode-languageserver-node",
+            "separateMajorMinor": false,
+            "minimumReleaseAge": "30 days",
+            "automerge": false,
+            "description": "Microsoft releases these together and a protocol/types patch can pin the next vscode-jsonrpc major, so they move as one reviewed PR. One release age for the group keeps a patch from landing weeks ahead of the majors it depends on."
         },
         {
             "matchPackageNames": ["@types/vscode"],

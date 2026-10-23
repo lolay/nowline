@@ -6,7 +6,7 @@
     "license": "Apache-2.0",
     "engines": {
         "node": ">=22",
-        "pnpm": ">=11.28.5"
+        "pnpm": ">=11"
     },
     "type": "module",
     "main": "./dist/index.js",

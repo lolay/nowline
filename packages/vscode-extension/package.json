@@ -28,8 +28,8 @@
     ],
     "engines": {
         "node": ">=22",
-        "pnpm": ">=11.28.5",
-        "vscode": "^1.141.0"
+        "pnpm": ">=11",
+        "vscode": "^1.128.0"
     },
     "icon": "dist/icons/icon.png",
     "main": "./dist/extension.cjs",
