@@ -293,7 +293,7 @@ The pass is a constant list, run in order. Its order is today's except f1, which
 | f10 `anchors` | P15 | scale (final), marker band, chart top, lane bottom | anchors |
 | f11 `dependencyEdges` | P16 | final boxes, marker midpoints | edges |
 | f12 `nowline` | P17 | scale (final), canvas, lane bottom, timeline | now-line |
-| f13 `waveLegend` | P18 | waves, canvas, chart bottom | legend, chart bottom |
+| f13 `waveLegend` | P18 | waves, chart bottom | legend, chart bottom |
 | f14 `footnotePanel` | P19 | chart bottom, canvas | footnotes |
 | f15 `header` | P20 | chart bottom, canvas, rows bottom (f7's) | header |
 | f16 `attribution` | P20 | footnotes, chart bottom, canvas | attribution box, canvas height |

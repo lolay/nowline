@@ -23,7 +23,6 @@ import {
     WAVE_BOUNDARY_WIDTH_PX,
     WAVE_CELL_INSET_PX,
     WAVE_CROSS_DASH,
-    WAVE_EMPTY_MARKER_SIZE_PX,
     WAVE_HATCH_OPACITY,
     WAVE_HATCH_STROKE_PX,
     WAVE_HATCH_TILE_PX,
@@ -114,7 +113,7 @@ export function usedWaveHatchKinds(model: PositionedRoadmap): WaveHatchKind[] {
     walkLanes(model.swimlanes);
     for (const r of model.includes) walkLanes(r.nestedSwimlanes);
     for (const e of model.waveLegend?.entries ?? []) {
-        if (e.kind === 'background' && e.hatch) used.add(e.hatch);
+        used.add(e.hatch);
     }
     return (['dark', 'light'] as const).filter((k) => used.has(k));
 }
@@ -354,35 +353,12 @@ export function renderWaveLabels(
         );
     };
 
-    if (strip.placeholder !== undefined && strip.placeholderDraw) {
-        const { x, halo } = strip.placeholderDraw;
-        parts.push(mutedText(x, strip.placeholder, halo));
-    }
-
     for (const w of model.waves) {
         // A gap opened by a start floor: no cell, the floor reference in
         // muted italics on a halo in the backing panel's fill.
         if (w.strip.gapLabel) {
             const { text, x, halo } = w.strip.gapLabel;
             parts.push(mutedText(x, text, halo));
-        }
-
-        // An empty wave: a hollow diamond, with the wave's tooltip.
-        if (w.strip.marker) {
-            const { x, y } = w.strip.marker;
-            const r = WAVE_EMPTY_MARKER_SIZE_PX / 2;
-            parts.push(
-                tag(
-                    'path',
-                    {
-                        d: `M${num(x)} ${num(y - r)} L${num(x + r)} ${num(y)} L${num(x)} ${num(y + r)} L${num(x - r)} ${num(y)} Z`,
-                        fill: palette.timeline.panelFill,
-                        stroke: palette.wave.boundary,
-                        'stroke-width': 1.5,
-                    },
-                    `<title>${escText(w.strip.tooltip)}</title>`,
-                ),
-            );
         }
 
         // Layout placed the label and superscript halos in the painted
@@ -466,8 +442,8 @@ function legendSwatchFill(palette: Theme): string {
 }
 
 /**
- * `wave-legend` (§9.5): a hatched bar swatch for background work, a short
- * boundary line, and the wave-name runs, all as the layout placed them.
+ * `wave-legend` (§9.5): the hatched bar swatch for background work and its
+ * text, as the layout placed them.
  */
 export function renderWaveLegend(
     legend: PositionedWaveLegend | undefined,
@@ -479,48 +455,34 @@ export function renderWaveLegend(
     const parts: string[] = [];
     for (const entry of legend.entries) {
         const s = entry.swatch;
-        if (s && entry.kind === 'background' && entry.hatch) {
-            const fill = legendSwatchFill(palette);
-            const geometry = {
-                x: num(s.x),
-                y: num(s.y),
-                width: num(s.width),
-                height: num(s.height),
-            };
-            parts.push(
-                tag('rect', {
-                    ...geometry,
-                    rx: 2,
-                    ry: 2,
-                    fill,
-                    stroke: palette.entities.item.fg,
-                    'stroke-width': 1,
-                }),
-            );
-            parts.push(
-                tag('rect', {
-                    x: num(s.x + 0.5),
-                    y: num(s.y + 0.5),
-                    width: num(s.width - 1),
-                    height: num(s.height - 1),
-                    rx: 2,
-                    ry: 2,
-                    fill: waveHatchUrl(idPrefix, entry.hatch),
-                }),
-            );
-        } else if (s && entry.kind === 'boundary') {
-            const x = s.x + s.width / 2;
-            parts.push(
-                tag('line', {
-                    x1: num(x),
-                    y1: num(s.y),
-                    x2: num(x),
-                    y2: num(s.y + s.height),
-                    stroke: palette.wave.boundary,
-                    'stroke-width': WAVE_BOUNDARY_WIDTH_PX,
-                }),
-            );
-        }
+        const fill = legendSwatchFill(palette);
+        const geometry = {
+            x: num(s.x),
+            y: num(s.y),
+            width: num(s.width),
+            height: num(s.height),
+        };
+        parts.push(
+            tag('rect', {
+                ...geometry,
+                rx: 2,
+                ry: 2,
+                fill,
+                stroke: palette.entities.item.fg,
+                'stroke-width': 1,
+            }),
+        );
+        parts.push(
+            tag('rect', {
+                x: num(s.x + 0.5),
+                y: num(s.y + 0.5),
+                width: num(s.width - 1),
+                height: num(s.height - 1),
+                rx: 2,
+                ry: 2,
+                fill: waveHatchUrl(idPrefix, entry.hatch),
+            }),
+        );
         for (const run of entry.runs) {
             parts.push(
                 textTag(

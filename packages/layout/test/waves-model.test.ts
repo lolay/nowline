@@ -6,23 +6,17 @@
 import * as path from 'node:path';
 import type { NowlineFile, ResolveResult } from '@nowline/core';
 import { describe, expect, it } from 'vitest';
-import { localeStrings, wavesDeclaredPlaceholder } from '../src/i18n.js';
 import { type LayoutOptions, layoutRoadmap } from '../src/layout.js';
 import { MARKER_ROW_CENTER_OFFSET_PX } from '../src/nodes/marker-geometry.js';
-import { fitPlaceholder, fitStripLabel, readableLabelText } from '../src/nodes/wave-node.js';
-import { estimateTextWidth } from '../src/text-measure.js';
+import { fitStripLabel, readableLabelText } from '../src/nodes/wave-node.js';
 import { contrastRatio } from '../src/themes/contrast.js';
 import { darkTheme, grayscaleTheme, lightTheme, resolveColor } from '../src/themes/index.js';
 import {
     FOOTNOTE_PANEL_PADDING_PX,
-    GUTTER_PX,
     TIMELINE_TICK_PANEL_HEIGHT_PX,
-    WAVE_EMPTY_MARKER_STEP_PX,
-    WAVE_LABEL_HALO_PAD_PX,
     WAVE_LEGEND_GAP_PX,
     WAVE_LEGEND_LINE_PX,
     WAVE_STRIP_HEIGHT_PX,
-    WAVE_STRIP_LABEL_FONT_SIZE_PX,
 } from '../src/themes/shared.js';
 import type {
     PositionedGroup,
@@ -257,10 +251,9 @@ swimlane a
             ['ordinal', '#4'],
             ['none', undefined],
         ]);
-        // Abbreviated labels bring in the legend's wave list, which names only
-        // the waves the strip doesn't spell out: #1 is shown in full, so it is not listed.
-        const list = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        expect(list?.text).toBe('Waves: #2 Build the platform · #3 Hardening · #4 Ship · #5 Tail');
+        // Abbreviated labels bring no legend: the cell's tooltip has the title.
+        expect('waveLegend' in model).toBe(false);
+        expect(waves[1].strip.tooltip.startsWith('Build the platform · ')).toBe(true);
     });
 
     it('Example 9: the tooltip names the dates (end exclusive) and the holder', async () => {
@@ -275,21 +268,23 @@ swimlane a
         expect(wavesOf(model)[1].strip.tooltip).toMatch(/ · retenue par i2$/);
     });
 
-    it('Example 12: an empty wave is a diamond mid-strip at its x, and says so', async () => {
+    it('Example 12: an empty wave is not drawn, but keeps its span and tooltip', async () => {
         const model = await lay(EXAMPLE_12);
         const [w1, w2] = wavesOf(model);
-        const strip = model.timeline.waveStrip!;
-        expect(w2.strip.marker).toEqual({ x: w1.endX, y: strip.y + strip.height / 2 });
+        expect(w2.empty).toBe(true);
+        expect(w2.startX).toBe(w1.endX);
         expect(w2.strip.labelX).toBe(w1.endX);
+        expect(w2.strip.labelKind).toBe('none');
+        expect('cell' in w2.strip).toBe(false);
+        expect('labelDraw' in w2.strip).toBe(false);
         // An empty wave spans no time: one date, and no holder.
         expect(w2.strip.tooltip).toBe(
             `Hardening (TBD) · ${w2.startDate.toISOString().slice(0, 10)} · no items`,
         );
         expect(w2.strip.footnotesShown).toBe(false);
-        expect('marker' in w1.strip).toBe(false);
     });
 
-    it('empty waves at one x step 9 px to the right', async () => {
+    it('empty waves at one x draw nothing and add no boundary', async () => {
         const model = await lay(`nowline v1
 
 roadmap r "R" start:2026-01-05 scale:1w
@@ -306,8 +301,7 @@ swimlane a
         const [w1, w2, w3, w4] = wavesOf(model);
         expect(w2.startX).toBe(w1.endX);
         expect(w3.startX).toBe(w1.endX);
-        expect(w2.strip.marker?.x).toBe(w1.endX);
-        expect(w3.strip.marker?.x).toBe(w1.endX + WAVE_EMPTY_MARKER_STEP_PX);
+        for (const w of [w2, w3]) expect('cell' in w.strip).toBe(false);
         expect(w4.visibleOrdinal).toBe(1);
         // Empty waves add no line: one shared boundary plus the closing line.
         expect(boundaryXs(model)).toEqual([w1.endX, w4.endX]);
@@ -374,125 +368,58 @@ swimlane a
         expect('inlineDatePin' in plan.strip).toBe(false);
     });
 
-    it('every wave empty: only the placeholder, no markers, boundaries or crossings', async () => {
-        const model = await lay(`nowline v1
+    it('every wave empty: no strip, hatch, boundaries, crossings or legend', async () => {
+        const source = `nowline v1
 
-roadmap r "R" start:2026-01-05 length:12w scale:1w
+roadmap r "R" start:2026-01-05 scale:1w
 
 wave discover "Discover"
 wave build "Build"
 
 swimlane a
   item a1 duration:2w
-`);
-        expect(model.timeline.waveStrip?.placeholder).toBe(
-            'Waves declared: Discover, Build — no items assigned yet',
-        );
-        // Layout places the placeholder on the timeline's centre and its halo
-        // around it, inside the strip, so the renderer measures nothing.
-        const strip = model.timeline.waveStrip;
-        const draw = strip?.placeholderDraw;
-        const box = model.timeline.box;
-        expect(draw?.x).toBe(box.x + box.width / 2);
-        expect(draw?.halo.width).toBeGreaterThan(0);
-        expect((draw?.halo.x ?? 0) + (draw?.halo.width ?? 0) / 2).toBeCloseTo(draw?.x ?? -1);
-        expect(draw?.halo.y).toBeGreaterThan(strip?.y ?? 0);
-        expect((draw?.halo.y ?? 0) + (draw?.halo.height ?? 0)).toBeLessThan(
-            (strip?.y ?? 0) + (strip?.height ?? 0),
-        );
+`;
+        const model = await lay(source);
+        expect('waveStrip' in model.timeline).toBe(false);
         for (const w of wavesOf(model)) {
             expect(w.empty).toBe(true);
-            expect('marker' in w.strip).toBe(false);
+            expect('cell' in w.strip).toBe(false);
             expect('visibleOrdinal' in w).toBe(false);
         }
         expect('waveBoundaries' in model).toBe(false);
         expect('waveCrossings' in model).toBe(false);
-        // The legend explains the empty waves (and the background bar), with
-        // no boundary entry since no boundary is drawn.
-        expect(model.waveLegend?.entries.map((e) => e.kind)).toEqual(['background', 'waves']);
-        expect(model.waveLegend?.entries[1].text).toBe(
-            'Waves: #1 Discover (no items) · #2 Build (no items)',
-        );
+        expect('waveLegend' in model).toBe(false);
+        // No wave is drawn, so no item is background work: no hatch, no tooltip.
+        const a1 = itemById(model, 'a1');
+        expect('waveRole' in a1).toBe(false);
+        expect('waveHatch' in a1).toBe(false);
+        expect('waveTooltip' in a1).toBe(false);
+        // The chart lays out exactly as it would without the wave lines.
+        const plain = await lay(source.replace(/^wave .*\n/gm, ''));
+        expect(model.chartBox).toEqual(plain.chartBox);
+        expect(model.timeline.markerRow).toEqual(plain.timeline.markerRow);
+        expect(a1.box).toEqual(itemById(plain, 'a1').box);
     });
 
-    // tests/waves-all-empty.nowline: centred on a 5-week timeline, the full
-    // placeholder ran under the title box and past the canvas edge.
-    const ALL_EMPTY = (length: string, build: string): string => `nowline v1
+    it('every wave empty: a wave floor still schedules (after:<wave>)', async () => {
+        const source = `nowline v1
 
-roadmap r "All waves empty" start:2026-01-05${length} scale:1w
+roadmap r "R" start:2026-01-05 scale:1w calendar:full
 
-wave discover "Discover"
-wave build "${build}"
-wave launch "Launch"
+wave discover "Discover" after:2026-02-02
 
-swimlane a "Lane A"
-  item a1 "Item A1" duration:2w
-  item a2 "Item A2" duration:1w
-
-swimlane b "Lane B"
-  item b1 "Item B1" duration:3w
+swimlane a
+  item a1 duration:1w after:discover
 `;
-    const LONG_BUILD = 'Build and harden the platform for general availability';
-
-    it.each([
-        ['a long title', '', LONG_BUILD],
-        ['short titles', '', 'Build'],
-        ['a long title on a wider timeline', ' length:16w', LONG_BUILD],
-    ])('every wave empty, %s: the placeholder fits the timeline', async (_, length, build) => {
-        const model = await lay(ALL_EMPTY(length, build));
-        const strip = model.timeline.waveStrip;
-        const draw = strip?.placeholderDraw;
-        const box = model.timeline.box;
-        expect(strip?.placeholder).toBeDefined();
-        expect(draw?.halo.x).toBeGreaterThanOrEqual(box.x);
-        expect((draw?.halo.x ?? 0) + (draw?.halo.width ?? 0)).toBeLessThanOrEqual(
-            box.x + box.width,
+        const model = await lay(source);
+        expect('waveStrip' in model.timeline).toBe(false);
+        const [discover] = wavesOf(model);
+        expect(discover.startDate.toISOString().slice(0, 10)).toBe('2026-02-02');
+        // a1 waits for the empty wave's floor, as if it named the date.
+        const dated = await lay(
+            source.replace(/^wave .*\n/m, '').replace('after:discover', 'after:2026-02-02'),
         );
-        expect(draw?.halo.width).toBeCloseTo(
-            estimateTextWidth(strip?.placeholder ?? '', WAVE_STRIP_LABEL_FONT_SIZE_PX) +
-                2 * WAVE_LABEL_HALO_PAD_PX,
-        );
-    });
-
-    it('every wave empty: the placeholder falls back from the names to the short form', () => {
-        const strings = localeStrings('en-US');
-        const names = ['Discover', LONG_BUILD, 'Launch'];
-        const width = (text: string): number =>
-            estimateTextWidth(text, WAVE_STRIP_LABEL_FONT_SIZE_PX);
-        const full = wavesDeclaredPlaceholder(strings, names);
-        expect(fitPlaceholder(strings, names, width(full))).toBe(full);
-        expect(fitPlaceholder(strings, names, width(full) - 1)).toBe(
-            'Waves declared: Discover, Build and harden the platform for general availability, Laun… — no items assigned yet',
-        );
-        // Not even three characters of names fit: the short form, then it ellipsized.
-        const short = 'No items assigned to waves yet';
-        expect(fitPlaceholder(strings, names, width(short))).toBe(short);
-        expect(fitPlaceholder(strings, names, width('No items…'))).toBe('No items…');
-        expect(fitPlaceholder(strings, names, width('No…') - 1)).toBeUndefined();
-    });
-
-    it('the legend wraps a wave name that would pass the canvas edge', async () => {
-        const model = await lay(ALL_EMPTY('', LONG_BUILD));
-        const waves = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        expect(waves?.text).toBe(
-            `Waves: #1 Discover (no items) · #2 ${LONG_BUILD} (no items) · #3 Launch (no items)`,
-        );
-        const runs = waves?.runs ?? [];
-        for (const run of runs) {
-            expect(
-                run.x + estimateTextWidth(run.text, WAVE_STRIP_LABEL_FONT_SIZE_PX),
-            ).toBeLessThanOrEqual(model.width - GUTTER_PX);
-        }
-        // Every word survives, the `(no items)` suffix is never split, and the
-        // wave after a wrapped name starts a line of its own.
-        expect(runs.map((r) => r.text).join(' ')).toBe(
-            `Waves: #1 Discover (no items) #2 ${LONG_BUILD} (no items) #3 Launch (no items)`,
-        );
-        expect(runs.some((r) => r.text === '(no items)' || r.text.endsWith(' (no items)'))).toBe(
-            true,
-        );
-        expect(runs.at(-1)?.text).toBe('#3 Launch (no items)');
-        expect(new Set(runs.map((r) => r.y)).size).toBe(runs.length);
+        expect(itemById(model, 'a1').box).toEqual(itemById(dated, 'a1').box);
     });
 
     it('a roadmap with members has no placeholder', async () => {
@@ -762,20 +689,16 @@ describe('wave legend (§9.5)', () => {
         expect(model.chartBox.y + model.chartBox.height).toBe(model.waveBoundaries?.[0].bottomY);
     });
 
-    it('Example 3: background work brings the hatch and boundary swatches', async () => {
+    it('Example 3: background work brings the hatch swatch, the only entry', async () => {
         const model = await lay(EXAMPLE_3);
         const legend = model.waveLegend;
         expect(legend?.entries.map((e) => [e.kind, e.text])).toEqual([
             ['background', 'Background work (not in a wave)'],
-            ['boundary', 'Wave boundary'],
         ]);
         const swimlaneBottomY = model.waveBoundaries?.[0].bottomY ?? 0;
         expect(legend?.box.y).toBe(swimlaneBottomY + WAVE_LEGEND_GAP_PX);
         expect(legend?.box.x).toBe(model.timeline.originX);
-        expect(legend?.box.height).toBe(
-            WAVE_LEGEND_LINE_PX *
-                new Set(legend?.entries.flatMap((e) => e.runs.map((r) => r.y))).size,
-        );
+        expect(legend?.box.height).toBe(WAVE_LEGEND_LINE_PX);
         // The chart bottom grows by the gap and the legend's lines.
         expect(model.chartBox.y + model.chartBox.height).toBe(
             swimlaneBottomY + WAVE_LEGEND_GAP_PX + (legend?.box.height ?? 0),
@@ -787,27 +710,9 @@ describe('wave legend (§9.5)', () => {
         }
     });
 
-    it('a wide chart keeps the swatch entries on one line', async () => {
-        const model = await lay(EXAMPLE_3.replace('scale:1w', 'scale:1w length:26w'));
-        const legend = model.waveLegend;
-        expect(legend?.box.height).toBe(WAVE_LEGEND_LINE_PX);
-        const [bg, boundary] = legend?.entries ?? [];
-        expect(boundary.runs[0].y).toBe(bg.runs[0].y);
-        expect(boundary.swatch?.x).toBeGreaterThan(bg.runs[0].x);
-    });
-
-    it('Example 12: an empty wave is listed alone, keeping its own #k', async () => {
+    it('Example 12: an empty wave and its boundaries bring no legend', async () => {
         const model = await lay(EXAMPLE_12);
-        const entries = model.waveLegend?.entries ?? [];
-        expect(entries.map((e) => e.kind)).toEqual(['boundary', 'waves']);
-        expect(entries[1].text).toBe('Waves: #2 Hardening (TBD) (no items)');
-        expect('swatch' in entries[1]).toBe(false);
-        // On this narrow chart the name would pass the canvas edge, so it
-        // wraps, keeping `(no items)` whole.
-        expect(entries[1].runs.map((r) => r.text)).toEqual([
-            'Waves: #2 Hardening (TBD)',
-            '(no items)',
-        ]);
+        expect('waveLegend' in model).toBe(false);
     });
 
     it('sits below the bottom tick panel and pushes the footnotes down', async () => {
@@ -872,7 +777,7 @@ footnote b-vendor "Vendor" on:[w1, a1]
         expect('waveLegend' in model).toBe(false);
     });
 
-    it('indicators that do not fit move to the legend', async () => {
+    it('indicators that do not fit are not drawn', async () => {
         // A 1d cell (8 px under the business calendar, clamped to the minimum
         // bar width) has no room for the superscript, or for any label.
         const model = await lay(source('1d'));
@@ -880,9 +785,7 @@ footnote b-vendor "Vendor" on:[w1, a1]
         expect(w1.footnoteIndicators).toEqual([2]);
         expect(w1.strip.footnotesShown).toBe(false);
         expect(w1.strip.labelKind).toBe('none');
-        const list = model.waveLegend?.entries.find((e) => e.kind === 'waves');
-        // #2 Build is named in full, so only the wave whose footnote moved is listed.
-        expect(list?.text).toBe('Waves: #1 Discover ²');
+        expect('superscripts' in w1.strip).toBe(false);
     });
 });
 

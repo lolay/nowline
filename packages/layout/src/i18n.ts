@@ -20,27 +20,12 @@ export interface LocaleStrings {
      * (`Launch · 2026-02-02 – 2026-02-23 · held by i2`; specs/waves.md §9.1).
      */
     waveHeldBy: string;
-    /** Marks an empty wave in its tooltip and the legend (`#2 Hardening (TBD) (no items)`). */
+    /** Marks an empty wave in its tooltip (`Hardening (TBD) · 2026-01-19 · no items`). */
     waveNoItems: string;
     /** Added to a background item's hover tooltip (specs/waves.md §9.3). */
     waveBackgroundItem: string;
     /** Legend entry beside the hatch swatch (specs/waves.md §9.5). */
     waveLegendBackground: string;
-    /** Legend entry beside the boundary swatch. */
-    waveLegendBoundary: string;
-    /** Prefix of the legend's wave-name list (`Waves: #1 Discover · #2 Build`). */
-    waveLegendPrefix: string;
-    /**
-     * Wave strip placeholder when every wave is empty (specs/waves.md
-     * §9.1). `{names}` is replaced by the wave titles; see
-     * `wavesDeclaredPlaceholder`.
-     */
-    wavesDeclaredPlaceholder: string;
-    /**
-     * The placeholder's short form, without the wave names, when not even
-     * an ellipsized name list fits the timeline (the legend lists them).
-     */
-    wavesDeclaredPlaceholderShort: string;
 }
 
 // Bundle entries keyed by language tag. The fallback chain strips the
@@ -59,10 +44,6 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
         waveNoItems: 'no items',
         waveBackgroundItem: 'Background (no wave)',
         waveLegendBackground: 'Background work (not in a wave)',
-        waveLegendBoundary: 'Wave boundary',
-        waveLegendPrefix: 'Waves:',
-        wavesDeclaredPlaceholder: 'Waves declared: {names} — no items assigned yet',
-        wavesDeclaredPlaceholderShort: 'No items assigned to waves yet',
     },
     fr: {
         // Short form of "maintenant"; keeps the pill compact while staying
@@ -77,11 +58,6 @@ const BUNDLES: Record<string, Partial<LocaleStrings>> = {
         waveNoItems: 'aucun élément',
         waveBackgroundItem: 'Travail de fond (hors vague)',
         waveLegendBackground: 'Travail de fond (dans aucune vague)',
-        waveLegendBoundary: 'Limite de vague',
-        waveLegendPrefix: 'Vagues\u00A0:',
-        wavesDeclaredPlaceholder:
-            'Vagues déclarées\u00A0: {names} — aucun élément affecté pour l’instant',
-        wavesDeclaredPlaceholderShort: 'Aucun élément affecté aux vagues pour l’instant',
     },
 };
 
@@ -136,20 +112,6 @@ export function localeStrings(locale: string): LocaleStrings {
     }
     // The root bundle (`en-US`) is always populated, so this cast is safe.
     return result as LocaleStrings;
-}
-
-/**
- * The all-empty wave strip placeholder (specs/waves.md §9.1), e.g.
- * `Waves declared: Discover, Build — no items assigned yet`.
- */
-export function wavesDeclaredPlaceholder(strings: LocaleStrings, names: readonly string[]): string {
-    return fillWaveNames(strings, names.join(', '));
-}
-
-/** The placeholder template with `{names}` replaced by `list` verbatim. */
-export function fillWaveNames(strings: LocaleStrings, list: string): string {
-    // A replacer function, so a `$` in a title is never read as a pattern.
-    return strings.wavesDeclaredPlaceholder.replace('{names}', () => list);
 }
 
 /**

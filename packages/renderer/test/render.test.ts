@@ -1355,22 +1355,18 @@ swimlane a
         expect(labels.match(/data-layer="inline-date-pin"/g)).toHaveLength(1);
     });
 
-    it('draws an empty wave as a hollow diamond with its tooltip', async () => {
-        const model = await parseToModel(EXAMPLE_12_SRC);
-        const labels = waveLayer(await renderSvg(model), 'wave-labels') ?? '';
-        const marker = model.waves?.[1].strip.marker;
-        expect(marker).toBeDefined();
-        const diamond = labels.match(/<path [^>]*>.*?<\/path>/)?.[0] ?? '';
-        expect(attrOf(diamond, 'stroke')).toBe(lightTheme.wave.boundary);
-        expect(attrOf(diamond, 'd')).toMatch(new RegExp(`^M${n2(marker?.x ?? 0)} `));
-        expect(diamond).toContain('no items</title>');
+    it('draws nothing for an empty wave', async () => {
+        const svg = await renderSvg(await parseToModel(EXAMPLE_12_SRC));
+        const labels = waveLayer(svg, 'wave-labels') ?? '';
+        expect(labels).not.toContain('<path');
+        expect(svg).not.toContain('Hardening (TBD)');
     });
 
-    it('shows only the placeholder when every wave is empty', async () => {
+    it('draws no wave layer and no hatch when every wave is empty', async () => {
         const svg = await renderSvg(
             await parseToModel(`nowline v1
 
-roadmap r "R" start:2026-01-05 length:12w scale:1w
+roadmap r "R" start:2026-01-05 scale:1w
 
 wave discover "Discover"
 wave build "Build"
@@ -1379,25 +1375,9 @@ swimlane a
   item a1 duration:2w
 `),
         );
-        const labels = waveLayer(svg, 'wave-labels') ?? '';
-        expect(labels).toContain('>Waves declared: Discover, Build — no items assigned yet</text>');
-        expect(labels).toContain(`fill="${lightTheme.wave.labelMuted}"`);
-        // On a halo in the backing panel's fill, so grid lines never cut it.
-        const [halo] = rectsOf(labels);
-        expect(attrOf(halo, 'fill')).toBe(lightTheme.timeline.panelFill);
-        expect(labels.indexOf(halo)).toBeLessThan(labels.indexOf('>Waves declared'));
-        const haloX = Number(attrOf(halo, 'x'));
-        const haloW = Number(attrOf(halo, 'width'));
-        const textX = Number(attrOf(labels.match(/<text [^>]*>/)?.[0] ?? '', 'x'));
-        expect(haloX + haloW / 2).toBeCloseTo(textX, 1);
-        expect(haloW).toBeGreaterThan(200);
-        expect(svg.indexOf('data-layer="wave-labels"')).toBeGreaterThan(
-            svg.indexOf('data-layer="grid"'),
-        );
-        expect(labels).not.toContain('<path');
-        expect(rectsOf(waveLayer(svg, 'wave-strip') ?? '')).toHaveLength(1);
-        expect(svg).not.toContain('data-layer="wave-boundary"');
-        expect(svg).not.toContain('data-layer="wave-cross"');
+        expect(svg).not.toContain('data-layer="wave-');
+        expect(svg).not.toContain('wave-hatch');
+        expect(svg).not.toContain('Discover');
     });
 
     it('labels a start-floor gap with its floor reference in muted italics', async () => {
@@ -1581,25 +1561,21 @@ swimlane a
         }
     });
 
-    it('renders the legend swatches and text, and none without a trigger', async () => {
+    it('renders the background swatch and text, and nothing else', async () => {
         const svg = await renderSvg(await parseToModel(WAVE_SAMPLE));
         const legend = waveLayer(svg, 'wave-legend') ?? '';
         expect(legend).toContain('>Background work (not in a wave)</text>');
-        expect(legend).toContain('>Wave boundary</text>');
+        expect(legend).not.toContain('Wave boundary');
         expect(rectsOf(legend)[1]).toContain('fill="url(#nl-0-root-wave-hatch-dark)"');
-        const [swatch] = linesOf(legend);
-        expect(attrOf(swatch, 'stroke')).toBe(lightTheme.wave.boundary);
+        expect(linesOf(legend)).toHaveLength(0);
         expect(svg.indexOf('data-layer="wave-legend"')).toBeGreaterThan(
             svg.indexOf('data-layer="footnotes"'),
         );
 
-        const fit = waveLayer(await renderSvg(await parseToModel(WAVE_FIT_SRC)), 'wave-legend');
-        // The wave-name list wraps between waves, one <text> per run. #1 is named
-        // in full in the strip, so it is not listed; the rest keep their own #k.
-        expect(fit).toContain('>Waves: #2 Implementation and build-out</text>');
-        expect(fit).toContain(
-            '>#3 Hardening and stabilisation · #4 Rollout everywhere · #5 Launch day</text>',
-        );
+        // Abbreviated strip labels bring no legend: the cell tooltips have the titles.
+        const fit = await renderSvg(await parseToModel(WAVE_FIT_SRC));
+        expect(fit).not.toContain('wave-legend');
+        expect(fit).toContain('<title>Implementation and build-out · ');
 
         const plain = await renderSvg(await parseToModel(WAVE_PLAIN_SRC));
         expect(plain).not.toContain('wave-legend');

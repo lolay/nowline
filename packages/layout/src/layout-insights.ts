@@ -189,19 +189,15 @@ function collectWaveInsights(
     const waves = layout.waves ?? [];
     const empty = waves.filter((w) => w.empty).map((w) => w.id);
     if (empty.length > 0) {
-        const args: I1006Args =
-            empty.length === waves.length
-                ? { reason: 'all', names: empty }
-                : empty.length === 1
-                  ? { reason: 'one', name: empty[0] }
-                  : { reason: 'many', names: empty };
+        // One consolidated message: the empty waves are not drawn (§9.1).
+        const args: I1006Args = { names: empty };
         out.push(
             makeInsight(
                 locale,
                 'NL.I1006',
                 'info',
                 args,
-                args.reason === 'one' ? args.name : undefined,
+                empty.length === 1 ? empty[0] : undefined,
             ),
         );
     }

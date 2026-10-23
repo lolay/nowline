@@ -96,6 +96,18 @@ export interface RoadmapSchedule {
     extent: ScheduleExtent;
 }
 
+/**
+ * True when some wave has a member (specs/waves.md §9.1). With none, the
+ * roadmap draws no waves: no strip, no hatch, no legend. The barrier still
+ * runs, so wave floors and `after:<wave>` keep their dates.
+ */
+export function hasVisibleWaves(schedule: Pick<RoadmapSchedule, 'waves'>): boolean {
+    for (const wave of schedule.waves?.values() ?? []) {
+        if (wave.memberCount > 0) return true;
+    }
+    return false;
+}
+
 /** A wave's solved span (specs/waves.md §5.1). */
 export interface ScheduledWave {
     /** 1-based declaration order. */

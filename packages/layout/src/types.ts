@@ -195,17 +195,12 @@ export interface PositionedTimelineScale {
      * The wave strip row (specs/waves.md §8.8): `WAVE_STRIP_HEIGHT_PX`
      * high, directly under the top tick panel (under the now-pill row
      * with `timeline-position:bottom`) and above the marker rows, which
-     * move down by its height. `placeholder` is set when every wave is
-     * empty: the strip then shows only that text, centred at
-     * `placeholderDraw.x` on `placeholderDraw.halo`, its backing box in the
-     * timeline panel's fill. Present only when the roadmap declares waves;
-     * the mirrored bottom panel never has one.
+     * move down by its height. Present only when some declared wave has
+     * items (specs/waves.md §9.1); the mirrored bottom panel never has one.
      */
     waveStrip?: {
         y: number;
         height: number;
-        placeholder?: string;
-        placeholderDraw?: { x: number; halo: BoundingBox };
     };
     // When `true`, the renderer draws a faint dotted line at every tick
     // boundary (not just major ticks) using `theme.timeline.minorGridLine`.
@@ -1032,7 +1027,7 @@ export interface PositionedWaveStrip {
     labelKind: 'title' | 'id' | 'ellipsis' | 'ordinal' | 'none';
     /**
      * Centre of the visible part of the span (clipped to the timeline);
-     * for an empty wave, the centre of its diamond.
+     * `startX` for an empty wave, which is not drawn.
      */
     labelX: number;
     /**
@@ -1042,18 +1037,10 @@ export interface PositionedWaveStrip {
     tooltip: string;
     /**
      * True when `footnoteIndicators` are drawn right-aligned in the cell;
-     * false when there are none or they did not fit (they then move to the
-     * legend).
+     * false when there are none or they did not fit (they are then not
+     * drawn; the footnote panel still lists the footnote).
      */
     footnotesShown: boolean;
-    /**
-     * Centre of an empty wave's hollow diamond (`WAVE_EMPTY_MARKER_SIZE_PX`),
-     * mid-strip at `startX`; empty waves sharing an x step
-     * `WAVE_EMPTY_MARKER_STEP_PX` to the right in declaration order.
-     * Omitted for a non-empty wave and when every wave is empty (the strip
-     * then shows only the placeholder).
-     */
-    marker?: Point;
     /**
      * The floor reference (`fy-budget`, `2026-02-02`) centred in the gap
      * this wave's start floor opened before it (`S_k > E_{k-1}`, k >= 2),
@@ -1104,24 +1091,15 @@ export interface PositionedWaveCrossing {
 
 /** One legend entry (specs/waves.md §9.5). */
 export interface WaveLegendEntry {
-    /** Hatch swatch, boundary swatch, or the wave-name list. */
-    kind: 'background' | 'boundary' | 'waves';
+    /** The hatch swatch for background work, the legend's only entry. */
+    kind: 'background';
     /** The entry's full text. */
     text: string;
-    /**
-     * The swatch box (`background`: a hatched bar; `boundary`: a boundary
-     * line through its centre). Omitted for the wave list.
-     */
-    swatch?: BoundingBox;
-    /**
-     * The hatch kind of the `background` swatch, a default item bar's fill.
-     * Omitted for the other entries.
-     */
-    hatch?: WaveHatchKind;
-    /**
-     * The text, one run per legend line the entry occupies (the wave list
-     * wraps between waves). `y` is the text baseline.
-     */
+    /** The swatch box: a hatched bar. */
+    swatch: BoundingBox;
+    /** The swatch's hatch kind, a default item bar's fill. */
+    hatch: WaveHatchKind;
+    /** The text, one run on the swatch's line. `y` is the text baseline. */
     runs: Array<{ text: string; x: number; y: number }>;
 }
 

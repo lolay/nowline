@@ -675,32 +675,25 @@ describe('NL.W1002', () => {
 
 describe('NL.I1006 / NL.I1007', () => {
     it('one (Example 12)', () => {
-        expect(en('NL.I1006', { reason: 'one', name: 'w2' })).toBe(
-            'Wave "w2" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.',
+        expect(en('NL.I1006', { names: ['w2'] })).toBe(
+            'Wave "w2" won\'t be displayed: it has no items assigned.',
         );
     });
-    it('many', () => {
-        expect(en('NL.I1006', { reason: 'many', names: ['w2', 'w3'] })).toBe(
-            'Waves "w2", "w3" have no items, so they span no time; they are drawn as markers in the wave strip and listed in the wave legend.',
+    it('many: one consolidated message', () => {
+        expect(en('NL.I1006', { names: ['abc', 'xyz', '123'] })).toBe(
+            'Waves "abc", "xyz" and "123" won\'t be displayed: they have no items assigned.',
         );
-    });
-    it('all', () => {
-        expect(en('NL.I1006', { reason: 'all', names: ['w1', 'w2'] })).toBe(
-            'None of the declared waves ("w1", "w2") has items yet. The wave strip shows a placeholder until work is assigned with wave:<id>.',
+        expect(en('NL.I1006', { names: ['w2', 'w3'] })).toBe(
+            'Waves "w2" and "w3" won\'t be displayed: they have no items assigned.',
         );
     });
     it('truncates names after five', () => {
         const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
-        expect(en('NL.I1006', { reason: 'many', names })).toContain(
-            'Waves "a", "b", "c", "d", "e" and 2 more have no items',
-        );
-        expect(en('NL.I1006', { reason: 'all', names })).toContain(
-            '("a", "b", "c", "d", "e" and 2 more)',
+        expect(en('NL.I1006', { names })).toContain(
+            'Waves "a", "b", "c", "d", "e" and 2 more won\'t be displayed',
         );
         // exactly five is not truncated
-        expect(en('NL.I1006', { reason: 'many', names: names.slice(0, 5) })).toContain(
-            '"d", "e" have no items',
-        );
+        expect(en('NL.I1006', { names: names.slice(0, 5) })).toContain('"d" and "e" won\'t');
     });
     it('I1007 (Example 11)', () => {
         expect(
@@ -1007,11 +1000,9 @@ describe('fr bundle', () => {
             ],
         });
         push('NL.W1002', { passes: 12 });
-        push('NL.I1006', { reason: 'one', name: 'w2' });
-        push('NL.I1006', { reason: 'many', names: ['w2', 'w3'] });
-        push('NL.I1006', { reason: 'many', names: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] });
-        push('NL.I1006', { reason: 'all', names: ['w1', 'w2'] });
-        push('NL.I1006', { reason: 'all', names: ['a', 'b', 'c', 'd', 'e', 'f'] });
+        push('NL.I1006', { names: ['w2'] });
+        push('NL.I1006', { names: ['w2', 'w3'] });
+        push('NL.I1006', { names: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] });
         push('NL.I1007', {
             name: 'exec-done',
             date: '2026-03-16',

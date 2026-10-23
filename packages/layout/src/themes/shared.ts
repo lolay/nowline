@@ -341,7 +341,6 @@ export const WAVE_HATCH_STROKE_PX = 2;
 export const WAVE_STYLED_TINT_OPACITY = 0.12;
 export const WAVE_STYLED_STRIP_MIX_OPACITY = 0.25;
 export const WAVE_STRIP_LABEL_FONT_SIZE_PX = 10;
-export const WAVE_EMPTY_MARKER_SIZE_PX = 7;
 export const WAVE_LEGEND_LINE_PX = 14;
 export const WAVE_LEGEND_GAP_PX = 8;
 // Wave strip and legend geometry (specs/waves.md §9.1, §9.5).
@@ -353,14 +352,10 @@ export const WAVE_LABEL_HALO_PAD_PX = 2;
 export const WAVE_LABEL_HALO_INSET_Y_PX = 3;
 /** How far a strip cell sits inside the backing panel: half its 1 px stroke. */
 export const WAVE_CELL_INSET_PX = 0.5;
-/** Step between the diamonds of empty waves that share an x. */
-export const WAVE_EMPTY_MARKER_STEP_PX = 9;
-/** Legend swatch (hatched bar or boundary line) size. */
+/** Legend swatch (a hatched bar) size. */
 export const WAVE_LEGEND_SWATCH_WIDTH_PX = 18;
 export const WAVE_LEGEND_SWATCH_HEIGHT_PX = 10;
 /** Gap between a legend swatch and its text. */
 export const WAVE_LEGEND_SWATCH_GAP_PX = 6;
-/** Gap between two legend entries on one line. */
-export const WAVE_LEGEND_ENTRY_GAP_PX = 16;
 /** Legend text baseline below its line's top (10 px text in a 14 px line). */
 export const WAVE_LEGEND_BASELINE_OFFSET_PX = 11;

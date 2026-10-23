@@ -131,10 +131,12 @@ function suggestionText(s: WaveSuggestion | undefined): string {
 }
 
 // Up to five quoted names, then "and N more".
-function namesText(names: string[]): string {
+/** `"a", "b" and "c"`; past five, `"a", …, "e" and 3 more`. */
+function namesAndText(names: string[]): string {
     const shown = names.slice(0, 5).map((n) => `"${n}"`);
     const rest = names.length - shown.length;
-    return rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.join(', ');
+    if (rest > 0) return `${shown.join(', ')} and ${rest} more`;
+    return `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`;
 }
 
 function waveListText(ids: string[]): string {
@@ -400,16 +402,10 @@ export const messages = {
         `Swimlane "${a.lane}" packed into ${a.rows} rows to avoid overlap.`,
     'NL.I1005': (a: { lane: string }) =>
         `Swimlane "${a.lane}" is over capacity in one or more periods (red utilization band).`,
-    'NL.I1006': (a: I1006Args) => {
-        switch (a.reason) {
-            case 'one':
-                return `Wave "${a.name}" has no items, so it spans no time; it is drawn as a marker in the wave strip and listed in the wave legend.`;
-            case 'many':
-                return `Waves ${namesText(a.names)} have no items, so they span no time; they are drawn as markers in the wave strip and listed in the wave legend.`;
-            case 'all':
-                return `None of the declared waves (${namesText(a.names)}) has items yet. The wave strip shows a placeholder until work is assigned with wave:<id>.`;
-        }
-    },
+    'NL.I1006': (a: I1006Args) =>
+        a.names.length === 1
+            ? `Wave "${a.names[0]}" won't be displayed: it has no items assigned.`
+            : `Waves ${namesAndText(a.names)} won't be displayed: they have no items assigned.`,
     'NL.I1007': (a: I1007Args) =>
         `Milestone "${a.name}" (${a.date}) is overrun: wave "${a.wave}" ends ${a.end}.`,
     'NL.I1008': (a: I1008Args) =>

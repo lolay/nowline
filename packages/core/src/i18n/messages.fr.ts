@@ -137,12 +137,12 @@ function suggestionText(s: WaveSuggestion | undefined): string {
 }
 
 // Jusqu'à cinq noms entre guillemets, puis « et N autres ».
-function namesText(names: string[]): string {
+/** `« a », « b » et « c »`; past five, `« a », …, « e » et 3 autres`. */
+function namesAndText(names: string[]): string {
     const shown = names.slice(0, 5).map(q);
     const rest = names.length - shown.length;
-    return rest > 0
-        ? `${shown.join(', ')} et ${rest} autre${rest > 1 ? 's' : ''}`
-        : shown.join(', ');
+    if (rest > 0) return `${shown.join(', ')} et ${rest} autre${rest > 1 ? 's' : ''}`;
+    return `${shown.slice(0, -1).join(', ')} et ${shown[shown.length - 1]}`;
 }
 
 function waveListText(ids: string[]): string {
@@ -422,16 +422,10 @@ export const messages: MessageBundle = {
     },
 
     // Informations de mise en page
-    'NL.I1006': (a: I1006Args) => {
-        switch (a.reason) {
-            case 'one':
-                return `La vague ${q(a.name)} n'a aucun élément, elle ne couvre donc aucune durée\u00A0; elle est dessinée comme un repère dans la bande des vagues et listée dans la légende des vagues.`;
-            case 'many':
-                return `Les vagues ${namesText(a.names)} n'ont aucun élément, elles ne couvrent donc aucune durée\u00A0; elles sont dessinées comme des repères dans la bande des vagues et listées dans la légende des vagues.`;
-            case 'all':
-                return `Aucune des vagues déclarées (${namesText(a.names)}) n'a encore d'élément. La bande des vagues affiche un espace réservé jusqu'à ce que du travail soit affecté avec wave:<id>.`;
-        }
-    },
+    'NL.I1006': (a: I1006Args) =>
+        a.names.length === 1
+            ? `La vague ${q(a.names[0])} ne sera pas affichée\u00A0: aucun élément ne lui est affecté.`
+            : `Les vagues ${namesAndText(a.names)} ne seront pas affichées\u00A0: aucun élément ne leur est affecté.`,
     'NL.I1007': (a: I1007Args) =>
         `Le jalon ${q(a.name)} (${a.date}) est dépassé\u00A0: la vague ${q(a.wave)} se termine le ${a.end}.`,
     'NL.I1008': (a: I1008Args) =>

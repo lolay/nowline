@@ -1,8 +1,8 @@
 nowline v1
 
 // Wave fixture: an empty wave (no items) between two populated ones.
-// It spans no time, draws as a hollow marker on the shared boundary, shows
-// "(no items)" in the legend, and reports NL.I1006.
+// It spans no time, draws nothing (no marker, no legend entry), and reports
+// NL.I1006.
 
 roadmap waves-empty "Empty wave" start:2026-01-05 scale:1w
 

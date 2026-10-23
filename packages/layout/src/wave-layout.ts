@@ -58,17 +58,24 @@ export interface WaveLayoutState {
      * renderer has no locale table (specs/waves.md §9.3).
      */
     readonly backgroundTooltip: string;
+    /**
+     * Some wave has a member (`hasVisibleWaves`). When none does, the
+     * barrier still runs but nothing is drawn: no item is background work.
+     */
+    readonly visible: boolean;
 }
 
 /**
- * Fresh state for a roadmap with waves; `scale` maps the floor dates and
- * `backgroundTooltip` is the locale's background-item line.
+ * Fresh state for a roadmap with waves; `scale` maps the floor dates,
+ * `backgroundTooltip` is the locale's background-item line, and `visible`
+ * says whether any wave has a member.
  */
 export function createWaveLayoutState(
     plan: WavePlan,
     scale: TimeScale,
     origin: number,
     backgroundTooltip: string,
+    visible: boolean,
 ): WaveLayoutState {
     const S = plan.waves.map(() => origin);
     return {
@@ -81,6 +88,7 @@ export function createWaveLayoutState(
         pass: new WavePass(plan, S),
         frozen: false,
         backgroundTooltip,
+        visible,
     };
 }
 
@@ -143,9 +151,9 @@ export function accumulateWaveMember(
     if (ctx.waves && !ctx.waves.frozen) ctx.waves.pass.accumulate(node, logicalEnd);
 }
 
-/** `PositionedItem.waveRole`, or undefined when the roadmap has no waves. */
+/** `PositionedItem.waveRole`, or undefined when the roadmap draws no waves. */
 export function waveRoleOf(node: ItemDeclaration, ctx: LayoutContext): PositionedItem['waveRole'] {
-    if (!ctx.waves) return undefined;
+    if (!ctx.waves?.visible) return undefined;
     return ctx.waves.plan.memberWave(node) !== undefined ? 'member' : 'background';
 }
 
