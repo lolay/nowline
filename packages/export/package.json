@@ -40,7 +40,7 @@
         "langium": "~4.4.0"
     },
     "devDependencies": {
-        "@types/node": "^26.6.3",
+        "@types/node": "^26.6.5",
         "langium": "~4.4.0",
         "typescript": "^7.0.2"
     }
