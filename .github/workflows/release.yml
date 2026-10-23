@@ -256,12 +256,33 @@ jobs:
           done
           ls -la release-assets
 
+      # The page carries the release's CHANGELOG.md section, the notes the
+      # fragments were folded into. With no section, or an empty one, it
+      # falls back to GitHub's generated list of merged PRs rather than
+      # blocking the release.
+      - name: Write release notes
+        id: notes
+        if: matrix.kind == 'github-release'
+        env:
+          LINK_BASE: ${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if make -C src --no-print-directory release-notes VERSION="${GITHUB_REF_NAME#v}" LINK_BASE="$LINK_BASE" > release-notes.md \
+             && [ -s release-notes.md ]; then
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::no CHANGELOG.md notes for $GITHUB_REF_NAME; using GitHub's generated notes"
+            : > release-notes.md
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish GitHub Release
         if: matrix.kind == 'github-release'
         uses: softprops/action-gh-release@v3
         with:
           files: release-assets/*
-          generate_release_notes: true
+          body_path: release-notes.md
+          generate_release_notes: ${{ steps.notes.outputs.generated == 'true' }}
 
       - name: Compute SHA256s and update Homebrew formula
         if: matrix.kind == 'github-release'

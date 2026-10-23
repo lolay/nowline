@@ -30,6 +30,10 @@ Commands:
         a legacy Unreleased entry in place, is fine), and with --require, if the branch adds or edits no fragment.
     changelog.py preview
         Prints the section each CHANGELOG.md would gain at the next release.
+    changelog.py notes X.Y.Z [--link-base URL]
+        Prints the body of the root CHANGELOG.md's X.Y.Z section, for a
+        release page. --link-base turns relative links (./specs/x.md)
+        into absolute ones, since the page doesn't resolve them.
     changelog.py release X.Y.Z [--date YYYY-MM-DD] [--dry-run]
         Writes the release section into each CHANGELOG.md and deletes the
         fragments it used. Entries still under "## [Unreleased]" (from
@@ -231,6 +235,19 @@ def entry_marker(line):
     return m and ("-" if m.group(1) == "*" else m.group(1))
 
 
+def release_notes(root, version, link_base):
+    """Body of the root CHANGELOG.md's section for version, or None if it has none."""
+    text = (root / "CHANGELOG.md").read_text()
+    m = re.search(rf"^## \[v?{re.escape(version)}\][^\n]*\n", text, re.M)
+    if not m:
+        return None
+    nxt = re.compile(r"^## ", re.M).search(text, m.end())
+    body = text[m.end():nxt.start() if nxt else len(text)].strip("\n")
+    if link_base:
+        body = re.sub(r"\]\(\./", f"]({link_base.rstrip('/')}/", body)
+    return body
+
+
 def unreleased_additions(root, base, path):
     """Entry and heading lines a branch adds to CHANGELOG.md above its latest release.
 
@@ -303,8 +320,9 @@ def check(root, base, require):
 
 
 def main(argv):
-    if not argv or argv[0] not in ("check", "preview", "release"):
-        fail("usage: changelog.py check [--base REF] [--require] | preview | release X.Y.Z [--date YYYY-MM-DD] [--dry-run]")
+    if not argv or argv[0] not in ("check", "preview", "notes", "release"):
+        fail("usage: changelog.py check [--base REF] [--require] | preview | notes X.Y.Z [--link-base URL] "
+             "| release X.Y.Z [--date YYYY-MM-DD] [--dry-run]")
     command, args = argv[0], argv[1:]
 
     def option(flag):
@@ -325,6 +343,17 @@ def main(argv):
             for e in errors:
                 print(f"error: {e}", file=sys.stderr)
             print(f"== {changelog.relative_to(root)}\n## [Unreleased]\n\n{body or '(no entries)'}\n")
+        return 0
+
+    if command == "notes":
+        link_base = option("--link-base")
+        positional = [a for a in args if not a.startswith("--")]
+        if len(positional) != 1:
+            fail("usage: changelog.py notes X.Y.Z [--link-base URL]")
+        body = release_notes(root, positional[0], link_base)
+        if body is None:
+            fail(f"CHANGELOG.md has no section for {positional[0]}")
+        print(body)
         return 0
 
     date = option("--date") or datetime.date.today().isoformat()
