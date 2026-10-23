@@ -53,6 +53,8 @@ describe('entry shapes', () => {
         ['claude-desktop', 'user', ['mcpServers'], plain],
         ['cursor', 'user', ['mcpServers'], plain],
         ['gemini', 'user', ['mcpServers'], plain],
+        ['antigravity', 'user', ['mcpServers'], plain],
+        ['antigravity', 'project', ['mcpServers'], plain],
         ['windsurf', 'user', ['mcpServers'], plain],
         ['claude-code', 'project', ['mcpServers'], stdio],
         ['copilot', 'project', ['mcpServers'], stdio],
@@ -98,6 +100,13 @@ describe('entry shapes', () => {
 });
 
 describe('config paths', () => {
+    it('antigravity uses the config file its app, IDE and CLI share', () => {
+        const host = fakeHost();
+        expect(jsonTarget('antigravity', 'user', host).path).toBe(
+            path.join(host.home, '.gemini', 'config', 'mcp_config.json'),
+        );
+    });
+
     it('resolves per-OS application directories', () => {
         const mac = fakeHost({ platform: 'darwin' });
         expect(jsonTarget('claude-desktop', 'user', mac).path).toBe(
@@ -134,6 +143,9 @@ describe('config paths', () => {
             path.join(host.cwd, '.mcp.json'),
         );
         expect(jsonTarget('amp', 'project', host).hint).toMatch(/amp mcp approve nowline/);
+        expect(jsonTarget('antigravity', 'project', host).path).toBe(
+            path.join(host.cwd, '.agents', 'mcp_config.json'),
+        );
     });
 
     it('opencode edits an existing opencode.jsonc instead of adding a .json beside it', () => {
@@ -184,6 +196,9 @@ describe('detection', () => {
     it('detects a harness by its CLI on PATH or its config directory', () => {
         expect(client('codex').detect(fakeHost())).toBe(false);
         expect(client('codex').detect(fakeHost({ binaries: { codex: ['/usr/bin/codex'] } }))).toBe(
+            true,
+        );
+        expect(client('antigravity').detect(fakeHost({ binaries: { agy: ['/bin/agy'] } }))).toBe(
             true,
         );
         const host = fakeHost();

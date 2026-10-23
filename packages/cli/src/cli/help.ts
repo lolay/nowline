@@ -38,9 +38,9 @@ MODE FLAGS (mutually exclusive)
                           \`npx @nowline/mcp\`.
       --mcp-install [<client>]
                           Register the MCP server with an agent: claude-code,
-                          claude-desktop, cursor, vscode, codex, gemini, muse,
-                          opencode, copilot, windsurf, zed, amp, goose, or
-                          all. Omitted: every agent found on this machine.
+                          claude-desktop, cursor, vscode, codex, gemini,
+                          antigravity, muse, opencode, copilot, windsurf, zed,
+                          amp, goose, or all. Omitted: every agent found on this machine.
                           Re-running is safe; -n previews the change.
       --mcp-uninstall [<client>]
                           Remove the server from the same configs.

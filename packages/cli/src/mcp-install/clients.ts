@@ -66,9 +66,9 @@ function appConfigDir(host: HostEnv, name: string): string {
     return path.join(xdgConfig(host), name);
 }
 
-function onPathOrExists(binary: string | undefined, dirs: (host: HostEnv) => string[]) {
+function onPathOrExists(binaries: readonly string[], dirs: (host: HostEnv) => string[]) {
     return (host: HostEnv): boolean =>
-        (binary !== undefined && host.findAllOnPath(binary).length > 0) ||
+        binaries.some((binary) => host.findAllOnPath(binary).length > 0) ||
         dirs(host).some((dir) => host.exists(dir));
 }
 
@@ -142,7 +142,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'claude-code',
         name: 'Claude Code',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('claude', (h) => [path.join(h.home, '.claude')]),
+        detect: onPathOrExists(['claude'], (h) => [path.join(h.home, '.claude')]),
         target: (scope, entry, host) => {
             if (scope === 'project') {
                 return underKey(path.join(host.cwd, '.mcp.json'), 'mcpServers', stdioTyped);
@@ -158,7 +158,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'claude-desktop',
         name: 'Claude Desktop',
         scopes: ['user'],
-        detect: onPathOrExists(undefined, (h) => [appConfigDir(h, 'Claude')]),
+        detect: onPathOrExists([], (h) => [appConfigDir(h, 'Claude')]),
         target: (_scope, _entry, host) =>
             underKey(
                 path.join(appConfigDir(host, 'Claude'), 'claude_desktop_config.json'),
@@ -171,7 +171,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'cursor',
         name: 'Cursor',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('cursor', (h) => [path.join(h.home, '.cursor')]),
+        detect: onPathOrExists(['cursor'], (h) => [path.join(h.home, '.cursor')]),
         target: (scope, _entry, host) =>
             underKey(
                 path.join(scope === 'user' ? host.home : host.cwd, '.cursor', 'mcp.json'),
@@ -183,7 +183,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'vscode',
         name: 'VS Code',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('code', (h) => [path.join(appConfigDir(h, 'Code'), 'User')]),
+        detect: onPathOrExists(['code'], (h) => [path.join(appConfigDir(h, 'Code'), 'User')]),
         target: (scope, _entry, host) =>
             underKey(
                 scope === 'user'
@@ -197,7 +197,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'codex',
         name: 'Codex CLI',
         scopes: ['user'],
-        detect: onPathOrExists('codex', (h) => [h.env.CODEX_HOME || path.join(h.home, '.codex')]),
+        detect: onPathOrExists(['codex'], (h) => [h.env.CODEX_HOME || path.join(h.home, '.codex')]),
         target: (_scope, entry, host) => {
             const configPath = path.join(
                 host.env.CODEX_HOME || path.join(host.home, '.codex'),
@@ -230,7 +230,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'gemini',
         name: 'Gemini CLI',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('gemini', (h) => [path.join(h.home, '.gemini')]),
+        detect: onPathOrExists(['gemini'], (h) => [path.join(h.home, '.gemini')]),
         target: (scope, _entry, host) =>
             underKey(
                 path.join(scope === 'user' ? host.home : host.cwd, '.gemini', 'settings.json'),
@@ -239,10 +239,28 @@ export const CLIENTS: readonly ClientDescriptor[] = [
             ),
     },
     {
+        id: 'antigravity',
+        name: 'Antigravity',
+        scopes: ['user', 'project'],
+        detect: onPathOrExists(['agy', 'antigravity'], (h) => [
+            path.join(h.home, '.gemini', 'config'),
+            path.join(h.home, '.gemini', 'antigravity-cli'),
+        ]),
+        // The Antigravity app, IDE and CLI share one file.
+        target: (scope, _entry, host) =>
+            underKey(
+                scope === 'user'
+                    ? path.join(host.home, '.gemini', 'config', 'mcp_config.json')
+                    : path.join(host.cwd, '.agents', 'mcp_config.json'),
+                'mcpServers',
+                plain,
+            ),
+    },
+    {
         id: 'muse',
         name: 'Muse Code',
         scopes: ['user'],
-        detect: onPathOrExists('muse', (h) => [path.join(h.home, '.config', 'muse')]),
+        detect: onPathOrExists(['muse'], (h) => [path.join(h.home, '.config', 'muse')]),
         target: (_scope, _entry, host) =>
             underKey(
                 path.join(host.home, '.config', 'muse', 'settings.json'),
@@ -262,7 +280,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'opencode',
         name: 'OpenCode',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('opencode', (h) => [path.join(xdgConfig(h), 'opencode')]),
+        detect: onPathOrExists(['opencode'], (h) => [path.join(xdgConfig(h), 'opencode')]),
         target: (scope, _entry, host) => ({
             kind: 'json',
             path: jsonOrJsonc(
@@ -293,7 +311,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'copilot',
         name: 'GitHub Copilot CLI',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('copilot', (h) => [path.join(h.home, '.copilot')]),
+        detect: onPathOrExists(['copilot'], (h) => [path.join(h.home, '.copilot')]),
         target: (scope, _entry, host) =>
             scope === 'user'
                 ? underKey(
@@ -313,7 +331,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'windsurf',
         name: 'Windsurf',
         scopes: ['user'],
-        detect: onPathOrExists('windsurf', (h) => [path.join(h.home, '.codeium', 'windsurf')]),
+        detect: onPathOrExists(['windsurf'], (h) => [path.join(h.home, '.codeium', 'windsurf')]),
         target: (_scope, _entry, host) =>
             underKey(
                 path.join(host.home, '.codeium', 'windsurf', 'mcp_config.json'),
@@ -325,7 +343,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'zed',
         name: 'Zed',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('zed', (h) => [zedConfigDir(h)]),
+        detect: onPathOrExists(['zed'], (h) => [zedConfigDir(h)]),
         target: (scope, _entry, host) =>
             underKey(
                 scope === 'user'
@@ -339,7 +357,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'amp',
         name: 'Amp',
         scopes: ['user', 'project'],
-        detect: onPathOrExists('amp', (h) => [path.join(h.home, '.config', 'amp')]),
+        detect: onPathOrExists(['amp'], (h) => [path.join(h.home, '.config', 'amp')]),
         target: (scope, entry, host) => {
             if (scope === 'user' && host.platform === 'win32') {
                 // Amp documents no Windows settings path; its own CLI knows it.
@@ -378,7 +396,7 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'goose',
         name: 'Goose',
         scopes: ['user'],
-        detect: onPathOrExists('goose', (h) => [gooseConfigPath(h, true)]),
+        detect: onPathOrExists(['goose'], (h) => [gooseConfigPath(h, true)]),
         target: (_scope, entry, host) => {
             const configPath = gooseConfigPath(host, false);
             // Goose's config is YAML we'd lose comments in; JSON scalars are valid YAML.

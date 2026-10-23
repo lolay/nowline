@@ -16,6 +16,8 @@ function isolatedEnv(dir: string): NodeJS.ProcessEnv {
         APPDATA: path.join(home, 'AppData', 'Roaming'),
         CODEX_HOME: path.join(home, '.codex'),
         PATH: path.join(dir, 'empty-bin'),
+        // Windows spells it Path; override both so the real one can't leak through.
+        Path: path.join(dir, 'empty-bin'),
     };
 }
 

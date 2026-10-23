@@ -111,7 +111,7 @@ Where a harness has an official marketplace, publish there and **only** there. S
 | Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Manual submission per Gemini CLI process | Manual (tracked issue) |
 | Claude Code | MCP CLI (manual) | `nowline --mcp-install claude-code`, `claude mcp add nowline -- npx -y @nowline/mcp`, or `.mcp.json`; no marketplace | n/a (user config) |
 | Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry; no marketplace | n/a (user config) |
-| Other local harnesses | MCP CLI (manual) | `nowline --mcp-install <client>` (Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose; [`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
+| Other local harnesses | MCP CLI (manual) | `nowline --mcp-install <client>` (Antigravity, Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose; [`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 
 Note: Cursor Marketplace and VS Code MCP gallery are both fed by the public MCP registry. Updating the registry entry is the single action that surfaces the MCP server in both IDEs.
 

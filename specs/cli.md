@@ -274,7 +274,7 @@ nowline --mcp-install -n                       # print what would change; write 
 nowline --mcp-uninstall                        # remove the entry from the same configs
 ```
 
-The positional is a client id: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`, or `all`. Omitted (or `all`), the CLI installs into every harness it detects: its CLI is on PATH or its config directory exists. An unknown id exits 2. The entry is always named `nowline`, so tools surface as `mcp__nowline__*`.
+The positional is a client id: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `antigravity`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`, or `all`. Omitted (or `all`), the CLI installs into every harness it detects: its CLI is on PATH or its config directory exists. An unknown id exits 2. The entry is always named `nowline`, so tools surface as `mcp__nowline__*`.
 
 | Option | Values | Default | Meaning |
 |---|---|---|---|
@@ -295,6 +295,7 @@ The positional is a client id: `claude-code`, `claude-desktop`, `cursor`, `vscod
 | `vscode` | `Code/User/mcp.json` in the OS app-config dir | `.vscode/mcp.json` | `servers.nowline` `{type: "stdio", command, args}` |
 | `codex` | `codex mcp add`, else a TOML snippet for `$CODEX_HOME/config.toml` | none | `[mcp_servers.nowline]` |
 | `gemini` | `~/.gemini/settings.json` | `.gemini/settings.json` | `mcpServers.nowline` |
+| `antigravity` | `~/.gemini/config/mcp_config.json` (shared by the Antigravity app, IDE and CLI) | `.agents/mcp_config.json` | `mcpServers.nowline` |
 | `muse` | `~/.config/muse/settings.json` | none | `mcp_servers.nowline` `{transport: "stdio", command, args, mode: "optional"}`; a new file gets `schema_version: 1` |
 | `opencode` | `$XDG_CONFIG_HOME/opencode/opencode.json[c]` | `opencode.json[c]` | `mcp.nowline` `{type: "local", command: [...], enabled: true}`, or `mcp.servers.nowline` in a v2-layout file |
 | `copilot` | `~/.copilot/mcp-config.json` | `.mcp.json` | `mcpServers.nowline` `{type: "local", command, args, tools: ["*"]}` (project: the Claude Code shape) |

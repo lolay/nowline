@@ -143,7 +143,7 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 
 ### MCP options
 
-`nowline --mcp-install` edits each agent's own config: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`. Re-running is safe, and comments in JSON configs survive. Details: [`specs/cli.md` § `--mcp-install`](../../specs/cli.md).
+`nowline --mcp-install` edits each agent's own config: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `antigravity`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`. Re-running is safe, and comments in JSON configs survive. Details: [`specs/cli.md` § `--mcp-install`](../../specs/cli.md).
 
 | Flag                 | Default | Meaning |
 |----------------------|---------|---------|
