@@ -431,7 +431,7 @@
         "@nowline/renderer": "workspace:*",
         "@resvg/resvg-wasm": "^2.6.2",
         "langium": "~4.4.0",
-        "vscode-languageclient": "^10.1.2"
+        "vscode-languageclient": "^11.0.0"
     },
     "devDependencies": {
         "@resvg/resvg-js": "^2.6.2",
