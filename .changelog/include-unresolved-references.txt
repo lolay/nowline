@@ -1,5 +1,5 @@
 ```release-note:fixed
-Validating or rendering a roadmap now reports an unresolved `after:`, `before:` or `on:` reference inside a file it includes, as `NL.E0302` at that file's line, under `roadmap:merge` and `roadmap:isolate`. Before, the root exited clean, and under `roadmap:merge` a child's reference could silently resolve against an id the parent declared. References never cross a file boundary; `roadmap:ignore` stays silent.
+**Breaking:** validating or rendering a roadmap now reports an unresolved `after:`, `before:` or `on:` reference inside a file it includes, as `NL.E0302` at that file's line, under `roadmap:merge` and `roadmap:isolate`. Before, the root exited clean, and under `roadmap:merge` a child's reference could silently resolve against an id the parent declared. References never cross a file boundary; `roadmap:ignore` stays silent.
 ```
 
 ```release-note:changed

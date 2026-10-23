@@ -1,0 +1,7 @@
+```release-note:changed
+Requires VS Code 1.128 or later (Cursor has embedded 1.128 since 3.12.10). Editors on an older engine keep the extension version they already have.
+```
+
+```release-note:fixed
+`icon:` completion offers the built-in `calendar` icon, and the `timeline-position` values `top`, `bottom` and `both` highlight like the other style values.
+```

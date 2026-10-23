@@ -16,8 +16,9 @@
   and new `non-working` and `working` snippets. In `config` they complete as
   keywords, `every:` completes the weekday names and `non-working:` completes
   `hide` and `show`. Hovering a declaration shows its id, title and `date:`,
-  `every:`, `start:` and `end:`. The live preview labels a dated, titled
-  closure (`Thanksgiving · 2d`).
+  `every:`, `start:` and `end:`, and notes when the chart never draws its
+  title (a titled bounded recurrence). The live preview labels a dated, titled
+  closure (`Thanksgiving · 2d`) and a dated, titled working day (`Release crunch · +1d`).
 - Non-working days display: the new `nowline.preview.nonWorking` setting
   (`file`, `hide` or `show`, default `file`) and a **Non-working days** menu in
   the preview toolbar (**File** / **Hide** / **Show**) draw a business
