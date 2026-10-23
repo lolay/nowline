@@ -9,6 +9,7 @@ USAGE
   nowline <input> [options]
   nowline --serve <input> [options]
   nowline --init [<name>]
+  nowline --mcp-install [<client>] [options]
   nowline --version
   nowline --help
 
@@ -35,6 +36,14 @@ MODE FLAGS (mutually exclusive)
                           exposing validate, render, export, and file tools.
                           Shares the same @nowline/mcp server code as
                           \`npx @nowline/mcp\`.
+      --mcp-install [<client>]
+                          Register the MCP server with an agent: claude-code,
+                          claude-desktop, cursor, vscode, codex, gemini, muse,
+                          opencode, copilot, windsurf, zed, amp, goose, or
+                          all. Omitted: every agent found on this machine.
+                          Re-running is safe; -n previews the change.
+      --mcp-uninstall [<client>]
+                          Remove the server from the same configs.
   -n, --dry-run           Run the full pipeline (parse + validate + layout +
                           format) but skip the write step. Subsumes the old
                           'validate' verb. Exit 0 on success, 1 on errors.
@@ -109,6 +118,13 @@ SERVE OPTIONS
 MCP OPTIONS
       --root <dir>        Allowed-root directory for file tools (default: cwd).
                           File paths are resolved and restricted to this root.
+                          With --mcp-install, written into the registered
+                          command.
+      --scope <s>         --mcp-install target: user (default, every
+                          project) or project (config files in cwd).
+      --server <s>        What --mcp-install registers: self (default, this
+                          nowline binary; needs no Node) or npx
+                          (npx -y @nowline/mcp, tracks npm).
 
 LOGGING (mutually exclusive)
   -v, --verbose           Print extra diagnostics to stderr.
@@ -130,6 +146,8 @@ EXAMPLES
   nowline --init my-project                 # scaffold ./my-project.nowline
   nowline --mcp                             # start MCP stdio server in cwd
   nowline --mcp --root ./roadmaps           # MCP server with custom root
+  nowline --mcp-install                     # register with every agent found
+  nowline --mcp-install cursor --scope project -n   # preview .cursor/mcp.json
 
 EXIT CODES
   0  Success

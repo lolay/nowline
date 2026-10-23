@@ -173,3 +173,49 @@ describe('parseArgv — usage errors', () => {
         }
     });
 });
+
+describe('parseArgv — MCP install', () => {
+    it('--mcp-install and --mcp-uninstall are modes; the positional is the client', () => {
+        const install = parseArgv(['--mcp-install', 'cursor']);
+        expect(install.mode).toBe('mcp-install');
+        expect(install.positional).toBe('cursor');
+        expect(parseArgv(['--mcp-uninstall']).mode).toBe('mcp-uninstall');
+    });
+
+    it('accepts --dry-run, --scope, --server, and --root', () => {
+        const r = parseArgv([
+            '--mcp-install',
+            '-n',
+            '--scope',
+            'project',
+            '--server',
+            'npx',
+            '--root',
+            'docs',
+        ]);
+        expect(r).toMatchObject({ dryRun: true, scope: 'project', server: 'npx', root: 'docs' });
+    });
+
+    it('leaves --scope and --server undefined when omitted', () => {
+        const r = parseArgv(['--mcp-install']);
+        expect(r.scope).toBeUndefined();
+        expect(r.server).toBeUndefined();
+    });
+
+    it.each([
+        [['--mcp-install', '--scope', 'global'], /--scope "global"/],
+        [['--mcp-install', '--server', 'docker'], /--server "docker"/],
+        [['--mcp-install', '--mcp'], /mutually exclusive/],
+        [['--mcp-install', '--mcp-uninstall'], /mutually exclusive/],
+        [['--mcp', '--dry-run'], /--dry-run cannot be combined with --mcp/],
+    ])('rejects %j', (argv, message) => {
+        try {
+            parseArgv(argv);
+            expect.fail('should have thrown');
+        } catch (err) {
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(ExitCode.InputError);
+            expect((err as CliError).message).toMatch(message);
+        }
+    });
+});

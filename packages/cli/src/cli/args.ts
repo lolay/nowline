@@ -3,14 +3,28 @@ import { isDiagnosticFormat } from '../diagnostics/format.js';
 import { CliError, ExitCode } from '../io/exit-codes.js';
 import type { LogLevel } from '../io/log.js';
 
-export type ModeKind = 'render' | 'serve' | 'init' | 'mcp' | 'help' | 'version';
+export type ModeKind =
+    | 'render'
+    | 'serve'
+    | 'init'
+    | 'mcp'
+    | 'mcp-install'
+    | 'mcp-uninstall'
+    | 'help'
+    | 'version';
+
+export type McpScope = 'user' | 'project';
+export type McpServerKind = 'self' | 'npx';
 
 export interface ParsedArgs {
     /** Resolved mode after dispatch (mutual-exclusivity already checked). */
     mode: ModeKind;
-    /** Positional argument, or undefined. Render = input path. Init = project name. Serve = input path. */
+    /**
+     * Positional argument, or undefined. Render = input path. Init = project name. Serve = input path.
+     * MCP install / uninstall = client id.
+     */
     positional?: string;
-    /** True if `--dry-run` / `-n` was passed (only valid for render mode). */
+    /** True if `--dry-run` / `-n` was passed (render and MCP install / uninstall). */
     dryRun: boolean;
     /** Logging level. Verbose and quiet are mutually exclusive. */
     logLevel: LogLevel;
@@ -85,6 +99,10 @@ export interface ParsedArgs {
 
     // MCP
     root?: string;
+    /** `--scope` for --mcp-install / --mcp-uninstall; validated in parseArgv. */
+    scope?: McpScope;
+    /** `--server` for --mcp-install; validated in parseArgv. */
+    server?: McpServerKind;
 }
 
 /**
@@ -125,6 +143,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             serve: { type: 'boolean' },
             init: { type: 'boolean' },
             mcp: { type: 'boolean' },
+            'mcp-install': { type: 'boolean' },
+            'mcp-uninstall': { type: 'boolean' },
             'dry-run': { type: 'boolean', short: 'n' },
 
             theme: { type: 'string', short: 't' },
@@ -153,6 +173,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
 
             // MCP
             root: { type: 'string' },
+            scope: { type: 'string' },
+            server: { type: 'string' },
 
             // Format-specific (m2c)
             'page-size': { type: 'string' },
@@ -216,6 +238,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
     if (values.serve === true) modes.push('serve');
     if (values.init === true) modes.push('init');
     if (values.mcp === true) modes.push('mcp');
+    if (values['mcp-install'] === true) modes.push('mcp-install');
+    if (values['mcp-uninstall'] === true) modes.push('mcp-uninstall');
     if (modes.length > 1) {
         throw new CliError(
             ExitCode.InputError,
@@ -239,6 +263,21 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             .map((p) => JSON.stringify(p))
             .join(' ');
         throw new CliError(ExitCode.InputError, `nowline: unexpected extra arguments: ${extras}.`);
+    }
+
+    const scope = stringOrUndefined(values.scope);
+    if (scope !== undefined && scope !== 'user' && scope !== 'project') {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --scope "${scope}". Expected user or project.`,
+        );
+    }
+    const server = stringOrUndefined(values.server);
+    if (server !== undefined && server !== 'self' && server !== 'npx') {
+        throw new CliError(
+            ExitCode.InputError,
+            `nowline: invalid --server "${server}". Expected self or npx.`,
+        );
     }
 
     const rawDiagnosticFormat = stringOrUndefined(values['diagnostic-format']);
@@ -284,6 +323,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         start: stringOrUndefined(values.start),
         locale: stringOrUndefined(values.locale),
         root: stringOrUndefined(values.root),
+        scope,
+        server,
     };
 }
 

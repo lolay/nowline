@@ -66,6 +66,12 @@ Mode flags (mutually exclusive)
                          tool surface. `npx @nowline/mcp` is the canonical
                          harness-install path; `nowline --mcp` is the power-user
                          equivalent. See [`specs/mcp.md`](./mcp.md).
+  --mcp-install [<client>]
+                         Register the MCP server with an agent harness
+                         (`--scope`, `--server`, `--root`, `-n`). Omit the
+                         client to install into every harness found.
+  --mcp-uninstall [<client>]
+                         Remove it from the same configs.
 
 Render options
   -t, --theme <name>     light | dark | grayscale (greyscale alias)
@@ -255,6 +261,51 @@ The server exposes the eight shared-contract tools (`validate`, `render`, `read`
 **CLI-design note for review:** `--mcp` is a mode flag on `nowline` (like `--serve` and `--init`) rather than a verb on the separate `@nowline/mcp` package. The separate package (`npx @nowline/mcp`) is the canonical install path for harness configs because it decouples the MCP server's install lifecycle from the CLI binary — a harness using `npx @nowline/mcp` always gets the published npm version, whereas `nowline --mcp` uses whatever binary the user has installed. Either form is valid; `npx @nowline/mcp` is preferred in MCP config examples. See [`specs/mcp.md`](./mcp.md).
 
 `--mcp` rejects `--serve`, `--init`, and `--dry-run`.
+
+### `--mcp-install [<client>]` / `--mcp-uninstall [<client>]`
+
+Register the MCP server with an agent harness, so `brew install nowline && nowline --mcp-install` is the whole setup.
+
+```bash
+nowline --mcp-install                          # every harness found on this machine
+nowline --mcp-install cursor                   # one harness
+nowline --mcp-install claude-code --scope project   # .mcp.json in cwd, for the team
+nowline --mcp-install -n                       # print what would change; write nothing
+nowline --mcp-uninstall                        # remove the entry from the same configs
+```
+
+The positional is a client id: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`, or `all`. Omitted (or `all`), the CLI installs into every harness it detects: its CLI is on PATH or its config directory exists. An unknown id exits 2. The entry is always named `nowline`, so tools surface as `mcp__nowline__*`.
+
+| Option | Values | Default | Meaning |
+|---|---|---|---|
+| `--scope` | `user`, `project` | `user` | `user` writes the harness's per-user config (every project); `project` writes the config file in the current directory, for committing. Naming a user-only client (`claude-desktop`, `codex`, `muse`, `windsurf`, `goose`) with `--scope project` exits 2; auto-detection skips them with a note. |
+| `--server` | `self`, `npx` | `self` | What gets registered. `self` is the installed `nowline` with `--mcp`, so a Homebrew or `.deb` install needs no Node. `npx` is `npx -y @nowline/mcp` (on Windows, `cmd /c npx …`), which tracks npm independently of the CLI but needs Node visible to the harness. |
+| `--root <dir>` | path | none | Resolved against cwd and written into the registered command as `--root <abs>`. Without it the server uses the harness's working directory. |
+| `-n`, `--dry-run` | | | Print the change (the entry, the file, or the harness command) without writing or running anything. |
+
+**`self` resolution.** The path is absolute, because GUI harnesses (Claude Desktop, Cursor, VS Code launched from the Dock) don't inherit the shell PATH. For the compiled binary it is the PATH entry whose realpath is the running binary, so Homebrew's `bin/nowline` symlink is registered rather than `Cellar/nowline/<version>/`, and `brew upgrade` carries the server along. If only a Cellar path is known, it is registered with a `warning:`. Running under Node (an npm install or a checkout), the `nowline` shim is a `#!/usr/bin/env node` script a GUI harness may not be able to run, so the absolute Node and the CLI script are registered, with a `warning:` that removing that Node version breaks the entry.
+
+**Per harness.** JSON and JSONC configs are edited in place: comments, key order, indentation, and line endings survive, siblings are untouched, writes are atomic and go through symlinks, and a file that doesn't parse is reported and left alone. Claude Code's user scope and Codex go through the harness's own `claude mcp add` / `codex mcp add`, since `~/.claude.json` is live state and Codex's config is TOML; the CLI first runs the matching `mcp remove` so a re-run replaces a stale entry, with stdin closed and a 30 s timeout. When that binary isn't on PATH, or the config is YAML (Goose) or has no documented path (Amp on Windows), the CLI prints a paste-ready snippet instead.
+
+| Client | User scope | Project scope | Entry |
+|---|---|---|---|
+| `claude-code` | `claude mcp add --scope user` | `.mcp.json` | `mcpServers.nowline` `{type: "stdio", command, args}` |
+| `claude-desktop` | `claude_desktop_config.json` in the OS app-config dir | none | `mcpServers.nowline` |
+| `cursor` | `~/.cursor/mcp.json` | `.cursor/mcp.json` | `mcpServers.nowline` |
+| `vscode` | `Code/User/mcp.json` in the OS app-config dir | `.vscode/mcp.json` | `servers.nowline` `{type: "stdio", command, args}` |
+| `codex` | `codex mcp add`, else a TOML snippet for `$CODEX_HOME/config.toml` | none | `[mcp_servers.nowline]` |
+| `gemini` | `~/.gemini/settings.json` | `.gemini/settings.json` | `mcpServers.nowline` |
+| `muse` | `~/.config/muse/settings.json` | none | `mcp_servers.nowline` `{transport: "stdio", command, args, mode: "optional"}`; a new file gets `schema_version: 1` |
+| `opencode` | `$XDG_CONFIG_HOME/opencode/opencode.json[c]` | `opencode.json[c]` | `mcp.nowline` `{type: "local", command: [...], enabled: true}`, or `mcp.servers.nowline` in a v2-layout file |
+| `copilot` | `~/.copilot/mcp-config.json` | `.mcp.json` | `mcpServers.nowline` `{type: "local", command, args, tools: ["*"]}` (project: the Claude Code shape) |
+| `windsurf` | `~/.codeium/windsurf/mcp_config.json` | none | `mcpServers.nowline` |
+| `zed` | `zed/settings.json` in `$XDG_CONFIG_HOME` (Windows: `%APPDATA%\Zed`) | `.zed/settings.json` | `context_servers.nowline` `{command, args, env}` |
+| `amp` | `~/.config/amp/settings.json` (Windows: printed `amp mcp add`) | `.amp/settings.json`, then `amp mcp approve nowline` | `"amp.mcpServers".nowline` |
+| `goose` | printed YAML for `config.yaml` | none | `extensions.nowline` |
+
+**Output and exit codes.** One line per client on stdout (`created`, `added … to`, `updated … in`, `already installed in`, `removed … from`, `not installed in`, `registered`, or the printed snippet); these are the requested output and print under `-q`. The `self` warnings are `warning:` lines on stderr that `-q` drops. A client that fails (unparseable config, harness CLI exiting non-zero) is reported on stderr and the rest still run; the run then exits 3. No harness found and none named exits 2.
+
+`--mcp-install` and `--mcp-uninstall` are mutually exclusive with each other and with the other mode flags, and accept `--dry-run`. The `.mcpb` bundle remains the Claude Desktop path for users who want its output-folder picker; the CLI doesn't generate one, since a bundle is a snapshot that goes stale on every `brew upgrade`.
 
 ### `--version` / `-V` and `--help` / `-h`
 

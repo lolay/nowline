@@ -22,6 +22,17 @@
 .Fl -init
 .Op Ar name
 .Nm
+.Fl -mcp
+.Op Fl -root Ar dir
+.Nm
+.Fl -mcp-install
+.Op Ar client
+.Op Ar options
+.Nm
+.Fl -mcp-uninstall
+.Op Ar client
+.Op Ar options
+.Nm
 .Fl -dry-run
 .Op Ar options
 .Ar input
@@ -143,6 +154,35 @@ is auto-appended if missing.
 Default name is
 .Sy roadmap .
 Existing files are silently overwritten.
+.It Fl -mcp
+Start a Model Context Protocol (MCP) server on standard input and
+output, exposing validate, render, export, and file tools to an agent.
+With
+.Fl -port Ar n ,
+it serves local Streamable HTTP instead.
+It is the same server as
+.Ql npx @nowline/mcp .
+.It Fl -mcp-install Op Ar client
+Register the MCP server with an agent harness:
+.Sy claude-code , claude-desktop , cursor , vscode , codex , gemini ,
+.Sy muse , opencode , copilot , windsurf , zed , amp , goose ,
+or
+.Sy all .
+Without
+.Ar client ,
+installs into every harness found on this machine.
+JSON configurations are edited in place, keeping comments and other
+entries; Claude Code (user scope) and Codex go through their own
+.Ql mcp add
+command; Goose gets a snippet to paste.
+Re-running is safe.
+With
+.Fl n ,
+prints the change without writing or running anything.
+See
+.Sx MCP OPTIONS .
+.It Fl -mcp-uninstall Op Ar client
+Remove the server from the same configurations.
 .It Fl n , -dry-run
 Run the full pipeline (parse + validate + layout + format) but skip the
 write step.
@@ -374,6 +414,36 @@ to expose on the LAN).
 .It Fl -open
 Open the browser on start.
 .El
+.Sh MCP OPTIONS
+.Bl -tag -width Fl
+.It Fl -root Ar dir
+Directory the MCP file tools may read and write (default: the current
+directory).
+With
+.Fl -mcp-install ,
+it is written into the registered command as an absolute path.
+.It Fl -scope Ar scope
+Where
+.Fl -mcp-install
+writes:
+.Sy user
+(default; the harness's per-user configuration) or
+.Sy project
+(the configuration file in the current directory, for committing).
+.It Fl -server Ar kind
+What
+.Fl -mcp-install
+registers:
+.Sy self
+(default; this
+.Nm
+binary with
+.Fl -mcp ,
+so a Homebrew install needs no Node.js) or
+.Sy npx
+.Pq Ql npx -y @nowline/mcp ,
+which follows npm independently of the CLI.
+.El
 .Sh LOGGING OPTIONS
 The logging flags are mutually exclusive.
 .Bl -tag -width Fl
@@ -542,6 +612,13 @@ Scaffold a new file:
 .Bd -literal -offset indent
 nowline --init
 nowline --init my-project
+.Ed
+.Pp
+Serve the MCP tools, or register them with every agent found:
+.Bd -literal -offset indent
+nowline --mcp
+nowline --mcp-install
+nowline --mcp-install cursor --scope project -n
 .Ed
 .Pp
 PDF with explicit page geometry, byte-stable across machines:

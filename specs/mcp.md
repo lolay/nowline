@@ -34,7 +34,7 @@ One codebase, two install wrappers — not two servers.
 
 Which form a harness uses depends on whether it is a terminal/IDE harness (MCP CLI) or a GUI desktop app (MCP Desktop). The server code, tool surface, and resources are identical.
 
-**Power-user path:** `nowline --mcp` starts the same server in stdio mode using an already-installed CLI binary. `npx @nowline/mcp` is the canonical path in harness configs because it decouples the MCP server's install lifecycle from the CLI binary. See [`specs/cli.md`](./cli.md) § `--mcp`.
+**CLI path:** `nowline --mcp` starts the same server in stdio mode using an already-installed CLI binary, and `nowline --mcp-install [<client>]` writes that registration into each harness's config (Claude Code, Claude Desktop, Cursor, VS Code, Codex, Gemini CLI, Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose), defaulting to the installed binary so a Homebrew install needs no Node. `npx @nowline/mcp` stays the canonical path for hand-written configs and the MCP registry because it decouples the server's install lifecycle from the CLI binary; `--mcp-install --server npx` registers that form instead. See [`specs/cli.md`](./cli.md) § `--mcp` and § `--mcp-install`.
 
 ## Branding and icons
 
@@ -224,10 +224,11 @@ The OSS local server ships wherever a harness can run a **local** stdio server w
 |---------|------------------|----------------------|-----------|
 | Cursor | MCP CLI (stdio) | Cursor Marketplace → `io.nowline/nowline` (registry-sourced) or manual `mcp.json` | Registry automated |
 | VS Code | MCP CLI (stdio) | VS Code MCP gallery → `io.nowline/nowline` (registry-sourced) or manual MCP config | Registry automated |
-| Claude Code | MCP CLI (stdio) | `claude mcp add` / `.mcp.json` — no marketplace | npm only |
+| Claude Code | MCP CLI (stdio) | `nowline --mcp-install claude-code`, `claude mcp add`, or `.mcp.json` — no marketplace | npm only |
 | Claude Desktop | MCP Desktop (`.mcpb`) | Claude Desktop Extensions directory (one-click) | `.mcpb` built in CI; directory submission manual |
 | Gemini CLI | MCP CLI (stdio) + extension bundle | Gemini CLI extension channel (`name: nowline`) | Manual submission |
-| Codex CLI | MCP CLI (manual) | `~/.codex/config.toml` entry | npm only |
+| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry | npm only |
+| Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose | MCP CLI (stdio) | `nowline --mcp-install <client>` or the harness's own config ([`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 | ChatGPT / Gemini app / MS Copilot | — | not supported (no local stdio) | — |
 
 Marketplace distribution status and the release pipeline: [`specs/milestones.md`](./milestones.md) § m4.9, [`specs/releasing.md`](./releasing.md) § MCP publishing artifacts, [`ops/mcp-marketplace.md`](../ops/mcp-marketplace.md).

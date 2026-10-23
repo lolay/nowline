@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:b2961e64886fe303a2c780cea2abe391af8f64fe10cf5c29653396cd3d23067d
+.\" translated-from: nowline.1 sha256:b8cdfd1687add3d8b4d73d567ecd234d3f339c24e7c82f767acae43c84ccc52b
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -29,6 +29,17 @@
 .Nm
 .Fl -init
 .Op Ar nom
+.Nm
+.Fl -mcp
+.Op Fl -root Ar rép
+.Nm
+.Fl -mcp-install
+.Op Ar client
+.Op Ar options
+.Nm
+.Fl -mcp-uninstall
+.Op Ar client
+.Op Ar options
 .Nm
 .Fl -dry-run
 .Op Ar options
@@ -158,6 +169,37 @@ est ajouté automatiquement s'il manque.
 Le nom par défaut est
 .Sy roadmap .
 Les fichiers existants sont écrasés sans confirmation.
+.It Fl -mcp
+Lance un serveur Model Context Protocol (MCP) sur l'entrée et la sortie
+standard, qui expose à un agent les outils de validation, de rendu,
+d'export et de fichiers.
+Avec
+.Fl -port Ar n ,
+il sert plutôt du Streamable HTTP local.
+C'est le même serveur que
+.Ql npx @nowline/mcp .
+.It Fl -mcp-install Op Ar client
+Enregistre le serveur MCP auprès d'un agent\ :
+.Sy claude-code , claude-desktop , cursor , vscode , codex , gemini ,
+.Sy muse , opencode , copilot , windsurf , zed , amp , goose ,
+ou
+.Sy all .
+Sans
+.Ar client ,
+l'installe dans chaque agent trouvé sur cette machine.
+Les configurations JSON sont modifiées sur place, en conservant les
+commentaires et les autres entrées\ ; Claude Code (portée utilisateur) et
+Codex passent par leur propre commande
+.Ql mcp add \ ;
+Goose reçoit un extrait à coller.
+Relancer la commande est sans risque.
+Avec
+.Fl n ,
+affiche la modification sans rien écrire ni exécuter.
+Voir
+.Sx OPTIONS MCP .
+.It Fl -mcp-uninstall Op Ar client
+Retire le serveur des mêmes configurations.
 .It Fl n , -dry-run
 Exécute la totalité du pipeline (analyse + validation + mise en page +
 format) sans écrire de fichier.
@@ -394,6 +436,36 @@ pour exposer sur le réseau local).
 .It Fl -open
 Ouvre le navigateur au démarrage.
 .El
+.Sh OPTIONS MCP
+.Bl -tag -width Fl
+.It Fl -root Ar rép
+Répertoire que les outils de fichiers MCP peuvent lire et écrire (par
+défaut\ : le répertoire courant).
+Avec
+.Fl -mcp-install ,
+il est inscrit dans la commande enregistrée sous forme de chemin absolu.
+.It Fl -scope Ar portée
+Où
+.Fl -mcp-install
+écrit\ :
+.Sy user
+(par défaut\ ; la configuration propre à l'utilisateur de l'agent) ou
+.Sy project
+(le fichier de configuration du répertoire courant, à versionner).
+.It Fl -server Ar type
+Ce que
+.Fl -mcp-install
+enregistre\ :
+.Sy self
+(par défaut\ ; ce binaire
+.Nm
+avec
+.Fl -mcp ,
+si bien qu'une installation Homebrew n'exige pas Node.js) ou
+.Sy npx
+.Pq Ql npx -y @nowline/mcp ,
+qui suit npm indépendamment de la CLI.
+.El
 .Sh OPTIONS DE JOURNALISATION
 Les indicateurs de journalisation sont mutuellement exclusifs.
 .Bl -tag -width Fl
@@ -567,6 +639,14 @@ Créer un nouveau fichier\ :
 .Bd -literal -offset indent
 nowline --init
 nowline --init mon-projet
+.Ed
+.Pp
+Servir les outils MCP, ou les enregistrer auprès de chaque agent
+trouvé\ :
+.Bd -literal -offset indent
+nowline --mcp
+nowline --mcp-install
+nowline --mcp-install cursor --scope project -n
 .Ed
 .Pp
 PDF avec géométrie de page explicite, stable octet pour octet entre
