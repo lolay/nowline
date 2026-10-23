@@ -1,9 +1,5 @@
 ```release-note:changed
-A caption that spills past the end of the chart now gets up to 160 px (about 20 characters), or one column when a column is wider, before it is cut with `…`, and the axis grows by the whole columns it needs. At week scale a short title like `Search v2` or `Deploy` now shows in full instead of `Sea…` or `Depl…`.
-```
-
-```release-note:changed
-A dated milestone whose predecessor finishes after its date now slips instead of pointing back in time: the diamond on the date turns red, a red dotted line runs along its marker row to a second diamond where it actually lands, and its label and cut line move there. The red arrow from the late predecessor back to the date is gone.
+A dated milestone whose predecessor finishes after its date now slips instead of pointing back in time: the diamond on the date turns red, a red dotted line runs along its marker row to a second diamond where it actually lands, and its label and cut line move there. The red arrow from the late predecessor back to the date is gone. A wave that overruns the milestone slips it the same way. A slip of 12 px or less draws one diamond, on the date, with its label and cut line in the overrun colour, which is a mid grey in the grayscale theme.
 ```
 
 ```release-note:changed
@@ -11,17 +7,5 @@ Every isolated region (`roadmap:isolate`) in a chart now ends at the same right 
 ```
 
 ```release-note:changed
-The item after a parallel or group now lines up with the block's first track instead of sitting up beside its header and bracket (`Cool` after `Burst A` / `Burst B`, `Deploy` after a `parallel` block). The block's own header and dashed bracket are unchanged.
-```
-
-```release-note:changed
 A two-word title whose first word misses the bar's first line by a hair now wraps inside its bar instead of spilling beside it. On a one-column bar, `Launch page` reads `Launch` / `page`, with the first line allowed to sit up to the status dot's left edge instead of 4 px short of it. Captions that already fit or wrap do not move.
-```
-
-```release-note:added
-A wave that declares a date floor (`wave launch "Launch" after:2026-11-02`) now shows the calendar glyph at the left of its strip cell, whether or not the floor opened a gap. Hovering it gives the date. A floor that names an anchor or milestone shows no glyph.
-```
-
-```release-note:changed
-The wave legend (`Waves: ...`) now lists only the waves the strip does not name in full: an empty wave, a wave whose label was shortened, or one whose footnote marks moved to the legend. A roadmap with seven waves and one empty one reads `Waves: #4 Beta (TBD) (no items)` instead of repeating all seven names. Each wave keeps its own `#k`.
 ```

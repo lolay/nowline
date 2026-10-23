@@ -3,5 +3,5 @@ Dependency arrows now run on the dates. An arrow leaves the middle of its source
 ```
 
 ```release-note:changed
-`@nowline/layout`: `PositionedDependencyEdge` drops `kind` (`normal`, `overflow`, `underBar`) for `slack`, `headWidth` and `head`, and every arrow is drawn behind the bars. `PositionedItem` gains `dateSpan`, the item's dates in x.
+**Breaking:** `@nowline/layout`: `PositionedDependencyEdge` drops `kind` (`normal`, `overflow`, `underBar`) for `slack`, `headWidth` and `head`, and every arrow is drawn behind the bars. `PositionedItem` gains `dateSpan`, the item's dates in x.
 ```

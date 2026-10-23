@@ -1,3 +1,3 @@
 ```release-note:removed
-The layout no longer reads `pixels-per-unit` from a `scale` config block. The key was never documented and the validator already rejected it; column width comes from the roadmap's `scale:` alone.
+The layout no longer reads `pixels-per-unit` or `unit` from a `scale` config block. Neither key was ever documented and the validator already rejected both; column width and the axis unit come from the roadmap's `scale:` alone, so set that instead.
 ```
