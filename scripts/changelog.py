@@ -26,8 +26,8 @@ Commands:
     changelog.py check [--base REF] [--require]
         Validates every fragment. With --base, also fails if the branch
         adds an entry or heading above the latest release in a CHANGELOG.md
-        that has a .changelog/ beside it (fixing a released entry is fine),
-        and with --require, if the branch adds or edits no fragment.
+        that has a .changelog/ beside it (fixing a released entry, or editing
+        a legacy Unreleased entry in place, is fine), and with --require, if the branch adds or edits no fragment.
     changelog.py preview
         Prints the section each CHANGELOG.md would gain at the next release.
     changelog.py release X.Y.Z [--date YYYY-MM-DD] [--dry-run]
@@ -221,24 +221,48 @@ def release(root, version, date):
     return writes, deletes, notes
 
 
+def first_release_line(lines):
+    return next((i + 1 for i, line in enumerate(lines) if re.match(r"^## \[v?\d", line)), len(lines) + 1)
+
+
+def entry_marker(line):
+    """'##', '###' or '-' for an entry or heading line, else None."""
+    m = re.match(r"^(#{2,3}|[-*]) ", line)
+    return m and ("-" if m.group(1) == "*" else m.group(1))
+
+
 def unreleased_additions(root, base, path):
     """Entry and heading lines a branch adds to CHANGELOG.md above its latest release.
 
     That is where the conflicts come from. Fixing a released entry, or the
-    preamble's prose, touches lines nobody else is editing, so it passes.
+    preamble's prose, touches lines nobody else is editing, so it passes. So
+    does editing a legacy ## [Unreleased] entry in place: within a hunk, each
+    added entry or heading line that replaces a removed one of the same kind
+    is an edit, and only the surplus counts as new.
     """
-    text = (root / path).read_text().splitlines()
-    first_release = next((i + 1 for i, line in enumerate(text) if re.match(r"^## \[v?\d", line)), len(text) + 1)
+    first_release = first_release_line((root / path).read_text().splitlines())
+    merge_base = (git(root, "merge-base", base, "HEAD") or "").strip()
+    old = git(root, "show", f"{merge_base}:{path}") if merge_base else None
+    first_release_old = first_release_line(old.splitlines()) if old is not None else 0
     diff = git(root, "diff", "-U0", f"{base}...HEAD", "--", path) or ""
-    added, lineno = [], 0
+    added, replaced, old_no, new_no = [], {}, 0, 0
     for line in diff.splitlines():
-        m = re.match(r"^@@ -\S+ \+(\d+)", line)
+        m = re.match(r"^@@ -(\d+)(?:,\d+)? \+(\d+)", line)
         if m:
-            lineno = int(m.group(1))
+            old_no, new_no, replaced = int(m.group(1)), int(m.group(2)), {}
+        elif line.startswith("-") and not line.startswith("---"):
+            marker = entry_marker(line[1:])
+            if marker and old_no < first_release_old:
+                replaced[marker] = replaced.get(marker, 0) + 1
+            old_no += 1
         elif line.startswith("+") and not line.startswith("+++"):
-            if lineno < first_release and re.match(r"^(#{2,3} |[-*] )", line[1:]):
-                added.append(line[1:].strip())
-            lineno += 1
+            marker = entry_marker(line[1:])
+            if marker and new_no < first_release:
+                if replaced.get(marker):
+                    replaced[marker] -= 1
+                else:
+                    added.append(line[1:].strip())
+            new_no += 1
     return added
 
 
@@ -265,7 +289,7 @@ def check(root, base, require):
                 for added in unreleased_additions(root, base, path):
                     errors.append(f"{path} gains {added!r} above the latest release; add a "
                                   f"{p.parent / FRAGMENT_DIR}/<name>.txt fragment instead (only the release step "
-                                  "writes new entries; fixing a released entry is fine)")
+                                  "writes new entries; fixing a released entry or editing one in place is fine)")
             elif p.parent.name == FRAGMENT_DIR and p.suffix == ".txt" and status in ("A", "M"):
                 touched.append(path)
         for path in touched:
