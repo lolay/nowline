@@ -21,6 +21,15 @@ The kind after `release-note:` is a Keep a Changelog section: `added`,
 several blocks of different kinds. Write the entry as it should read in the
 changelog; the release step adds the leading `- `.
 
+Write each entry relative to the last release, not to `main` today. If your
+PR changes, replaces or removes something a pending fragment (or a legacy
+`## [Unreleased]` entry) describes, edit or delete that entry instead of
+adding one that contradicts it. For a feature that's new since the last
+release, put later tweaks in its original fragment, so the notes describe
+where it ended up. The `Changelog` check counts an edited fragment as the
+PR's entry; a PR that only deletes one, or only edits an `[Unreleased]`
+entry, takes the `no-changelog` label.
+
 A PR with no user-visible change needs no fragment: label it `no-changelog`.
 `python3 scripts/changelog.py check` validates the files, and
 `python3 scripts/changelog.py preview` shows the next release's section.

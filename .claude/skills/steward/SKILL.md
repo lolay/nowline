@@ -21,6 +21,12 @@ Then `make changelog-check BASE=origin/main REQUIRE=1`, unless the PR is labelle
 
 Don't call `pnpm` directly to stand in for any of these.
 
+## Changelog entries
+
+Write the entry relative to the last release. Before adding a fragment, read the pending ones (`make changelog-preview`). If your PR changes, replaces or removes behaviour one of them, or a legacy `## [Unreleased]` entry, describes, edit or delete that entry instead of adding a contradicting one, and tweaks to a feature that's new since the last release go into its original fragment. v0.9.0 needed lolay/nowline#209 to untangle entries that later PRs had quietly superseded. The rule is in [`.changelog/README.md`](../../../.changelog/README.md).
+
+When merging `main` in, read the fragments it brings too: a sibling PR may have landed an entry yours now supersedes.
+
 ## Updating the branch
 
 Keep the branch current. On every wake (CI result, review, conflict notice, check-in), fetch `main`. If the branch is behind, merge `main` in, even if the merge is clean. Then run the local gate and push. The merge queue would catch drift anyway, but a current branch surfaces conflicts and man-page stamp breakage while the session that wrote the change is still around to fix it.
