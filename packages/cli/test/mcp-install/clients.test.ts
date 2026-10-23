@@ -205,4 +205,13 @@ describe('detection', () => {
         mkdirSync(path.join(host.home, '.cursor'), { recursive: true });
         expect(client('cursor').detect(host)).toBe(true);
     });
+
+    it('an Antigravity-only ~/.gemini does not look like Gemini CLI', () => {
+        const host = fakeHost();
+        mkdirSync(path.join(host.home, '.gemini', 'config'), { recursive: true });
+        expect(client('antigravity').detect(host)).toBe(true);
+        expect(client('gemini').detect(host)).toBe(false);
+        writeFileSync(path.join(host.home, '.gemini', 'settings.json'), '{}');
+        expect(client('gemini').detect(host)).toBe(true);
+    });
 });

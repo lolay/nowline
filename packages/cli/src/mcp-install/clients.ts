@@ -230,7 +230,8 @@ export const CLIENTS: readonly ClientDescriptor[] = [
         id: 'gemini',
         name: 'Gemini CLI',
         scopes: ['user', 'project'],
-        detect: onPathOrExists(['gemini'], (h) => [path.join(h.home, '.gemini')]),
+        // Antigravity also lives under ~/.gemini, so look for Gemini's own file.
+        detect: onPathOrExists(['gemini'], (h) => [path.join(h.home, '.gemini', 'settings.json')]),
         target: (scope, _entry, host) =>
             underKey(
                 path.join(scope === 'user' ? host.home : host.cwd, '.gemini', 'settings.json'),

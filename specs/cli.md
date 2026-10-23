@@ -274,7 +274,7 @@ nowline --mcp-install -n                       # print what would change; write 
 nowline --mcp-uninstall                        # remove the entry from the same configs
 ```
 
-The positional is a client id: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `antigravity`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`, or `all`. Omitted (or `all`), the CLI installs into every harness it detects: its CLI is on PATH or its config directory exists. An unknown id exits 2. The entry is always named `nowline`, so tools surface as `mcp__nowline__*`.
+The positional is a client id: `claude-code`, `claude-desktop`, `cursor`, `vscode`, `codex`, `gemini`, `antigravity`, `muse` (Meta Muse Code), `opencode`, `copilot` (GitHub Copilot CLI), `windsurf`, `zed`, `amp`, `goose`, or `all`. Omitted (or `all`), the CLI installs into every harness it detects: its CLI is on PATH or its config directory exists (for Gemini CLI, its `settings.json`, since Antigravity also lives under `~/.gemini`). An unknown id exits 2. The entry is always named `nowline`, so tools surface as `mcp__nowline__*`.
 
 | Option | Values | Default | Meaning |
 |---|---|---|---|

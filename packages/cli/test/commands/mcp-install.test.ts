@@ -27,11 +27,11 @@ function hostWith(dirs: string[], options: Parameters<typeof fakeHost>[0] = {}):
 
 describe('mcpInstallHandler', () => {
     it('installs into every detected client and nothing else', async () => {
-        const host = hostWith(['.cursor', '.gemini']);
+        const host = hostWith(['.cursor', '.codeium/windsurf']);
         const out = await run(['--mcp-install', '-q'], host);
         expect(out).toMatch(/^cursor: created .*mcp\.json$/m);
-        expect(out).toMatch(/^gemini: created .*settings\.json$/m);
-        expect(existsSync(path.join(host.home, '.codeium'))).toBe(false);
+        expect(out).toMatch(/^windsurf: created .*mcp_config\.json$/m);
+        expect(existsSync(path.join(host.home, '.gemini'))).toBe(false);
         const cursor = JSON.parse(
             readFileSync(path.join(host.home, '.cursor', 'mcp.json'), 'utf-8'),
         );
@@ -90,7 +90,7 @@ describe('mcpInstallHandler', () => {
     });
 
     it('keeps going after one client fails, then exits with an output error', async () => {
-        const host = hostWith(['.cursor', '.gemini']);
+        const host = hostWith(['.cursor', '.codeium/windsurf']);
         writeFileSync(path.join(host.home, '.cursor', 'mcp.json'), '{ broken');
         const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
         let out = '';
@@ -111,7 +111,7 @@ describe('mcpInstallHandler', () => {
         } finally {
             stderr.mockRestore();
         }
-        expect(out).toMatch(/gemini: created/);
+        expect(out).toMatch(/windsurf: created/);
     });
 
     it('fails a client whose harness CLI exits non-zero', async () => {
