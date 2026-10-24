@@ -18,7 +18,8 @@ import { createLog } from '../io/log.js';
  * Runs until the process receives SIGINT/SIGTERM or the client closes stdin.
  */
 export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> {
-    const root = args.root ?? process.cwd();
+    // Without --root the server follows the client's MCP roots, else cwd.
+    const root = args.root;
 
     const portStr = args.port;
     if (portStr !== undefined) {

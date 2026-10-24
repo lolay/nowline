@@ -144,7 +144,7 @@ EXAMPLES
   nowline roadmap.nowline --dry-run         # validate-only
   nowline roadmap.nowline --serve -p 8080   # live preview
   nowline --init my-project                 # scaffold ./my-project.nowline
-  nowline --mcp                             # start MCP stdio server in cwd
+  nowline --mcp                             # start MCP stdio server
   nowline --mcp --root ./roadmaps           # MCP server with custom root
   nowline --mcp-install                     # register with every agent found
   nowline --mcp-install cursor --scope project -n   # preview .cursor/mcp.json

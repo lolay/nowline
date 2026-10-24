@@ -62,8 +62,20 @@ Tool names are **identical** to the Nowline Pro MCP server so agents and users g
 | `create` | `{ path: string, source: string }` | `{ path }` | Writes a new `.nowline` file after validation. Overwrites if the path already exists (same silent-overwrite posture as the CLI). |
 | `update` | `{ path: string, source: string }` | `{ path }` | Replaces an existing file after validation. |
 | `delete` | `{ path: string }` | `{ path }` | Deletes a local `.nowline` file. |
-| `list` | `{ directory?: string, recursive?: boolean = false }` | `{ paths: string[] }` | Lists `.nowline` files under `directory` (default: cwd). |
+| `list` | `{ directory?: string, recursive?: boolean = false }` | `{ paths: string[] }` | Lists `.nowline` files under `directory` (default: the primary root, see [Path roots](#path-roots)). |
 | `export` | `{ source?: string, path?: string, format: 'svg' \| 'pdf' \| 'html' \| 'mermaid' \| 'xlsx' \| 'msproj' \| 'png', now?, timezone?, delivery?: 'file' \| 'inline' \| 'both', nonWorking?: 'hide' \| 'show', ... }` | file resource + metadata | Same `@nowline/export` kernel and format adapters as `nowline <input> -f <format>`, run in-process. Byte-identical to the CLI for the same source + inputs ([export-determinism](./export-determinism.md)). `svg` is accepted here (in addition to `render`) so agents can save a vector file via `delivery:"file"`. `now` and `timezone` have the same meaning and validation as on `render`. The optional `delivery` parameter controls file vs. inline delivery (see [Structured output](#structured-output) § export delivery). `nonWorking` has the same meaning and validation as on `render` and changes only the picture formats (`svg`, `png`, `pdf`, `html`); `mermaid`, `xlsx` and `msproj` bytes are identical for `show` and `hide`, because the schedule does not depend on the view. `validate` takes no `nonWorking`. `convert` takes neither `now` nor `timezone`: its JSON does not depend on today's date. |
+
+### Path roots
+
+The OSS tools take local paths, and every path must land inside an allowed root. The server picks its roots once per connection, in this order:
+
+1. **`--root <dir>`** (or `allowedRoot` from an embedder of `createMcpServer`): the one root. The client is never asked. The [`.mcpb` bundle](#mcpb-bundle-packaging) relies on this to point the server at the folder picked in Claude Desktop.
+2. **The client's MCP roots.** When the client advertises the `roots` capability, the server sends `roots/list` on the first tool call that needs a path and caches the answer until the client sends `notifications/roots/list_changed`. Every `file://` root is allowed; relative paths, the default `list` directory, and the default `export` output resolve against the **first** root, so a client that lists the project first gets project-relative paths. Non-`file://` roots are ignored.
+3. **`process.cwd()`**, when the client has no `roots` capability, lists no `file://` roots, or `roots/list` fails or takes longer than 5 seconds.
+
+Client roots change where paths resolve, not how `export` delivers binary formats: a client root never counts as the configured root folder that switches the smart `pdf`/`xlsx`/`png` default to writing a file ([Structured output](#structured-output) § export delivery). The stateless Streamable HTTP transport (`--port`) builds a server per request that never sees the client's `initialize`, so it always uses `--root` or cwd.
+
+`nowline --mcp` follows the same order.
 
 Pro-only additions (`search`, cloud `read`/`create`/`update`/`delete` by `id`) live in [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). This doc covers the OSS local surface only.
 
@@ -104,7 +116,7 @@ Every tool declares an `outputSchema` and returns [structured content](https://m
 
 **export delivery.** Binary `export` formats support an explicit `delivery` parameter (`"file"` / `"inline"` / `"both"`):
 
-- `"file"` — writes to `output` (if provided) or `<allowedRoot>/<roadmap-id>.<ext>` and returns the path in `structuredContent`. No inline bytes.
+- `"file"` — writes to `output` (if provided) or `<primary root>/<roadmap-id>.<ext>` ([Path roots](#path-roots)) and returns the path in `structuredContent`. No inline bytes.
 - `"inline"` — returns bytes in the response: embedded MCP resource block for `pdf`/`xlsx`, image block for `png`. No file written.
 - `"both"` — writes to disk and also attaches inline bytes.
 - **smart default (no `delivery` specified):** `pdf`/`xlsx`/`png` write to disk when the server has a configured root folder (e.g. the Claude Desktop `.mcpb` bundle with an output folder set); otherwise return inline bytes. Text formats (`svg`/`html`/`mermaid`/`msproj`) always return inline so the host can surface them as downloadable artifacts. This follows the MCP "return a reference, not the bytes" convention — binary bytes bloat context and Claude Desktop silently drops inline binary documents anyway.
@@ -228,7 +240,7 @@ The OSS local server ships wherever a harness can run a **local** stdio server w
 | Claude Desktop | MCP Desktop (`.mcpb`) | Claude Desktop Extensions directory (one-click) | `.mcpb` built in CI; directory submission manual |
 | Gemini CLI | MCP CLI (stdio) + extension bundle | Gemini CLI extension channel (`name: nowline`) | Manual submission |
 | GitHub Copilot CLI | MCP CLI (stdio) via plugin | `copilot plugin marketplace add lolay/nowline`, then `copilot plugin install nowline@nowline` ([plugin bundle](#plugin-bundle)), or `nowline --mcp-install copilot` | Version synced at release cut |
-| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry. The [plugin bundle](#plugin-bundle) installs, but Codex starts plugin servers in the plugin cache, not the project | npm only |
+| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry. The [plugin bundle](#plugin-bundle) installs, but Codex starts plugin servers in the plugin cache, not the project, and sends no MCP roots to correct it (checked on Codex 0.164.0) | npm only |
 | Antigravity, Muse Code, OpenCode, Windsurf, Zed, Amp, Goose | MCP CLI (stdio) | `nowline --mcp-install <client>` or the harness's own config ([`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 | ChatGPT / Gemini app / MS Copilot | — | not supported (no local stdio) | — |
 
@@ -249,7 +261,7 @@ The plugin carries the server in two formats so one directory loads in every har
 
 Both launch `npx -y @nowline/mcp@latest`, like `gemini-extension.json`, so the server tracks npm without a manifest change. The two manifests' `version` is the `@nowline/mcp` version, synced at the release cut by [`scripts/sync-mcp-metadata.mjs`](../scripts/sync-mcp-metadata.mjs); a changed `version` is what tells an installed plugin there is an update. [`packages/integration-tests/test/mcp-metadata.test.ts`](../packages/integration-tests/test/mcp-metadata.test.ts) keeps the versions in lock-step and the two formats from drifting apart.
 
-Where each harness starts the server matters, because the OSS server resolves file paths against its working directory ([Shared tool contract](#shared-tool-contract)). Claude Code starts plugin stdio servers in the project directory, which is what the server expects. Codex starts them in the plugin's install cache, so in Codex `read`/`list`/`create` see the cache rather than the project; Codex users should register the server with `nowline --mcp-install codex` until the server takes its root from the client's MCP roots. A plugin manifest can't set a platform-specific command, so on native Windows, where a harness can't spawn `npx` without `cmd /c`, `nowline --mcp-install` is the fallback.
+Where each harness starts the server matters, because the OSS server resolves file paths against its working directory ([Shared tool contract](#shared-tool-contract)). Claude Code starts plugin stdio servers in the project directory, which is what the server expects. The server also honors the client's MCP roots ([Path roots](#path-roots)), which covers a harness that starts it elsewhere but tells it where the project is. Codex does neither: it starts plugin servers in the plugin's install cache (`~/.codex/plugins/cache/nowline/nowline/<version>`), and as of Codex 0.164.0 its `initialize` advertises no `roots` capability and it answers `roots/list` with an empty list, so in Codex `read`/`list`/`create` see the cache rather than the project. Codex users should register the server with `nowline --mcp-install codex` instead: a `config.toml` server with no `cwd` starts in the directory Codex runs in. A plugin manifest can't set a platform-specific command, so on native Windows, where a harness can't spawn `npx` without `cmd /c`, `nowline --mcp-install` is the fallback.
 
 The OSS plugin is not submitted to Anthropic's plugin directory; the repo marketplace is its only listing. The repo marketplace lists OSS plugins only. Nowline Pro, and any other hosted Nowline service (such as the free viewer at `free.nowline.io`, which consumes the OSS packages but isn't part of OSS), publishes from the proprietary side: Anthropic's directory or a proprietary marketplace, never this one. A Nowline Pro plugin takes the id `nowline-pro`, which also keeps it installable next to the OSS plugin: two plugins with the same name can't be installed side by side, because each one's MCP servers and skills are namespaced by its name.
 

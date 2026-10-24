@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:3fc6d77fadcf4ba2add7f127da8cff257262ed010f253a1b0a0e7801b56f0d4f
+.\" translated-from: nowline.1 sha256:032668f06f1c5fa404d9e94021ed15b045372a5d155f3eac56cec4daffaf6630
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -439,8 +439,10 @@ Ouvre le navigateur au démarrage.
 .Sh OPTIONS MCP
 .Bl -tag -width Fl
 .It Fl -root Ar rép
-Répertoire que les outils de fichiers MCP peuvent lire et écrire (par
-défaut\ : le répertoire courant).
+Répertoire que les outils de fichiers MCP peuvent lire et écrire.
+Sans cette option, le serveur utilise les racines que le client annonce
+via MCP (les chemins relatifs sont résolus par rapport à la première), ou
+le répertoire courant si le client n'en annonce aucune.
 Avec
 .Fl -mcp-install ,
 il est inscrit dans la commande enregistrée sous forme de chemin absolu.

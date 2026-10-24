@@ -79,6 +79,7 @@ import {
     UpdateOutputSchema,
     ValidateOutputSchema,
 } from './schemas.js';
+import { createWorkspaceRoots, isInsideRoots, type WorkspaceRoots } from './workspace-roots.js';
 
 // ---- MCP Apps UI (in-chat live preview) -------------------------------------
 //
@@ -174,11 +175,10 @@ function mutatingTool(title: string, opts: { destructiveHint: boolean; idempoten
 
 // ---- Server factory ---------------------------------------------------------
 
-function resolveAndGuard(filePath: string, allowedRoot: string): string {
-    const abs = path.resolve(allowedRoot, filePath);
-    const guard = path.resolve(allowedRoot);
-    if (!abs.startsWith(guard + path.sep) && abs !== guard) {
-        throw new PathOutsideRootError(filePath, allowedRoot);
+function resolveAndGuard(filePath: string, roots: WorkspaceRoots): string {
+    const abs = path.resolve(roots.primary, filePath);
+    if (!isInsideRoots(abs, roots)) {
+        throw new PathOutsideRootError(filePath, roots.allowed.join(', '));
     }
     return abs;
 }
@@ -224,13 +224,13 @@ function findExample(name: string): ExampleFile | undefined {
 
 async function sourceAndPath(
     args: { source?: string; path?: string },
-    allowedRoot: string,
+    roots: WorkspaceRoots,
 ): Promise<{ source: string; filePath: string }> {
     if (args.source !== undefined && args.path === undefined) {
-        return { source: args.source, filePath: path.join(allowedRoot, 'unnamed.nowline') };
+        return { source: args.source, filePath: path.join(roots.primary, 'unnamed.nowline') };
     }
     if (args.path !== undefined) {
-        const abs = resolveAndGuard(args.path, allowedRoot);
+        const abs = resolveAndGuard(args.path, roots);
         const source = args.source ?? (await fs.readFile(abs, 'utf-8'));
         return { source, filePath: abs };
     }
@@ -240,7 +240,10 @@ async function sourceAndPath(
 // ---- Server factory ---------------------------------------------------------
 
 export interface McpServerOptions {
-    /** Working directory — all file paths are resolved relative to this root. Defaults to process.cwd(). */
+    /**
+     * Working directory: all file paths resolve relative to this root. When omitted, the
+     * server uses the client's MCP roots if it advertises them, else process.cwd().
+     */
     allowedRoot?: string;
     /** Whether the allowed root was explicitly configured (vs. defaulting to cwd). Controls smart export delivery for binary formats. Defaults to false. */
     rootConfigured?: boolean;
@@ -251,7 +254,6 @@ export interface McpServerOptions {
 }
 
 export function createMcpServer(opts: McpServerOptions = {}): McpServer {
-    const allowedRoot = opts.allowedRoot ?? process.cwd();
     const rootConfigured = opts.rootConfigured ?? false;
     const server = new McpServer(
         {
@@ -278,6 +280,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 '(opens the free Nowline web app, where they can also export).',
         },
     );
+
+    const workspaceRoots = createWorkspaceRoots(server, opts.allowedRoot);
 
     // ---- Resources ----------------------------------------------------------
 
@@ -418,7 +422,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         async (args) => {
             try {
                 const { options } = resolveMcpOptions(args);
-                const { source, filePath } = await sourceAndPath(args, allowedRoot);
+                const { source, filePath } = await sourceAndPath(args, await workspaceRoots());
                 const doc = await buildDocument(source);
                 const diagnostics = collectMcpDiagnostics(doc, filePath);
                 // One stage: the routed (wave-rule) include diagnostics join
@@ -478,7 +482,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, allowedRoot);
+                const abs = resolveAndGuard(args.path, await workspaceRoots());
                 const source = await fs.readFile(abs, 'utf-8');
                 const structured = { path: abs, source };
                 return {
@@ -512,7 +516,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, allowedRoot);
+                const abs = resolveAndGuard(args.path, await workspaceRoots());
                 const blocked = await diagnosticsErrorBlock(args.source, abs);
                 if (!blocked.ok) return blocked.response;
                 await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -550,7 +554,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, allowedRoot);
+                const abs = resolveAndGuard(args.path, await workspaceRoots());
                 const blocked = await diagnosticsErrorBlock(args.source, abs);
                 if (!blocked.ok) return blocked.response;
                 await fs.writeFile(abs, args.source, 'utf-8');
@@ -581,7 +585,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, allowedRoot);
+                const abs = resolveAndGuard(args.path, await workspaceRoots());
                 await fs.unlink(abs);
                 const structured = { path: abs };
                 return {
@@ -605,7 +609,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     .string()
                     .optional()
                     .describe(
-                        'Directory to scan. Defaults to the allowed root (cwd or --root). Absolute or relative.',
+                        "Directory to scan. Defaults to the project root (--root, else the client's first MCP root, else cwd). Absolute or relative.",
                     ),
                 recursive: z
                     .boolean()
@@ -617,9 +621,8 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const dir = args.directory
-                    ? resolveAndGuard(args.directory, allowedRoot)
-                    : allowedRoot;
+                const roots = await workspaceRoots();
+                const dir = args.directory ? resolveAndGuard(args.directory, roots) : roots.primary;
                 const recursive = args.recursive ?? false;
                 const paths = await listNowlineFiles(dir, recursive);
                 const structured = { paths };
@@ -715,7 +718,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             let source: string;
             let filePath: string;
             try {
-                ({ source, filePath } = await sourceAndPath(args, allowedRoot));
+                ({ source, filePath } = await sourceAndPath(args, await workspaceRoots()));
             } catch (err) {
                 return handleToolError(err, args.path);
             }
@@ -795,7 +798,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             if (args.output) {
                 try {
-                    const outAbs = resolveAndGuard(args.output, allowedRoot);
+                    const outAbs = resolveAndGuard(args.output, await workspaceRoots());
                     await fs.mkdir(path.dirname(outAbs), { recursive: true });
                     await fs.writeFile(outAbs, bytes);
                     const structured = {
@@ -949,7 +952,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             let source: string;
             let filePath: string;
             try {
-                ({ source, filePath } = await sourceAndPath(args, allowedRoot));
+                ({ source, filePath } = await sourceAndPath(args, await workspaceRoots()));
             } catch (err) {
                 return handleToolError(err, args.path);
             }
@@ -1043,11 +1046,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
 
             // Write to disk if needed.
-            const outTarget = args.output ?? path.join(allowedRoot, defaultFilename);
+            const roots = await workspaceRoots();
+            const outTarget = args.output ?? path.join(roots.primary, defaultFilename);
             let writtenPath: string | undefined;
             if (doWrite) {
                 try {
-                    const outAbs = resolveAndGuard(outTarget, allowedRoot);
+                    const outAbs = resolveAndGuard(outTarget, roots);
                     await fs.mkdir(path.dirname(outAbs), { recursive: true });
                     await fs.writeFile(outAbs, bytes);
                     writtenPath = outAbs;
@@ -1126,7 +1130,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             let source: string;
             let filePath: string;
             try {
-                ({ source, filePath } = await sourceAndPath(args, allowedRoot));
+                ({ source, filePath } = await sourceAndPath(args, await workspaceRoots()));
             } catch (err) {
                 return handleToolError(err, args.path);
             }
@@ -1175,7 +1179,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         async (args) => {
             try {
                 if (args.to === 'json') {
-                    const { source, filePath } = await sourceAndPath(args, allowedRoot);
+                    const { source, filePath } = await sourceAndPath(args, await workspaceRoots());
                     const host = createNodeHostEnv(filePath);
                     // The JSON AST does not depend on today's date, so convert
                     // takes no `now`; the kernel still wants a concrete one.
@@ -1203,7 +1207,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const jsonSource =
                     args.source ??
                     (args.path
-                        ? await fs.readFile(resolveAndGuard(args.path, allowedRoot), 'utf-8')
+                        ? await fs.readFile(
+                              resolveAndGuard(args.path, await workspaceRoots()),
+                              'utf-8',
+                          )
                         : null);
                 if (!jsonSource) {
                     throw new InputRequiredError('At least one of `source` or `path` is required.');

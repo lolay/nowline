@@ -1,0 +1,3 @@
+```release-note:changed
+MCP server: without `--root`, `@nowline/mcp` and `nowline --mcp` now resolve file paths against the roots the client advertises over MCP (relative paths against the first root, every root allowed) and follow `notifications/roots/list_changed`, falling back to the working directory when the client has no roots.
+```
