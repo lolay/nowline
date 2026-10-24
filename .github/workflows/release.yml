@@ -82,9 +82,19 @@ jobs:
         run: |
           set -euo pipefail
           git add packages/*/package.json packages/mcp/manifest.json packages/mcp/server.json \
+            gemini-extension.json plugins/nowline/.claude-plugin/plugin.json plugins/nowline/plugin.json \
             CHANGELOG.md packages/vscode-extension/CHANGELOG.md \
             .changelog packages/vscode-extension/.changelog
           git commit -m "release v${NEW_VERSION}"
+          # Anything the bump or changelog promotion rewrote but the list above
+          # missed would ship a tag whose metadata disagrees with package.json
+          # (v0.10.0: `make pack-mcpb` failed on the stale plugin manifests).
+          # Fail here, before the tag exists, instead of in the tag build.
+          if ! git diff --quiet HEAD; then
+            echo "::error::release commit left tracked files unstaged; add them to the git add list above"
+            git status --short
+            exit 1
+          fi
           git tag "v${NEW_VERSION}"
           git push origin HEAD
           git push origin "v${NEW_VERSION}"
