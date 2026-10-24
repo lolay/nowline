@@ -55,6 +55,7 @@ packages/        # @nowline/* workspace: core, cli, layout, renderer, lsp, expor
 examples/        # User-grounded .nowline files: progressive samples + nowline --init templates
 tests/           # Renderer manual-validation fixtures (one stressed axis per file). NOT Vitest.
 grammars/        # TextMate grammar for editor highlighting
+plugins/         # Agent plugin bundling the MCP server (listed by .claude-plugin/marketplace.json)
 specs/           # Design specs — source of truth. Read before non-trivial changes.
 scripts/         # Repo-wide build/render/packaging scripts
 ```

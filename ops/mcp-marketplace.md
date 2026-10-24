@@ -13,6 +13,7 @@ Operator runbook for `@nowline/mcp` marketplace distribution: the public MCP reg
 | Attach `.mcpb` to GitHub Release | `publish-mcp.yml` | After npm is live |
 | MCP registry `io.nowline/nowline` | `publish-mcp.yml` (last step) | DNS domain auth via `MCP_PRIVATE_KEY` |
 | Cursor Marketplace + VS Code MCP gallery | — | Registry-sourced; no separate action once registry entry is live |
+| Agent plugin (`plugins/nowline/`) | `release.yml` → `cut-release` | The version sync in the release commit is the release; the repo is its own marketplace, so there is no publish step |
 | Gemini CLI extension gallery | — | Crawler-sourced; no separate action once `gemini-extension.json` is in the repo and the `gemini-cli-extension` GitHub topic is set (one-time, see below) |
 | Tracking issue for manual channels | `publish-mcp.yml` | Labels `maintainer-only` + `release-ops` |
 
@@ -120,7 +121,7 @@ That's all. The crawler indexes tagged repos daily; the extension will appear in
 
 ### Keeping the manifest in sync
 
-`gemini-extension.json` uses `@nowline/mcp@latest` so no version bump is needed on release. If the package name or invocation ever changes, update the manifest in the same PR.
+`gemini-extension.json` uses `@nowline/mcp@latest`, so the server it launches tracks npm on its own. Its `version` field is synced at the release cut with the other MCP metadata (`scripts/sync-mcp-metadata.mjs`). If the package name or invocation ever changes, update the manifest in the same PR, along with the plugin's `.mcp.json` and `mcp.json` under `plugins/nowline/`.
 
 ## Re-running MCP publish only
 

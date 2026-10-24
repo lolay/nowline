@@ -1,6 +1,6 @@
 {
     "name": "nowline",
-    "version": "0.8.5",
+    "version": "0.9.0",
     "description": "Create and edit your roadmaps in a plain-text format.",
     "mcpServers": {
         "nowline": {

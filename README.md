@@ -72,6 +72,14 @@ nowline --init my-project                            # ./my-project.nowline
 nowline --init my-project -t teams                   # ./my-project.nowline (teams template)
 ```
 
+To give an AI agent Nowline tools, install the plugin from this repo's marketplace. In Claude Code:
+
+```text
+/plugin install nowline --marketplace lolay/nowline
+```
+
+GitHub Copilot CLI and Codex read the same marketplace; see [`plugins/nowline/README.md`](./plugins/nowline/README.md) for those and the other ways to add the MCP server.
+
 For the VS Code / Cursor / VSCodium extension, search **Nowline** on the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=nowline.vscode-nowline) or [Open VSX](https://open-vsx.org/extension/nowline/vscode-nowline).
 
 > **`0.x` versioning.** `nowline` is on `0.x.y` while we settle the embed surface and IDE expansion. Public APIs may change between minor versions; full SemVer guarantees apply once we ship `1.0`. See [`specs/releasing.md`](./specs/releasing.md) for the version contract.
