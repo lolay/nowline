@@ -417,8 +417,10 @@ Open the browser on start.
 .Sh MCP OPTIONS
 .Bl -tag -width Fl
 .It Fl -root Ar dir
-Directory the MCP file tools may read and write (default: the current
-directory).
+Directory the MCP file tools may read and write.
+Without it, the server uses the roots the client advertises over MCP
+(relative paths resolve against the first), or the current directory
+when the client has none.
 With
 .Fl -mcp-install ,
 it is written into the registered command as an absolute path.

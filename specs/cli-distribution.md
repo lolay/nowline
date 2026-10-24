@@ -111,7 +111,7 @@ Where a harness has an official marketplace, publish there and **only** there. S
 | Gemini CLI Extension channel | Extension bundle + `GEMINI.md` | Manual submission per Gemini CLI process | Manual (tracked issue) |
 | Repo plugin marketplace (`lolay/nowline`) | Agent plugin (`plugins/nowline/`) | Claude Code `/plugin install nowline --marketplace lolay/nowline`; Copilot CLI `copilot plugin marketplace add lolay/nowline`; Codex reads the same marketplace. See [`specs/mcp.md`](./mcp.md) § Plugin bundle | Version synced at release cut; no publish step |
 | Claude Code | MCP CLI (manual) | `nowline --mcp-install claude-code`, `claude mcp add nowline -- npx -y @nowline/mcp`, or `.mcp.json` when not using the plugin | n/a (user config) |
-| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry (preferred over the plugin; see [`specs/mcp.md`](./mcp.md) § Plugin bundle) | n/a (user config) |
+| Codex CLI | MCP CLI (manual) | `nowline --mcp-install codex` or a `~/.codex/config.toml` entry (preferred over the plugin: Codex starts plugin servers in the plugin cache and sends no MCP roots; see [`specs/mcp.md`](./mcp.md) § Plugin bundle) | n/a (user config) |
 | Other local harnesses | MCP CLI (manual) | `nowline --mcp-install <client>` (Antigravity, Muse Code, OpenCode, GitHub Copilot CLI, Windsurf, Zed, Amp, Goose; [`specs/cli.md`](./cli.md) § `--mcp-install`) | n/a (user config) |
 
 Note: Cursor Marketplace and VS Code MCP gallery are both fed by the public MCP registry. Updating the registry entry is the single action that surfaces the MCP server in both IDEs.
