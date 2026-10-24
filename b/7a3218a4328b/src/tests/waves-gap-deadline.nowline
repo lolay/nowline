@@ -1,0 +1,26 @@
+nowline v1
+
+// Wave fixture: start floors that create gaps (an anchor floor and an
+// inline-date floor) and a dated deadline milestone `after:<wave>` that the
+// wave overruns. The inline-date gap shows its gap label (the one-week
+// anchor gap is too narrow for one), plus the red overrun cut line and NL.I1007.
+
+roadmap waves-gap-deadline "Gaps and deadline" start:2026-01-05 scale:1w calendar:full
+
+anchor fy-budget "FY budget release" date:2026-02-02
+
+wave plan "Plan"
+wave execute "Execute" after:fy-budget
+wave harden "Harden" after:2026-04-06
+
+swimlane a "Lane A"
+  item a1 "Item A1" duration:2w wave:plan
+  item a2 "Item A2" duration:5w wave:execute
+  item a3 "Item A3" duration:2w wave:harden
+
+swimlane b "Lane B"
+  item b1 "Item B1" duration:3w wave:plan
+  item b2 "Item B2" duration:7w wave:execute
+  item b3 "Item B3" duration:1w wave:harden
+
+milestone exec-done "Execute complete" date:2026-03-16 after:execute

@@ -1,0 +1,35 @@
+nowline v1
+
+// Titled working exceptions (specs/working-calendar.md §4, §7.4, §10 Example
+// D). A titled, dated `working` declaration puts days back into the schedule
+// and is labelled in the marker row with the days it adds ("Release crunch ·
+// +1d"). The label has no cut line under `hide` and no band under `show`: a
+// working day removes no time.
+//
+// The stressed axis is the working-exception labels:
+//   - Release crunch: a working Saturday, Dec 5, one day after the Launch
+//     milestone, so the two pack against each other in the marker row.
+//   - Crunch weekend: a range over Sat Dec 19 and Sun Dec 20, so `+2d`.
+//   - Make-up day: Wed Dec 30 works inside Winter break, which splits the
+//     closure into two labelled seams; the make-up label says why.
+//   - An untitled working Saturday, Dec 12: the day works, nothing is drawn.
+
+config
+
+non-working winter-break "Winter break" start:2026-12-24 end:2027-01-01
+
+working crunch "Release crunch" date:2026-12-05
+
+working weekend "Crunch weekend" start:2026-12-19 end:2026-12-20
+
+working makeup "Make-up day" date:2026-12-30
+
+working date:2026-12-12
+
+roadmap working-exceptions "Working exceptions" start:2026-11-30 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-12-04
+swimlane a "A"
+  item build "Build" duration:2w
+  item harden "Harden" duration:2w
+  item ship "Ship" duration:1w

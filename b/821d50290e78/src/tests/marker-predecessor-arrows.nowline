@@ -1,0 +1,17 @@
+nowline v1
+
+include "./marker-predecessor-partner.nowline" roadmap:isolate
+
+roadmap marker-predecessor-arrows "Marker predecessor arrows" start:2026-01-05 scale:1w
+
+anchor kickoff "Kickoff" date:2026-01-12
+anchor freeze "Code freeze" date:2026-02-02
+
+swimlane core "Core"
+  item build "Build" duration:6w
+  item polish "Polish" duration:3w after:build
+
+milestone alpha "Alpha" after:[kickoff, build]
+milestone beta "Beta" after:[alpha, polish]
+milestone review "Review" date:2026-02-09 after:alpha
+milestone cut "Cut" date:2026-01-26 after:freeze

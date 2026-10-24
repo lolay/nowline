@@ -1,0 +1,18 @@
+nowline v1
+
+// Company logo, above header at the largest preset (specs/rendering.md
+// § Company Logo Size Presets). A 512 px square mark scales down to the
+// 72 px `logo-size:xl` slot, which is taller than the 72 px band allows
+// with its 10 px clearance, so the band grows to 92 px, the title and
+// author center vertically beside the logo, and the chart moves down 20 px.
+
+config
+
+default roadmap header-position:above
+
+roadmap logo-above-xl "Logo above, xl" author:"Acme Engineering" logo:"./assets/logo-mark.svg" logo-size:xl start:2026-01-05
+
+swimlane build "Build"
+  item design "Design" duration:1w status:done
+  item implement "Implement" duration:2w status:in-progress
+  item ship "Ship" duration:3d
