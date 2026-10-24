@@ -1,0 +1,8 @@
+{
+    "mcpServers": {
+        "nowline": {
+            "command": "npx",
+            "args": ["-y", "@nowline/mcp@latest"]
+        }
+    }
+}

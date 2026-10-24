@@ -1,0 +1,15 @@
+{
+    "name": "nowline",
+    "owner": {
+        "name": "Nowline",
+        "url": "https://nowline.io"
+    },
+    "description": "The open-source Nowline plugin: a local MCP server for creating, validating, rendering, and exporting .nowline roadmaps.",
+    "plugins": [
+        {
+            "name": "nowline",
+            "source": "./plugins/nowline",
+            "category": "productivity"
+        }
+    ]
+}

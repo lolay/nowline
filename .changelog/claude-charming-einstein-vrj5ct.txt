@@ -1,0 +1,7 @@
+```release-note:added
+Agent plugin for the MCP server: this repository is now a plugin marketplace, so Claude Code users can run `/plugin install nowline --marketplace lolay/nowline` (GitHub Copilot CLI and Codex read the same marketplace).
+```
+
+```release-note:fixed
+`gemini-extension.json` reports the current release version; it had stayed at 0.8.5.
+```

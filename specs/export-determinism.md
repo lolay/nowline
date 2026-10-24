@@ -114,7 +114,7 @@ Deviating on any row forfeits the byte-identity guarantee for that export.
 | `@nowline/mcp` (OSS) | Node (`npx`) | Imports `@nowline/export` directly, fully in-process — **no CLI shell-out** (see [`mcp.md`](./mcp.md)). Same runtime, same `HostEnv` as the CLI. |
 | `vscode-extension` | Node (extension host) | Imports `@nowline/export`; the existing `in-process.ts` becomes its thin `HostEnv`. The preview "Save PNG" path delegates to the kernel so it matches "Export…". |
 | Free / Pro web apps | Browser | Import `@nowline/export`; browser `HostEnv` fetches `resvg.wasm` + bundled fonts. Canonical export uses `@resvg/resvg-wasm`, not `<canvas>`. Owned by [`lolay/nowline-app/specs/export-determinism.md`](https://github.com/lolay/nowline-app/blob/main/specs/export-determinism.md). |
-| Cloud MCP / REST API | Go (`nowline-api`) | Cannot import the JS kernel (Go-only, single sanctioned subprocess). Achieves byte-identity structurally by shelling out to the **same pinned `nowline` CLI binary** that uses the kernel. Owned by [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). |
+| Nowline Pro MCP / REST API | Go (`nowline-api`) | Cannot import the JS kernel (Go-only, single sanctioned subprocess). Achieves byte-identity structurally by shelling out to the **same pinned `nowline` CLI binary** that uses the kernel. Owned by [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). |
 
 The cloud surface is the one deliberate exception to "import the kernel": its
 hard architectural rule is Go-everywhere with `nowline` as the only
@@ -257,4 +257,4 @@ and it is clearly labelled as such in [`specs/ide.md`](./ide.md).
 - OSS MCP in-process surface: [`mcp.md`](./mcp.md)
 - Font resolution chain: `packages/export-core/src/fonts/resolve.ts`
 - Web app surfaces: [`lolay/nowline-app/specs/export-determinism.md`](https://github.com/lolay/nowline-app/blob/main/specs/export-determinism.md)
-- Cloud MCP / API surfaces: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md)
+- Nowline Pro MCP / API surfaces: [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md)
