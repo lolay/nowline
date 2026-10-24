@@ -10,20 +10,29 @@ const repoRoot = path.resolve(process.cwd(), '..', '..');
 const longPath = path.join(repoRoot, 'examples', 'long.nowline');
 
 const BUDGET_MS = 100;
-// Shared CI runners (Windows especially) occasionally stall a single call past
-// the budget; the median of several warm runs ignores one slow sample while a
-// real regression still moves every sample and fails.
-const SAMPLES = 5;
+// The budget is checked against the fastest of several warm runs, not a
+// typical one. Everything that perturbs a single run (another job on a shared
+// CI runner, a GC pause, V8 still tiering the layout code up to optimized
+// machine code) only adds time; nothing makes a run faster than the code
+// allows. So the fastest sample is the best estimate of the code's own cost,
+// and a median can sit at the budget on a busy macOS runner while the code is
+// well inside it. A real regression is different: layout is deterministic, so
+// added work slows every run, the fastest one included, and the test still
+// fails. Fifteen samples give the runner room for a quiet moment and carry
+// the later samples past V8's tier-up, which the first few are still in.
+const SAMPLES = 15;
 
-async function medianMs(fn: () => unknown): Promise<number> {
+async function timeRuns(fn: () => unknown): Promise<{ fastestMs: number; samplesMs: string }> {
     const samples: number[] = [];
     for (let i = 0; i < SAMPLES; i++) {
         const started = performance.now();
         await fn();
         samples.push(performance.now() - started);
     }
-    samples.sort((a, b) => a - b);
-    return samples[Math.floor(SAMPLES / 2)];
+    return {
+        fastestMs: Math.min(...samples),
+        samplesMs: samples.map((ms) => ms.toFixed(1)).join(', '),
+    };
 }
 
 describe('performance', () => {
@@ -41,12 +50,16 @@ describe('performance', () => {
         const model = layoutRoadmap(doc.parseResult.value, resolved, { theme: 'light' });
         await renderSvg(model);
 
-        const layoutMs = await medianMs(() =>
+        const layout = await timeRuns(() =>
             layoutRoadmap(doc.parseResult.value, resolved, { theme: 'light' }),
         );
-        expect(layoutMs).toBeLessThan(BUDGET_MS);
+        expect(layout.fastestMs, `layout samples (ms): ${layout.samplesMs}`).toBeLessThan(
+            BUDGET_MS,
+        );
 
-        const renderMs = await medianMs(() => renderSvg(model));
-        expect(renderMs).toBeLessThan(BUDGET_MS);
+        const render = await timeRuns(() => renderSvg(model));
+        expect(render.fastestMs, `render samples (ms): ${render.samplesMs}`).toBeLessThan(
+            BUDGET_MS,
+        );
     });
 });
