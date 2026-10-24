@@ -21,7 +21,7 @@ copilot plugin marketplace add lolay/nowline
 copilot plugin install nowline@nowline
 ```
 
-**Codex:** `codex plugin marketplace add lolay/nowline`, then `codex plugin add nowline@nowline`. Codex starts plugin servers in the plugin's install folder rather than your project, so file tools won't see your roadmaps; until that changes, register the server with `nowline --mcp-install codex` instead.
+**Codex:** `codex plugin marketplace add lolay/nowline`, then `codex plugin add nowline@nowline`. Codex starts plugin servers in the plugin's install folder rather than your project, and doesn't send the MCP roots the server would otherwise use to find your project, so file tools won't see your roadmaps. Register the server with `nowline --mcp-install codex` instead.
 
 **Everything else** (Claude Desktop, Cursor, VS Code, Gemini CLI, Windsurf, Zed, Goose, and more): see [`specs/mcp.md` § Harness coverage](../../specs/mcp.md#harness-coverage-oss-tier-only), or run `nowline --mcp-install` with the CLI installed.
 

@@ -1,5 +1,5 @@
 ```release-note:added
-Agent plugin for the MCP server: this repository is now a plugin marketplace, so Claude Code users can run `/plugin install nowline --marketplace lolay/nowline` (GitHub Copilot CLI and Codex read the same marketplace).
+Agent plugin for the MCP server: this repository is now a plugin marketplace, so Claude Code users can run `/plugin install nowline --marketplace lolay/nowline` (GitHub Copilot CLI and Codex read the same marketplace). In Codex, register the server with `nowline --mcp-install codex` instead: Codex starts plugin servers in its plugin cache and doesn't send MCP roots, so the plugin's file tools can't find your project.
 ```
 
 ```release-note:fixed
