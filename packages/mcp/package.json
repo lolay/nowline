@@ -1,7 +1,7 @@
 {
     "name": "@nowline/mcp",
     "mcpName": "io.nowline/nowline",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "description": "Nowline MCP server — lets AI agents create, edit, and render your roadmaps.",
     "license": "Apache-2.0",
     "engines": {

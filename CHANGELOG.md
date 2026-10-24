@@ -4,6 +4,20 @@ All notable changes to Nowline are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Don't edit this file in a PR: add a fragment to [`.changelog/`](./.changelog/README.md), and the release cut folds every pending fragment into a new `## [X.Y.Z]` section (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)). The `## [Unreleased]` section below predates fragments; the next release folds it in and drops the heading.
 
+## [0.10.0] - 2026-10-24
+
+### Added
+
+- Agent plugin for the MCP server: this repository is now a plugin marketplace, so Claude Code users can run `/plugin install nowline --marketplace lolay/nowline` (GitHub Copilot CLI and Codex read the same marketplace). In Codex, register the server with `nowline --mcp-install codex` instead: Codex starts plugin servers in its plugin cache and doesn't send MCP roots, so the plugin's file tools can't find your project.
+
+### Changed
+
+- MCP server: without `--root`, `@nowline/mcp` and `nowline --mcp` now resolve file paths against the roots the client advertises over MCP (relative paths against the first root, every root allowed) and follow `notifications/roots/list_changed`, falling back to the working directory when the client has no roots.
+
+### Fixed
+
+- `gemini-extension.json` reports the current release version; it had stayed at 0.8.5.
+
 ## [0.9.0] - 2026-10-23
 
 ### Added
