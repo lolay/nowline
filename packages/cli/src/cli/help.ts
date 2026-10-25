@@ -87,6 +87,14 @@ RENDER OPTIONS
                           is the same in both views.
       --asset-root <dir>  Root for logo / image assets (default: the
                           .nowlinerc assetRoot key, then the input dir).
+      --include-root <dir>
+                          Read includes only from inside <dir>. An absolute
+                          path, a '..' or a symlink that leaves it is error
+                          NL.E0208. Stdin includes resolve against <dir>,
+                          never the cwd; included files are named relative
+                          to it.
+      --no-includes       Read no includes: every include is error NL.E0209.
+                          For validating untrusted source.
       --locale <bcp47>    BCP-47 locale (e.g. fr, fr-CA) for CLI message
                           output (validator diagnostics, --help, errors).
                           Used as a fallback for the rendered drawing only

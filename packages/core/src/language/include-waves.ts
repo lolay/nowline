@@ -77,14 +77,10 @@ export function hasParseErrors(file: NowlineFile): boolean {
 /**
  * `participates(C)` from specs/waves.md §7.1: C declares a roadmap, its
  * resolved content has a swimlane, or it declares waves. A child that failed
- * to parse, or a circular-include stub, never participates.
+ * to parse never participates.
  */
-export function participates(
-    childFile: NowlineFile,
-    childContent: ResolvedContent,
-    isStub: boolean,
-): boolean {
-    if (isStub || hasParseErrors(childFile)) return false;
+export function participates(childFile: NowlineFile, childContent: ResolvedContent): boolean {
+    if (hasParseErrors(childFile)) return false;
     return (
         !!childFile.roadmapDecl || childContent.swimlanes.size > 0 || ownWaves(childFile).length > 0
     );

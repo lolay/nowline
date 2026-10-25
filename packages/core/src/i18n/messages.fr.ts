@@ -12,6 +12,7 @@
 // Les clés manquantes ici font silencieusement repli sur `messages.en.ts`,
 // donc une couverture partielle est sûre.
 
+import type { E0203Args, E0207Args, E0208Args } from './include-message-types.js';
 import type { MessageBundle } from './index.js';
 import type {
     E0202Args,
@@ -201,6 +202,51 @@ export const messages: MessageBundle = {
                 return `La vague ${q(a.id)} dans ${q(a.path)} ${floorText(a.childFloor)}, mais la vague ${q(a.id)} de ce fichier ${floorText(a.parentFloor)}. Une vague doit avoir la même borne de départ dans chaque roadmap incluse.`;
         }
     },
+    'NL.E0203': (a: E0203Args) => {
+        switch (a.reason) {
+            case 'not-found':
+                return `Impossible de lire l'include ${q(a.path)}\u00A0: fichier introuvable.`;
+            case 'is-directory':
+                return `Impossible de lire l'include ${q(a.path)}\u00A0: c'est un répertoire.`;
+            case 'permission-denied':
+                return `Impossible de lire l'include ${q(a.path)}\u00A0: permission refusée.`;
+            case 'not-nowline':
+                return `Impossible de lire l'include ${q(a.path)}\u00A0: seuls les fichiers .nowline peuvent être inclus.`;
+            case 'unreadable':
+                return a.detail
+                    ? `Impossible de lire l'include ${q(a.path)}\u00A0: ${a.detail}`
+                    : `Impossible de lire l'include ${q(a.path)}.`;
+        }
+    },
+    'NL.E0204': (a: { path: string; chain: string }) =>
+        `Include circulaire\u00A0: ${q(a.path)} est déjà en cours d'inclusion (${a.chain}).`,
+    'NL.E0205': (a: { path: string }) =>
+        `Include ${q(a.path)} en double. Incluez chaque fichier une seule fois.`,
+    'NL.E0206': (a: { path: string }) =>
+        `Impossible d'isoler ${q(a.path)}\u00A0: il ne déclare aucune roadmap.`,
+    'NL.E0207': (a: E0207Args) => {
+        if (a.parentStart && a.childStart) {
+            return `L'include ${q(a.path)} déclare start:${a.childStart}, qui ne correspond pas au start:${a.parentStart} de ce fichier. Les deux fichiers doivent déclarer la même date de début, ou aucun des deux.`;
+        }
+        if (a.parentStart) {
+            return `L'include ${q(a.path)} n'a pas de start:, mais ce fichier déclare start:${a.parentStart}. Les deux fichiers doivent déclarer la même date de début, ou aucun des deux.`;
+        }
+        return `L'include ${q(a.path)} déclare start:${a.childStart}, mais ce fichier n'a pas de start:. Les deux fichiers doivent déclarer la même date de début, ou aucun des deux.`;
+    },
+    'NL.E0208': (a: E0208Args) => {
+        switch (a.reason) {
+            case 'absolute':
+                return `L'include ${q(a.path)} est un chemin absolu. Avec une racine d'include, un include doit être un chemin relatif à l'intérieur de celle-ci.`;
+            case 'parent':
+                return `L'include ${q(a.path)} se résout hors de la racine d'include.`;
+            case 'symlink':
+                return `L'include ${q(a.path)} se résout hors de la racine d'include par un lien symbolique.`;
+        }
+    },
+    'NL.E0209': (a: { path: string }) =>
+        `Les includes ne sont pas pris en charge dans ce contexte\u00A0: ${q(a.path)} n'a pas été lu.`,
+    'NL.E0210': (a: { path: string; max: number }) =>
+        `L'include ${q(a.path)} dépasse ${a.max} niveaux d'inclusion. Aplatissez la chaîne d'includes.`,
 
     // Identifiant
     'NL.E0300': (a: { name: string; location: string }) =>

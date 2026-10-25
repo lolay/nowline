@@ -792,52 +792,58 @@ describeBuilt('render: include diagnostics', () => {
         });
     });
 
-    it('REGRESSION: a missing include keeps exit 3 and the same message', async () => {
+    // REGRESSION: a missing include was exit 3 ("output error") with the OS
+    // message, which named the absolute path. It is a source problem.
+    it('REGRESSION: a missing include is exit 1 with NL.E0203 on the include line', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'parent.nowline');
             await fs.writeFile(
                 source,
                 'include "./missing.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w\n',
             );
-            for (const extra of [[], ['--diagnostic-format', 'json']]) {
-                const r = await runCliBuilt([source, '-o', '-', ...extra], {
-                    cwd: dir,
-                    env: NO_LOCALE_ENV,
-                });
-                expect(r.exitCode).toBe(3);
-                expect(r.stdout).toBe('');
-                // Captured from the CLI before wave diagnostics were routed.
-                expect(r.stderr).toBe(
-                    `nowline: svg export failed: @nowline/export: include error in ${source}: ` +
-                        `Could not read include "./missing.nowline": ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'\n`,
-                );
-            }
+            const text = await runCliBuilt([source, '-o', '-'], { cwd: dir, env: NO_LOCALE_ENV });
+            expect(text.exitCode).toBe(1);
+            expect(text.stdout).toBe('');
+            expect(text.stderr).toContain(
+                `${source}:1:9 error: Cannot read include "./missing.nowline": file not found.`,
+            );
+            expect(text.stderr).not.toContain('export failed');
+
+            const json = await runCliBuilt([source, '-o', '-', '--diagnostic-format', 'json'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(json.exitCode).toBe(1);
+            expect(JSON.parse(json.stderr).diagnostics).toEqual([
+                {
+                    file: source,
+                    line: 1,
+                    column: 9,
+                    severity: 'error',
+                    code: 'NL.E0203',
+                    message: 'Cannot read include "./missing.nowline": file not found.',
+                    span: { start: { line: 1, column: 9 }, end: { line: 1, column: 28 } },
+                },
+            ]);
         });
     });
 
-    it('REGRESSION: JSON mode reports validator warnings before a missing-include failure', async () => {
+    it('JSON mode reports validator warnings and a missing include in one document', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'parent.nowline');
             await fs.writeFile(
                 source,
                 'include "./missing.nowline"\nroadmap r "R"\nswimlane a "A"\n  item x duration:1w sizee:l\n',
             );
-            const args = [source, '-o', '-', '--diagnostic-format', 'json'];
-            // Reference: the same parent with the include present reports
-            // only the validator's warnings document.
-            await fs.writeFile(path.join(dir, 'missing.nowline'), 'swimlane c "C"\n');
-            const ok = await runCliBuilt(args, { cwd: dir, env: NO_LOCALE_ENV });
-            expect(ok.exitCode).toBe(0);
-            expect(JSON.parse(ok.stderr).diagnostics.map((d: { code: string }) => d.code)).toEqual([
+            const r = await runCliBuilt([source, '-o', '-', '--diagnostic-format', 'json'], {
+                cwd: dir,
+                env: NO_LOCALE_ENV,
+            });
+            expect(r.exitCode).toBe(1);
+            expect(JSON.parse(r.stderr).diagnostics.map((d: { code: string }) => d.code)).toEqual([
                 'NL.W0700',
+                'NL.E0203',
             ]);
-            await fs.rm(path.join(dir, 'missing.nowline'));
-            const r = await runCliBuilt(args, { cwd: dir, env: NO_LOCALE_ENV });
-            expect(r.exitCode).toBe(3);
-            expect(r.stderr).toBe(
-                `${ok.stderr}nowline: svg export failed: @nowline/export: include error in ${source}: ` +
-                    `Could not read include "./missing.nowline": ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'\n`,
-            );
         });
     });
 

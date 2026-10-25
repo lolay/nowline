@@ -77,6 +77,15 @@ describe('parseArgv — flags and short aliases', () => {
         expect(parseArgv(['foo.nowline']).nonWorking).toBeUndefined();
     });
 
+    it('--include-root and --no-includes map to includeRoot and noIncludes', () => {
+        const rooted = parseArgv(['-', '--include-root', 'roadmaps']);
+        expect(rooted.includeRoot).toBe('roadmaps');
+        expect(rooted.noIncludes).toBe(false);
+        const off = parseArgv(['-', '--no-includes']);
+        expect(off.includeRoot).toBeUndefined();
+        expect(off.noIncludes).toBe(true);
+    });
+
     it('-v is verbose, -q is quiet, -V is version', () => {
         expect(parseArgv(['foo.nowline', '-v']).logLevel).toBe('verbose');
         expect(parseArgv(['foo.nowline', '-q']).logLevel).toBe('quiet');
@@ -93,6 +102,19 @@ describe('parseArgv — mutual exclusivity', () => {
             expect(err).toBeInstanceOf(CliError);
             expect((err as CliError).exitCode).toBe(ExitCode.InputError);
             expect((err as CliError).message).toMatch(/verbose.*quiet|quiet.*verbose/i);
+        }
+    });
+
+    it('--no-includes and --include-root are mutually exclusive', () => {
+        try {
+            parseArgv(['-', '--no-includes', '--include-root', '.']);
+            expect.fail('should have thrown');
+        } catch (err) {
+            expect(err).toBeInstanceOf(CliError);
+            expect((err as CliError).exitCode).toBe(ExitCode.InputError);
+            expect((err as CliError).message).toBe(
+                'nowline: --no-includes and --include-root are mutually exclusive.',
+            );
         }
     });
 

@@ -42,6 +42,14 @@ export type MessageCode =
     | 'NL.E0200' // invalid-include-mode
     | 'NL.E0201' // duplicate-include-option
     | 'NL.E0202' // include-wave-agreement
+    | 'NL.E0203' // include-unreadable
+    | 'NL.E0204' // include-circular
+    | 'NL.E0205' // include-duplicate
+    | 'NL.E0206' // include-isolate-no-roadmap
+    | 'NL.E0207' // include-start-mismatch
+    | 'NL.E0208' // include-outside-root
+    | 'NL.E0209' // includes-disabled
+    | 'NL.E0210' // include-too-deep
 
     // Identifier (NL.E0300–E0399)
     | 'NL.E0300' // duplicate-identifier
@@ -150,6 +158,14 @@ export const ALL_CODES: ReadonlyArray<MessageCode> = [
     'NL.E0200',
     'NL.E0201',
     'NL.E0202',
+    'NL.E0203',
+    'NL.E0204',
+    'NL.E0205',
+    'NL.E0206',
+    'NL.E0207',
+    'NL.E0208',
+    'NL.E0209',
+    'NL.E0210',
     'NL.E0300',
     'NL.E0301',
     'NL.E0302',

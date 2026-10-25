@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import type { ResolveDiagnostic } from '@nowline/core';
+import type { IncludePolicy, ResolveDiagnostic } from '@nowline/core';
 import {
     acceptStagedRoadmap,
     type ExportFormat,
@@ -20,6 +20,7 @@ import {
     type OutputFormat,
     resolveFormat,
 } from '../cli/formats.js';
+import { resolveIncludeSetup } from '../cli/include-policy.js';
 import { type PdfOrientation, resolveCliOptions } from '../cli/options.js';
 import { resolveRenderOutputPath } from '../cli/output-path.js';
 import { parseNowlineJson } from '../convert/parse-json.js';
@@ -95,6 +96,7 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
     const inputFormat = resolveInputFormat(args.positional, args.inputFormat);
 
     const input = await readInput(args.positional, { cwd });
+    const includes = await resolveIncludeSetup(args, input.isStdin ? undefined : input.path, cwd);
 
     const resolved = resolveLocaleOverride({
         flag: args.locale,
@@ -110,8 +112,10 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         inputFormat,
         contents: input.contents,
         displayPath: input.displayPath,
-        absInputPath: input.isStdin ? path.resolve(cwd, 'stdin.nowline') : input.path,
+        absInputPath: includes.inputPath,
         isStdin: input.isStdin,
+        includePolicy: includes.policy,
+        includeRoot: includes.root,
         theme: cliOptions.surface.theme,
         today: cliOptions.surface.today,
         width: cliOptions.surface.width,
@@ -200,6 +204,9 @@ interface ProduceArgs {
     displayPath: string;
     absInputPath: string;
     isStdin: boolean;
+    includePolicy?: IncludePolicy;
+    /** `--include-root` as a real path: included files are named relative to it. */
+    includeRoot?: string;
     theme: ThemeName;
     today?: Date;
     width?: number;
@@ -330,11 +337,13 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
 }
 
 /**
- * How an included file is named in diagnostics: relative to the input's
- * display path, so `examples/a.nowline` including `./teams/b.nowline` prints
- * `examples/teams/b.nowline` (absolute when the input was given absolute).
+ * How an included file is named in diagnostics: relative to the include root
+ * when one is set, else to the input's display path, so `examples/a.nowline`
+ * including `./teams/b.nowline` prints `examples/teams/b.nowline` (absolute
+ * when the input was given absolute).
  */
 function includeDisplayPath(absPath: string, args: ProduceArgs): string {
+    if (args.includeRoot) return path.relative(args.includeRoot, absPath);
     const rel = path.relative(path.dirname(args.absInputPath), absPath);
     if (path.isAbsolute(rel)) return rel;
     const base = args.isStdin ? '' : path.dirname(args.displayPath);
@@ -485,6 +494,7 @@ async function parseAndValidate(
             stage = await stageForExport(contents, inputs, host, {
                 document: result.document,
                 services: getServices(),
+                includePolicy: args.includePolicy,
             });
         } catch (err) {
             stageFailure = err;

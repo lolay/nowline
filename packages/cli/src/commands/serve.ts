@@ -5,6 +5,7 @@ import { isRoutedResolveDiagnostic } from '@nowline/core';
 import type { ThemeName } from '@nowline/layout';
 import { renderSvg, stageRoadmap } from '@nowline/renderer';
 import type { ParsedArgs } from '../cli/args.js';
+import { resolveIncludeSetup } from '../cli/include-policy.js';
 import { resolveCliOptions } from '../cli/options.js';
 import { getServices, parseSource } from '../core/parse.js';
 import {
@@ -76,12 +77,15 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
     const locale = resolvedLocale.tag;
     const opLocale = operatorLocale(resolvedLocale);
 
-    const inputPath = path.resolve(cwd, args.positional);
+    const givenPath = path.resolve(cwd, args.positional);
     try {
-        await fs.access(inputPath);
+        await fs.access(givenPath);
     } catch {
         throw new CliError(ExitCode.InputError, `nowline: file not found: ${args.positional}`);
     }
+    // Under --include-root the input is its real path, which the include
+    // root is compared against.
+    const { policy: includePolicy, inputPath } = await resolveIncludeSetup(args, givenPath, cwd);
 
     // `--asset-root`, else the rc `assetRoot` (relative to the `.nowlinerc`), else
     // the input's directory.
@@ -131,6 +135,7 @@ export async function serveHandler(options: ServeHandlerOptions): Promise<void> 
                 assetResolver,
                 document: parse.document,
                 layout: { theme, today, locale, width, nonWorking },
+                includePolicy,
             });
             if (stage.kind === 'invalid') {
                 // The parse above found no errors, so the stage cannot disagree.
