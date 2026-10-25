@@ -55,9 +55,9 @@ There are two ways to trigger a release; the dispatch UI is the default.
 This kicks off the `cut-release` job, which:
 
 1. Checks out `main` using `RELEASE_TAG_PAT` (a user-scoped PAT — `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point).
-2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer, and to sync that version into the tracked MCP metadata (`packages/mcp/manifest.json` for the `.mcpb`, `packages/mcp/server.json` for the MCP registry) via `scripts/sync-mcp-metadata.mjs`.
+2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer, and to sync that version into the tracked MCP metadata (`packages/mcp/manifest.json` for the `.mcpb`, `packages/mcp/server.json` for the MCP registry, `gemini-extension.json`, and the two plugin manifests under `plugins/nowline/`) via `scripts/sync-mcp-metadata.mjs`.
 3. Runs `make release-changelog VERSION=<version>` (`python3 scripts/changelog.py release <version>`) to fold every fragment in `.changelog/` and `packages/vscode-extension/.changelog/` into a new `## [X.Y.Z] - YYYY-MM-DD` section of the `CHANGELOG.md` beside it, and delete the fragments.
-4. Commits the bump (package manifests plus the two MCP metadata files), the changelog sections and the fragment deletions as `release vX.Y.Z`.
+4. Runs `make release-commit VERSION=<version>` ([`.github/scripts/release-commit.sh`](../.github/scripts/release-commit.sh)), which commits the bump, the changelog sections and the fragment deletions as `release vX.Y.Z`, then fails if any tracked file is still dirty, so a file the bump rewrote but the commit missed stops the cut before a tag exists. [`scripts/test/release-cut.test.mjs`](../scripts/test/release-cut.test.mjs) dry-runs steps 2 to 4 in a throwaway worktree on every `make test`, so the same drift fails the PR that introduces it (v0.10.0 was first tagged without the plugin manifests this way).
 5. Tags `vX.Y.Z`.
 6. Pushes both the commit and the tag to `main`.
 
@@ -70,7 +70,7 @@ If the dispatch flow is unusable (e.g. PAT expired), you can do the same thing l
 ```bash
 node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version, syncs MCP metadata
 make release-changelog VERSION=X.Y.Z               # folds .changelog/ fragments, deletes them
-git commit -am "release vX.Y.Z"
+make release-commit VERSION=X.Y.Z                # commits as `release vX.Y.Z`, fails on anything left out
 git tag vX.Y.Z
 git push origin main
 git push origin vX.Y.Z
@@ -163,6 +163,8 @@ The matrix uses `fail-fast: false` so a flaky npm publish does not cancel an in-
 ### `publish-mcp`
 
 Defined in [`publish-mcp.yml`](./.github/workflows/publish-mcp.yml). Reusable workflow invoked from `release.yml` with `needs: [build, publish]` so the MCP registry pointer is never pushed for a half-failed release or before npm is live. A thin standalone caller ([`publish-mcp-standalone.yml`](./.github/workflows/publish-mcp-standalone.yml)) reuses the same implementation for maintainer re-runs.
+
+Called from `release.yml`, the job downloads `nowline.mcpb` from the current run. Called from the standalone workflow, it uses the newest completed tag-push Release run that still holds the artifact, so a release run that failed after its build phase can still be published from; failing that, it falls back to the `.mcpb` attached to the GitHub Release.
 
 The job checks out `refs/tags/v$VERSION` rather than the caller's ref, so a standalone dispatch from `main` for an older version stamps `server.json` from that tag's `packages/mcp/package.json` (the job fails fast if the two disagree). Ordered steps inside `publish-mcp.yml`:
 
