@@ -42,14 +42,31 @@ jobs:
           version="${VERSION_INPUT#v}"
           test -n "$version"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
-          # Resolve the run that built this tag's artifacts. When called from
-          # release.yml the artifact lives in the current run; when called
-          # from publish-mcp-standalone.yml it lives in the tag's completed
-          # Release run, which download-artifact can only reach with an
-          # explicit run-id. Tag-push runs report the tag as their branch.
-          run_id="$(gh run list --workflow release.yml --event push \
-            --branch "v${version}" --json databaseId,status \
-            --jq '[.[] | select(.status=="completed")][0].databaseId // empty')"
+          # Resolve the run that built this tag's artifacts.
+          if [ "${GITHUB_EVENT_NAME}" = push ]; then
+            # Called from release.yml on the tag push: the artifact is in this
+            # run. A lookup would find an earlier completed run for the same
+            # tag instead; the v0.10.0 re-tag picked its failed first run,
+            # which never built a .mcpb.
+            run_id="${GITHUB_RUN_ID}"
+          else
+            # Called from publish-mcp-standalone.yml: the newest completed
+            # tag-push Release run still holding nowline.mcpb, which
+            # download-artifact can only reach with an explicit run-id. A run
+            # that failed after its build phase still counts. Tag-push runs
+            # report the tag as their branch.
+            run_id=""
+            for id in $(gh run list --workflow release.yml --event push \
+                --branch "v${version}" --json databaseId,status \
+                --jq '.[] | select(.status=="completed") | .databaseId'); do
+              live="$(gh api "repos/${GH_REPO}/actions/runs/${id}/artifacts?name=nowline.mcpb" \
+                --jq '[.artifacts[] | select(.expired | not)] | length')"
+              if [ "${live}" != 0 ]; then
+                run_id="${id}"
+                break
+              fi
+            done
+          fi
           echo "artifact_run_id=${run_id:-${GITHUB_RUN_ID}}" >> "$GITHUB_OUTPUT"
 
       # Pin the job to the released tree, not the caller's ref. A

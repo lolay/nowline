@@ -29,7 +29,7 @@ SHELL := bash
         gallery gallery-collect gallery-publish gallery-serve gallery-e2e \
         lint-workflows lint-man bundle-size gh-runs-list gh-runs-watch gh-runs-status \
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
-        compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog release-notes \
+        compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog release-commit release-notes \
         changelog-check changelog-preview \
         publish-npm publish-vscode publish-cdn publish-mcp-registry
 
@@ -312,6 +312,11 @@ snapshot-version: ## [pkg] Compute and write 0.0.0-dev.<ts>.g<sha> to every pack
 
 release-changelog: ## [pkg] Fold .changelog/ fragments into a dated [X.Y.Z] section in both CHANGELOGs (VERSION=X.Y.Z)
 	@python3 scripts/changelog.py release $(VERSION)
+
+# Runs after `bump` and `release-changelog`; fails if the commit leaves any
+# tracked file dirty. scripts/test/release-cut.test.mjs dry-runs all three.
+release-commit: ## [pkg] Commit the bump and changelog promotion as `release vX.Y.Z` (VERSION=X.Y.Z)
+	@bash .github/scripts/release-commit.sh $(VERSION)
 
 # LINK_BASE turns the section's relative links into absolute ones; release.yml
 # passes the tag's blob URL so ./specs/ links work on the release page.
