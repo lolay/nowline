@@ -119,6 +119,24 @@ describeBuilt('--dry-run machine-readable diagnostics', () => {
         expect(doc.diagnostics[0].suggestion).toBe('size');
     });
 
+    // Regression: the E1101 message renders `wave:build ("Build")`, and the
+    // suggestion used to be regex-matched out of it as `wave:build (`.
+    it('suggests the bare wave id for a misspelled wave: in every locale', async () => {
+        const stdin =
+            'nowline v1\n\nroadmap r "R" start:2026-01-05\n\nwave plan "Plan"\nwave build "Build"\n' +
+            'swimlane a "A"\n  item one "One" duration:1w wave:bild\n';
+        for (const locale of ['en', 'fr']) {
+            const r = await runCliBuilt(['-', '--dry-run', '--format=json', `--locale=${locale}`], {
+                stdin,
+            });
+            expect(r.exitCode).toBe(1);
+            const doc = JSON.parse(r.stderr);
+            expect(doc.diagnostics).toHaveLength(1);
+            expect(doc.diagnostics[0].code).toBe('NL.E1101');
+            expect(doc.diagnostics[0].suggestion).toBe('build');
+        }
+    });
+
     it('--diagnostic-format json works without --format=json', async () => {
         const r = await runCliBuilt(['-', '--dry-run', '--diagnostic-format', 'json'], {
             stdin: 'roadmap r\nswimlane s\n  item x\n',

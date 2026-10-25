@@ -1,11 +1,11 @@
 import {
-    extractSuggestion,
     inferCodeFromMessage,
     type LangiumLikeDiagnostic,
     type LexerErrorLike,
     type ParserErrorLike,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
+    resolveDiagnosticSuggestion,
 } from '@nowline/core';
 import type { CliDiagnostic, DiagnosticSeverity, LocalizedMessageData } from './model.js';
 
@@ -31,7 +31,7 @@ export function adaptLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string
                   },
               }
             : undefined,
-        suggestion: extractSuggestion(diag.message),
+        suggestion: resolveDiagnosticSuggestion(diag.message, diag.data),
         // The CLI keeps the full { code, args } so formatDiagnostics can
         // re-render the message in the operator's locale at print time.
         data: extractMessageData(diag.data),
@@ -109,6 +109,7 @@ export function adaptResolveDiagnostic(
     // checked on its own.
     if (diag.syntax?.origin === 'lexer') return adaptLexerError(diag.syntax.error, file);
     if (diag.syntax?.origin === 'parser') return adaptParserError(diag.syntax.error, file);
+    const data = diag.code === undefined ? undefined : { code: diag.code, args: diag.args ?? [] };
     return {
         file,
         ...resolveLocation(diag, contents),
@@ -116,8 +117,8 @@ export function adaptResolveDiagnostic(
         // WV8 is uncoded; label it the way the validator's copy is labelled.
         code: diag.code ?? inferCodeFromMessage(diag.message),
         message: diag.message,
-        suggestion: extractSuggestion(diag.message),
-        data: diag.code === undefined ? undefined : { code: diag.code, args: diag.args ?? [] },
+        suggestion: resolveDiagnosticSuggestion(diag.message, data),
+        data,
     };
 }
 

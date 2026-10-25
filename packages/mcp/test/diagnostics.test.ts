@@ -29,4 +29,23 @@ describe('resolveDiagnosticToMcp', () => {
     it('falls back to column 1 on the line without a range', () => {
         expect(resolveDiagnosticToMcp(diag)).toMatchObject({ line: 8, column: 1 });
     });
+
+    it('suggests the bare wave id for a routed NL.E1101', () => {
+        const e1101 = {
+            reason: 'unknown' as const,
+            value: 'bild',
+            declared: ['build'],
+            suggestion: { id: 'build', title: 'Build' },
+        };
+        const routed: ResolveDiagnostic = {
+            severity: 'error',
+            message: tr('en-US', 'NL.E1101', e1101),
+            sourcePath: '/root/child.nowline',
+            line: 3,
+            code: 'NL.E1101',
+            args: [e1101],
+            rule: 'wave',
+        };
+        expect(resolveDiagnosticToMcp(routed).suggestion).toBe('build');
+    });
 });

@@ -3,12 +3,12 @@
 import {
     collectDocumentDiagnostics,
     createNowlineServices,
-    extractSuggestion,
     inferCodeFromMessage,
     isRoutedResolveDiagnostic,
     type NowlineFile,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
+    resolveDiagnosticSuggestion,
 } from '@nowline/core';
 import {
     type HostEnv,
@@ -93,7 +93,7 @@ export function collectMcpDiagnostics(
                 severity,
                 code: resolveDiagnosticCode(diag),
                 message: diag.message,
-                suggestion: extractSuggestion(diag.message),
+                suggestion: resolveDiagnosticSuggestion(diag.message, diag.data),
             });
         }
     }
@@ -125,7 +125,10 @@ export function resolveDiagnosticToMcp(diag: ResolveDiagnostic): McpDiagnostic {
             message: diag.message,
         };
     }
-    const suggestion = extractSuggestion(diag.message);
+    const suggestion = resolveDiagnosticSuggestion(
+        diag.message,
+        diag.code === undefined ? undefined : { code: diag.code, args: diag.args ?? [] },
+    );
     return {
         file: diag.sourcePath,
         line: (diag.range?.start.line ?? diag.line ?? 0) + 1,

@@ -6,6 +6,7 @@
 // output shapes (CliDiagnostic, DiagnosticRow, …).
 
 import type { LangiumDocument } from 'langium';
+import type { MessageArgs, MessageCode } from '../i18n/index.js';
 
 /**
  * Minimal LSP-style diagnostic shape. Langium re-exports
@@ -107,10 +108,50 @@ export function collectDocumentDiagnostics(doc: LangiumDocument): RawDiagnostic[
 
 const DID_YOU_MEAN_RE = /did you mean ['"]?([^'"?]+)['"]?\??/i;
 
-/** Extract a `did you mean "X"` suggestion target from a message, if present. */
+/**
+ * Extract a `did you mean "X"` suggestion target from a message, if present.
+ * Only reliable for the plain `Did you mean "X"?` phrasing; prefer
+ * {@link resolveDiagnosticSuggestion}, which reads a coded diagnostic's
+ * suggestion from its message args.
+ */
 export function extractSuggestion(message: string): string | undefined {
     const match = message.match(DID_YOU_MEAN_RE);
     return match ? match[1].trim() : undefined;
+}
+
+// The suggestion each "did you mean" template renders, read from the same
+// args. The value is the bare token that replaces the offending one in the
+// source (a property key, a wave id), never the rendered phrase: the E1101
+// template writes `wave:build ("Build")`, which no regex should have to undo.
+// A template that gains a "did you mean" needs an entry here.
+const SUGGESTION_FROM_ARGS: {
+    [K in MessageCode]?: (...args: MessageArgs<K>) => string | undefined;
+} = {
+    'NL.W0700': (a) => a.suggested || undefined,
+    'NL.E1101': (a) => ('suggestion' in a ? a.suggestion?.id : undefined),
+};
+
+// The suggestion a coded diagnostic's message offers, from the args the
+// message is built from, so it is the same in every locale. Undefined for a
+// code whose message offers none.
+function suggestionFromArgs(code: string, args: readonly unknown[]): string | undefined {
+    const pick = SUGGESTION_FROM_ARGS[code as MessageCode] as
+        | ((...a: readonly unknown[]) => string | undefined)
+        | undefined;
+    return pick?.(...args);
+}
+
+/**
+ * Resolve the `suggestion` shown to users / machine consumers: the token to
+ * put in place of the offending one. A coded diagnostic (`data` carries the
+ * validator's `{ code, args }`) reads it from its args; only an uncoded one
+ * falls back to parsing the message. Shared so the CLI, preview, embed and
+ * MCP server agree.
+ */
+export function resolveDiagnosticSuggestion(message: string, data: unknown): string | undefined {
+    const code = stableValidatorCode(data);
+    if (code === undefined) return extractSuggestion(message);
+    return suggestionFromArgs(code, (data as { args: unknown[] }).args);
 }
 
 /**
