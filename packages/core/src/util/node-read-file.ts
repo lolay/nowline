@@ -9,3 +9,8 @@ export async function nodeReadFile(absPath: string): Promise<string> {
     const fs = await import('node:fs');
     return fs.promises.readFile(absPath, 'utf-8');
 }
+
+export async function nodeRealPath(absPath: string): Promise<string> {
+    const fs = await import('node:fs');
+    return fs.promises.realpath(absPath);
+}

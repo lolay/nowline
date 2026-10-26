@@ -44,12 +44,22 @@ import {
     isWorkingDeclaration,
 } from '../generated/ast.js';
 import type { MessageCode } from '../i18n/codes.js';
-import { basename, dirname, resolve as resolvePath } from '../util/posix-path.js';
+import type { E0203Args, E0208Args } from '../i18n/include-message-types.js';
+import { type MessageArgs, tr } from '../i18n/index.js';
+import {
+    basename,
+    dirname,
+    isAbsolute,
+    isWithin,
+    relative,
+    resolve as resolvePath,
+} from '../util/posix-path.js';
 import { isRealIsoDate } from '../util/props.js';
 import { checkIncludedReferences } from './include-references.js';
 import {
     checkWaveAgreement,
     hasParseErrors,
+    nodeLocation,
     participates,
     runResolverWaveChecks,
     type WaveIncludeEdge,
@@ -66,20 +76,6 @@ function readStartProp(decl: RoadmapDeclaration | undefined): string | undefined
     const prop = decl?.properties.find((p) => p.key === 'start');
     if (!prop?.value || !isRealIsoDate(prop.value)) return undefined;
     return prop.value;
-}
-
-function formatStartMismatch(
-    childRelPath: string,
-    parentStart: string | undefined,
-    childStart: string | undefined,
-): string {
-    if (parentStart && childStart) {
-        return `Included "${childRelPath}" declares start:${childStart}, which doesn't match this file's start:${parentStart}. Both files must declare the same start date, or neither should.`;
-    }
-    if (parentStart) {
-        return `Included "${childRelPath}" has no start:, but this file declares start:${parentStart}. Both files must declare the same start date, or neither should.`;
-    }
-    return `Included "${childRelPath}" declares start:${childStart}, but this file has no start:. Both files must declare the same start date, or neither should.`;
 }
 
 export interface ResolvedConfig {
@@ -160,9 +156,10 @@ export interface ResolveDiagnostic {
      */
     range?: ResolveRange;
     /**
-     * Stable code of a coded diagnostic (the wave rules, specs/waves.md
-     * §7.4, and an included file's unresolved reference, NL.E0302). Absent
-     * on every other resolver diagnostic.
+     * Stable code of a coded diagnostic: every include error (NL.E0203 to
+     * NL.E0210), the wave rules (specs/waves.md §7.4), and an included
+     * file's unresolved reference (NL.E0302). Absent on the shadow
+     * warnings, an included file's syntax error, and WV8.
      */
     code?: MessageCode;
     /** The message arguments as a rest tuple, as `acceptTr` stores them. */
@@ -188,9 +185,9 @@ export type IncludedSyntaxError = Extract<RawDiagnostic, { origin: 'lexer' | 'pa
 
 /**
  * True for a resolver diagnostic that consumers report like a validator
- * diagnostic (file, line, localized, exit 1): a coded one (the wave rules and
- * NL.E0302), one from the wave checks, or an included file's syntax error.
- * Every other resolver diagnostic keeps the include-error path
+ * diagnostic (file, line, localized, exit 1): a coded one (every include
+ * error, the wave rules and NL.E0302), one from the wave checks, or an
+ * included file's syntax error. What is left is the uncoded shadow warnings
  * (specs/waves.md §6.1).
  */
 export function isRoutedResolveDiagnostic(d: ResolveDiagnostic): boolean {
@@ -208,6 +205,11 @@ interface ResolveContext {
     services: NowlineServices;
     /** Absolute path of the root file, whose syntax errors the validator reports. */
     rootAbs: string;
+    policy?: IncludePolicy;
+    /** Resolves symlinks under a `rooted` policy. */
+    realPath: (absPath: string) => Promise<string>;
+    /** What a circular include's chain is shown relative to. */
+    displayBase: string;
     diagnostics: ResolveDiagnostic[];
     resolving: string[];
     processed: Map<string, { config: ResolvedConfig; content: ResolvedContent }>;
@@ -216,8 +218,6 @@ interface ResolveContext {
     files: Map<NowlineFile, string>;
     /** Include edges whose child was read, per including file, in include order. */
     edges: Map<string, WaveIncludeEdge[]>;
-    /** Contents returned for a circular include (they never participate). */
-    stubs: Set<ResolvedContent>;
     /** Children that failed include rule 12 (NL.E0202). */
     failedWaves: Set<string>;
 }
@@ -246,9 +246,33 @@ function emptyContent(): ResolvedContent {
     };
 }
 
+/**
+ * How deep an include chain may go: the root's includes are depth 1. A
+ * deeper include is NL.E0210 and is not read, so a chain the cycle check
+ * cannot see (a symlinked directory that contains itself) still ends.
+ */
+export const MAX_INCLUDE_DEPTH = 16;
+
+/**
+ * Where includes may be read from (specs/dsl.md, Include rules 14 and 15).
+ * Omitted: anywhere the reader reaches, relative to the including file.
+ */
+export type IncludePolicy =
+    /** Every include is NL.E0209 on its line, and nothing is read. */
+    | { kind: 'disabled' }
+    /**
+     * Every include, at any depth, must be a relative path that resolves,
+     * symlinks followed, to a `.nowline` file inside `root`; anything else
+     * is NL.E0208 on its line and is not read. `root` and the root file's
+     * path must be absolute real paths (symlinks already resolved).
+     * `realPath` resolves symlinks; Node's `fs.realpath` by default.
+     */
+    | { kind: 'rooted'; root: string; realPath?: (absPath: string) => Promise<string> };
+
 export interface ResolveIncludesOptions {
     services: NowlineServices;
     readFile?: (absPath: string) => Promise<string>;
+    includePolicy?: IncludePolicy;
 }
 
 export async function resolveIncludes(
@@ -265,17 +289,26 @@ export async function resolveIncludes(
             const { nodeReadFile } = await import('../util/node-read-file.js');
             return nodeReadFile(p);
         });
+    const policy = options.includePolicy;
+    const realPath =
+        (policy?.kind === 'rooted' ? policy.realPath : undefined) ??
+        (async (p: string) => {
+            const { nodeRealPath } = await import('../util/node-read-file.js');
+            return nodeRealPath(p);
+        });
     const absPath = resolvePath('', filePath);
     const ctx: ResolveContext = {
         services: options.services,
         rootAbs: absPath,
+        policy,
+        realPath,
+        displayBase: policy?.kind === 'rooted' ? policy.root : dirname(absPath),
         diagnostics: [],
         resolving: [],
         processed: new Map(),
         readFile,
         files: new Map(),
         edges: new Map(),
-        stubs: new Set(),
         failedWaves: new Set(),
     };
     const { config, content } = await resolveFile(file, absPath, ctx);
@@ -309,17 +342,6 @@ async function resolveFile(
     if (ctx.processed.has(absPath)) {
         return ctx.processed.get(absPath)!;
     }
-    if (ctx.resolving.includes(absPath)) {
-        ctx.diagnostics.push({
-            severity: 'error',
-            message: `Circular include detected: ${[...ctx.resolving, absPath].join(' → ')}`,
-            sourcePath: absPath,
-        });
-        const empty = { config: emptyConfig(), content: emptyContent() };
-        ctx.stubs.add(empty.content);
-        ctx.processed.set(absPath, empty);
-        return empty;
-    }
 
     // Each included file once, in every include mode: a `roadmap:ignore`
     // child's config is still merged (Include rule 13).
@@ -347,18 +369,51 @@ async function resolveFile(
     const seenIncludes = new Set<string>();
     for (const inc of file.includes) {
         const childRelPath = inc.path;
-        const childAbsPath = resolvePath(dirname(absPath), childRelPath);
+        // Every include error is coded, at the path on the include line.
+        const fail = <K extends MessageCode>(code: K, ...args: MessageArgs<K>): void => {
+            ctx.diagnostics.push(includeError(absPath, inc, code, ...args));
+        };
+
+        if (ctx.policy?.kind === 'disabled') {
+            fail('NL.E0209', { path: childRelPath });
+            continue;
+        }
+        const located = await locateInclude(absPath, childRelPath, ctx);
+        if ('refused' in located) {
+            fail('NL.E0208', located.refused);
+            continue;
+        }
+        if ('unreadable' in located) {
+            fail('NL.E0203', located.unreadable);
+            continue;
+        }
+        const childAbsPath = located.absPath;
 
         if (seenIncludes.has(childAbsPath)) {
-            ctx.diagnostics.push({
-                severity: 'error',
-                message: `Duplicate include "${childRelPath}" in ${basename(absPath)}.`,
-                sourcePath: absPath,
-                line: inc.$cstNode?.range.start.line,
-            });
+            fail('NL.E0205', { path: childRelPath });
             continue;
         }
         seenIncludes.add(childAbsPath);
+
+        // Caught before the child is read, so a cycle reads nothing twice.
+        const cycleStart = ctx.resolving.indexOf(childAbsPath);
+        if (cycleStart >= 0) {
+            const chain = [...ctx.resolving.slice(cycleStart), childAbsPath]
+                .map((p) => relative(ctx.displayBase, p))
+                .join(' → ');
+            fail('NL.E0204', { path: childRelPath, chain });
+            continue;
+        }
+        // `resolving` holds the chain down to this file, the root included,
+        // so its length is the child's depth.
+        if (ctx.resolving.length > MAX_INCLUDE_DEPTH) {
+            fail('NL.E0210', { path: childRelPath, max: MAX_INCLUDE_DEPTH });
+            continue;
+        }
+        if (!childAbsPath.endsWith('.nowline')) {
+            fail('NL.E0203', { reason: 'not-nowline', path: childRelPath });
+            continue;
+        }
 
         const configMode = getIncludeMode(inc, 'config') ?? 'merge';
         const roadmapMode = getIncludeMode(inc, 'roadmap') ?? 'merge';
@@ -368,12 +423,7 @@ async function resolveFile(
             const text = await ctx.readFile(childAbsPath);
             childFile = await parseString(ctx.services, text, childAbsPath);
         } catch (err) {
-            ctx.diagnostics.push({
-                severity: 'error',
-                message: `Could not read include "${childRelPath}": ${(err as Error).message}`,
-                sourcePath: absPath,
-                line: inc.$cstNode?.range.start.line,
-            });
+            fail('NL.E0203', unreadableArgs(childRelPath, err));
             continue;
         }
 
@@ -390,7 +440,7 @@ async function resolveFile(
             mode: roadmapMode,
             childFile,
             childContent,
-            participates: participates(childFile, childContent, ctx.stubs.has(childContent)),
+            participates: participates(childFile, childContent),
         });
 
         applyConfigMode(config, childConfig, configMode, childAbsPath, ctx.diagnostics);
@@ -409,12 +459,7 @@ async function resolveFile(
         const isParsed = !hasParseErrors(childFile);
 
         if (isParsed && roadmapMode === 'isolate' && !childContent.roadmap) {
-            ctx.diagnostics.push({
-                severity: 'error',
-                message: `Cannot isolate "${childRelPath}": it has no roadmap declaration.`,
-                sourcePath: absPath,
-                line: inc.$cstNode?.range.start.line,
-            });
+            fail('NL.E0206', { path: childRelPath });
         }
 
         // Non-ignored includes with a child roadmap must agree on start: with the parent.
@@ -424,11 +469,10 @@ async function resolveFile(
             const parentStart = readStartProp(file.roadmapDecl);
             const childStart = readStartProp(childFile.roadmapDecl);
             if (parentStart !== childStart) {
-                ctx.diagnostics.push({
-                    severity: 'error',
-                    message: formatStartMismatch(childRelPath, parentStart, childStart),
-                    sourcePath: absPath,
-                    line: inc.$cstNode?.range.start.line,
+                fail('NL.E0207', {
+                    path: childRelPath,
+                    ...(parentStart ? { parentStart } : {}),
+                    ...(childStart ? { childStart } : {}),
                 });
             }
         }
@@ -448,6 +492,68 @@ async function resolveFile(
     const result = { config, content };
     ctx.processed.set(absPath, result);
     return result;
+}
+
+/** A coded include error at `inc`'s path, in the including file. */
+function includeError<K extends MessageCode>(
+    sourcePath: string,
+    inc: IncludeDeclaration,
+    code: K,
+    ...args: MessageArgs<K>
+): ResolveDiagnostic {
+    return {
+        severity: 'error',
+        message: tr('en-US', code, ...args),
+        sourcePath,
+        ...nodeLocation(inc, 'path'),
+        code,
+        args,
+    };
+}
+
+type IncludeLocation = { absPath: string } | { refused: E0208Args } | { unreadable: E0203Args };
+
+/**
+ * Where `include "<path>"` in `parentAbs` reads from, under the policy.
+ * Unrooted: the path resolved against the parent's directory, as written.
+ * Rooted: an absolute path, or one that leaves the root before or after
+ * symlinks are resolved, is refused; otherwise the real path, so a file
+ * reached through two spellings is one file. Nothing is read here.
+ */
+async function locateInclude(
+    parentAbs: string,
+    path: string,
+    ctx: ResolveContext,
+): Promise<IncludeLocation> {
+    const policy = ctx.policy;
+    if (policy?.kind !== 'rooted') return { absPath: resolvePath(dirname(parentAbs), path) };
+    if (isAbsolute(path)) return { refused: { reason: 'absolute', path } };
+    const lexical = resolvePath(dirname(parentAbs), path);
+    if (!isWithin(policy.root, lexical)) return { refused: { reason: 'parent', path } };
+    let real: string;
+    try {
+        real = await ctx.realPath(lexical);
+    } catch (err) {
+        return { unreadable: unreadableArgs(path, err) };
+    }
+    if (!isWithin(policy.root, real)) return { refused: { reason: 'symlink', path } };
+    return { absPath: real };
+}
+
+/** NL.E0203's reason for a failed read; the OS error's text only when no reason fits. */
+function unreadableArgs(path: string, err: unknown): E0203Args {
+    switch ((err as { code?: unknown } | undefined)?.code) {
+        case 'ENOENT':
+        case 'ENOTDIR':
+            return { reason: 'not-found', path };
+        case 'EISDIR':
+            return { reason: 'is-directory', path };
+        case 'EACCES':
+        case 'EPERM':
+            return { reason: 'permission-denied', path };
+    }
+    const detail = err instanceof Error ? err.message : undefined;
+    return { reason: 'unreadable', path, ...(detail ? { detail } : {}) };
 }
 
 /**

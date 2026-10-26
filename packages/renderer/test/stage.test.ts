@@ -78,7 +78,7 @@ describe('stageRoadmap', () => {
         expect(result.diagnostics.some((d) => d.origin === 'parser')).toBe(true);
     });
 
-    it('lets the first uncoded include error hide the routed ones', async (): Promise<void> => {
+    it('reports an unreadable include with the routed ones: every include error is coded', async (): Promise<void> => {
         const result = await stage(
             WAVE_PARENT.replace(
                 'include "./other.nowline"',
@@ -88,10 +88,11 @@ describe('stageRoadmap', () => {
         );
         expect(result.kind).toBe('include-error');
         if (result.kind !== 'include-error') return;
-        expect(result.legacy?.message).toBe('Could not read include "./missing.nowline": boom');
-        expect(result.routed).toEqual([]);
-        // The hidden routed error is still in the full resolver list.
-        expect(result.resolved.diagnostics.map((d) => d.code)).toContain('NL.E0202');
+        expect(result.legacy).toBeUndefined();
+        expect(result.routed.map((d) => [d.code, d.message])).toEqual([
+            ['NL.E0203', 'Cannot read include "./missing.nowline": boom'],
+            ['NL.E0202', expect.stringContaining('"./other.nowline" declares no waves')],
+        ]);
     });
 
     it('returns the routed errors alone when no uncoded include error occurs', async (): Promise<void> => {
@@ -113,8 +114,10 @@ describe('stageRoadmap', () => {
         expect(result.kind).toBe('staged');
         if (result.kind !== 'staged') return;
         expect(result.resolved.diagnostics.map((d) => d.message)).toEqual([
-            'Could not read include "./other.nowline": boom',
+            'Cannot read include "./other.nowline": boom',
         ]);
+        // Coded, but still the caller's to report: it is not routed.
+        expect(result.routed).toEqual([]);
     });
 
     it('warns on a missing logo and lays out without it', async (): Promise<void> => {

@@ -60,6 +60,14 @@ export interface ParsedArgs {
      */
     nonWorking?: string;
     assetRoot?: string;
+    /**
+     * `--include-root <dir>`: every include must resolve inside this
+     * directory, and a stdin input's includes resolve against it.
+     * Validated by the render and serve commands.
+     */
+    includeRoot?: string;
+    /** `--no-includes`: every `include` is an error and nothing is read. */
+    noIncludes: boolean;
 
     // Format-specific options (m2c)
     pageSize?: string;
@@ -119,6 +127,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             dryRun: false,
             logLevel: 'normal',
             noLinks: false,
+            noIncludes: false,
             strict: false,
             open: false,
             headless: false,
@@ -162,6 +171,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             width: { type: 'string', short: 'w' },
             'non-working': { type: 'string' },
             'asset-root': { type: 'string' },
+            'include-root': { type: 'string' },
+            'no-includes': { type: 'boolean' },
 
             port: { type: 'string', short: 'p' },
             host: { type: 'string' },
@@ -208,6 +219,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             dryRun: false,
             logLevel: 'normal',
             noLinks: false,
+            noIncludes: false,
             strict: false,
             open: false,
             headless: false,
@@ -220,6 +232,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
             dryRun: false,
             logLevel: 'normal',
             noLinks: false,
+            noIncludes: false,
             strict: false,
             open: false,
             headless: false,
@@ -265,6 +278,13 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         throw new CliError(ExitCode.InputError, `nowline: unexpected extra arguments: ${extras}.`);
     }
 
+    if (values['no-includes'] === true && values['include-root'] !== undefined) {
+        throw new CliError(
+            ExitCode.InputError,
+            'nowline: --no-includes and --include-root are mutually exclusive.',
+        );
+    }
+
     const scope = stringOrUndefined(values.scope);
     if (scope !== undefined && scope !== 'user' && scope !== 'project') {
         throw new CliError(
@@ -308,6 +328,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         width: stringOrUndefined(values.width),
         nonWorking: stringOrUndefined(values['non-working']),
         assetRoot: stringOrUndefined(values['asset-root']),
+        includeRoot: stringOrUndefined(values['include-root']),
+        noIncludes: values['no-includes'] === true,
         port: stringOrUndefined(values.port),
         host: stringOrUndefined(values.host),
         open: values.open === true,

@@ -14,6 +14,7 @@
 // per-code argument inference. Coverage of `MessageCode` is enforced by
 // the runtime test in `test/i18n/messages-coverage.test.ts`.
 
+import type { E0203Args, E0207Args, E0208Args } from './include-message-types.js';
 import type {
     E0202Args,
     E1100Args,
@@ -179,6 +180,50 @@ export const messages = {
                 return `Wave "${a.id}" in "${a.path}" ${floorClause(a.childFloor)}, but this file's wave "${a.id}" ${floorClause(a.parentFloor)}. A wave must have the same start floor in every included roadmap.`;
         }
     },
+    'NL.E0203': (a: E0203Args) => {
+        switch (a.reason) {
+            case 'not-found':
+                return `Cannot read include "${a.path}": file not found.`;
+            case 'is-directory':
+                return `Cannot read include "${a.path}": it is a directory.`;
+            case 'permission-denied':
+                return `Cannot read include "${a.path}": permission denied.`;
+            case 'not-nowline':
+                return `Cannot read include "${a.path}": only .nowline files can be included.`;
+            case 'unreadable':
+                return a.detail
+                    ? `Cannot read include "${a.path}": ${a.detail}`
+                    : `Cannot read include "${a.path}".`;
+        }
+    },
+    'NL.E0204': (a: { path: string; chain: string }) =>
+        `Circular include: "${a.path}" is already being included (${a.chain}).`,
+    'NL.E0205': (a: { path: string }) => `Duplicate include "${a.path}". Include each file once.`,
+    'NL.E0206': (a: { path: string }) =>
+        `Cannot isolate "${a.path}": it has no roadmap declaration.`,
+    'NL.E0207': (a: E0207Args) => {
+        if (a.parentStart && a.childStart) {
+            return `Included "${a.path}" declares start:${a.childStart}, which doesn't match this file's start:${a.parentStart}. Both files must declare the same start date, or neither should.`;
+        }
+        if (a.parentStart) {
+            return `Included "${a.path}" has no start:, but this file declares start:${a.parentStart}. Both files must declare the same start date, or neither should.`;
+        }
+        return `Included "${a.path}" declares start:${a.childStart}, but this file has no start:. Both files must declare the same start date, or neither should.`;
+    },
+    'NL.E0208': (a: E0208Args) => {
+        switch (a.reason) {
+            case 'absolute':
+                return `Include "${a.path}" is an absolute path. With an include root, an include must be a relative path inside it.`;
+            case 'parent':
+                return `Include "${a.path}" resolves outside the include root.`;
+            case 'symlink':
+                return `Include "${a.path}" resolves outside the include root through a symbolic link.`;
+        }
+    },
+    'NL.E0209': (a: { path: string }) =>
+        `Includes are not supported in this context: "${a.path}" was not read.`,
+    'NL.E0210': (a: { path: string; max: number }) =>
+        `Include "${a.path}" is more than ${a.max} includes deep. Flatten the include chain.`,
 
     // Identifier
     'NL.E0300': (a: { name: string; location: string }) =>

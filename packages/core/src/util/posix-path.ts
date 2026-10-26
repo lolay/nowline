@@ -1,6 +1,6 @@
 // Browser-safe path helpers used by the include resolver. The set is
-// deliberately narrow: dirname, basename, and resolve(parentDir, relative)
-// — exactly the operations the resolver performs. Keeping these in the
+// deliberately narrow: dirname, basename, resolve(parentDir, relative),
+// relative and isWithin — exactly the operations the resolver performs. Keeping these in the
 // `@nowline/core` source tree (instead of pulling in `pathe` or
 // `path-browserify`) avoids adding an embed-bundle dependency for
 // behaviour that is ~30 lines of code, and keeps Windows / POSIX
@@ -31,7 +31,7 @@ function dominantSep(...paths: string[]): '/' | '\\' {
     return '/';
 }
 
-function isAbsolute(p: string): boolean {
+export function isAbsolute(p: string): boolean {
     if (!p) return false;
     if (p[0] === '/' || p[0] === '\\') return true;
     // Windows drive-letter form: `C:\\…` or `C:/…`.
@@ -91,4 +91,29 @@ function normalize(p: string, sep: '/' | '\\'): string {
         segments.push(seg);
     }
     return prefix + segments.join(sep);
+}
+
+// Both paths absolute; drive letters compare case-insensitively.
+function segmentsOf(p: string): string[] {
+    const normalized = resolve('', p).replace(/\\/g, '/');
+    const drive = /^[A-Za-z]:/.test(normalized) ? normalized.slice(0, 2).toLowerCase() : '';
+    const body = drive ? normalized.slice(2) : normalized;
+    return [drive, ...body.split('/').filter((s) => s !== '')];
+}
+
+/** True when absolute `p` is `dir` or lies below it. Lexical: symlinks are not followed. */
+export function isWithin(dir: string, p: string): boolean {
+    const d = segmentsOf(dir);
+    const t = segmentsOf(p);
+    return d.length <= t.length && d.every((seg, i) => seg === t[i]);
+}
+
+/** The path from absolute `from` (a directory) to absolute `to`, with `/` separators. */
+export function relative(from: string, to: string): string {
+    const f = segmentsOf(from);
+    const t = segmentsOf(to);
+    if (f[0] !== t[0]) return to;
+    let i = 0;
+    while (i < f.length && i < t.length && f[i] === t[i]) i++;
+    return [...f.slice(i).map(() => '..'), ...t.slice(i)].join('/') || '.';
 }

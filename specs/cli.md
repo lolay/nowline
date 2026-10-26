@@ -116,6 +116,10 @@ Render options
                          (default: the `.nowlinerc` `assetRoot` key, then the
                          input file's directory). A relative flag resolves
                          against the working directory. `--serve` takes it too.
+  --include-root <dir>   Read includes only from inside <dir> (see Include
+                         policy). `--serve` takes it too.
+  --no-includes          Read no includes: every `include` is NL.E0209 (see
+                         Include policy). `--serve` takes it too.
 
 Format-specific options
   --page-size <size>     PDF page size: preset (letter | legal | tabloid |
@@ -204,6 +208,7 @@ Options:
 | `--no-links` | off | Drop the link icons from the served SVG, as for render. |
 | `--strict` | off | A render warning, such as a missing logo, is shown as an error instead of a chart, as for render. |
 | `--now`, `--timezone`, `--locale`, `--asset-root` | as for render | Same meaning and validation as for render. `--asset-root` defaults to the `.nowlinerc` `assetRoot`. |
+| `--include-root <dir>`, `--no-includes` | off | Same meaning and validation as for render (see Include policy). |
 
 `--serve` resolves these options exactly as render does (flag, then `.nowlinerc`, then the built-in default) and stages the roadmap through the same function, so the served SVG is the SVG `nowline <input>` writes for the same flags. A bad value is the same usage error (exit 2) at start-up. Page size, orientation, margin, fonts and `--format` do not apply: `--serve` shows SVG only.
 
@@ -374,6 +379,17 @@ Existing files are silently overwritten — matches POSIX redirection (`> file`)
 - Stdin (`-`) defaults to `.nowline`. It is read from file descriptor 0, so pipes, shell redirects (`nowline - < roadmap.nowline`) and here-docs all work. On an interactive terminal where the synchronous read reports EAGAIN, it falls back to reading the stream until Ctrl-D. Empty stdin is an input error (exit 2, `nowline: no input on stdin`).
 - The standard `--` "end of options" marker handles filenames that start with `-`.
 
+### Include policy
+
+By default an `include` resolves against the including file's directory (stdin: the working directory) and may read any `.nowline` file the process can. Two flags restrict that, for a caller that validates source it does not trust, such as a hosted service running `nowline - --dry-run --format=json`. They are mutually exclusive (exit 2).
+
+- `--no-includes`: every `include`, at any position, is error `NL.E0209` ("Includes are not supported in this context") on its path, and nothing is read from disk. A source without includes is unaffected.
+- `--include-root <dir>`: every include, at any depth, must be a relative path that resolves, symbolic links followed, to a file inside `<dir>`. An absolute path, a `..` that leaves `<dir>`, or a symbolic link that points out of it is error `NL.E0208` on the `include` line, and the file is not read (a `..` escape is caught before the disk is touched). A stdin input sits in `<dir>`, so its relative includes resolve against `<dir>`, and logo assets default to it too: with a root set, the working directory never affects resolution. A file input is taken at its real path, and its includes must resolve inside `<dir>` as well. Diagnostics in an included file name it relative to `<dir>` (`teams/web.nowline`), so a multi-file caller can point at the right file. A relative `<dir>` resolves against the working directory; one that does not exist or is not a directory is a usage error (exit 2, `nowline: invalid --include-root "x". Expected an existing directory.`).
+
+Both are flags only, with no `.nowlinerc` key: the policy belongs to whoever runs the CLI, not to the roadmap. A checked-in key would be set by the same author whose includes it restricts, and the hosted caller passes flags anyway. `--format nowline` does not resolve includes, so neither flag affects it.
+
+Whatever the policy, include resolution is bounded on its own, without relying on a caller's timeout: each file is read once per include edge and resolved once, a cycle is caught before the file that closes it is read again (`NL.E0204`), and a chain deeper than 16 includes stops with `NL.E0210`.
+
 ## Diagnostics
 
 Default text format renders biome / oxc-style frames via `@babel/code-frame`:
@@ -407,16 +423,16 @@ type Diagnostic = {
 
 `code` is the stable validator code (`NL.E0600`, `NL.W0700`, ...) when the diagnostic has one, `parse-error` or `lex-error` for syntax errors, and a legacy string such as `validation` for validator messages that predate stable codes. `suggestion` is present when the message offers a "did you mean" target, and holds the bare token to put in place of the offending one (`status` for a misspelled property key, `build` for a misspelled `wave:` value), the same in every locale. A coded diagnostic takes it from the arguments its message is built from (`resolveDiagnosticSuggestion` in `@nowline/core`); only an uncoded one falls back to parsing the message.
 
-**Include diagnostics.** The wave rules that need the included files (include rule 12 `NL.E0202`, the wave checks on included files, and the cross-file `NL.E0300`; `specs/waves.md` §6.1) are reported by include resolution, not by the validator, and so are an included file's lexer and parser errors (include rule 13 in `specs/dsl.md`). The CLI reports them exactly like validator diagnostics: `file` is the file the diagnostic points into (an included file is named relative to the input's directory as given, e.g. `examples/teams/web.nowline`), `line` is 1-based and the span covers that line, the message is localized like any validator message, and they share the run's one text report or JSON document with the validator's diagnostics. They are checked only when the input itself has no validation errors. An error among them exits 1. An included file's syntax error is reported exactly as checking that file on its own reports it (same position, message, and `lex-error` / `parse-error` code). Every other include failure (an unreadable or circular include, a duplicate include, a `start:` mismatch, an isolate without a roadmap) carries no code and keeps its single message on stderr, `nowline: <format> export failed: @nowline/export: include error in <path>: <message>`, with exit 3. When both kinds fail, the uncoded include error wins. `--format nowline` does not resolve includes and reports neither.
+**Include diagnostics.** Every include error (a missing or unreadable include `NL.E0203`, a cycle `NL.E0204`, a duplicate `NL.E0205`, an isolate without a roadmap `NL.E0206`, a `start:` mismatch `NL.E0207`, an include the policy refuses `NL.E0208` / `NL.E0209`, a chain too deep `NL.E0210`; Include rules in `specs/dsl.md`) and the wave rules that need the included files (include rule 12 `NL.E0202`, the wave checks on included files, and the cross-file `NL.E0300`; `specs/waves.md` §6.1) are reported by include resolution, not by the validator, and so are an included file's lexer and parser errors (include rule 13 in `specs/dsl.md`). An include error points at the path string on the `include` line of the file that names it. The CLI reports them exactly like validator diagnostics: `file` is the file the diagnostic points into (an included file is named relative to the input's directory as given, e.g. `examples/teams/web.nowline`, or relative to `--include-root` when it is set), `line` is 1-based and the span covers that line, the message is localized like any validator message, and they share the run's one text report or JSON document with the validator's diagnostics. They are checked only when the input itself has no validation errors. An error among them exits 1. An included file's syntax error is reported exactly as checking that file on its own reports it (same position, message, and `lex-error` / `parse-error` code). No include problem exits 3. `--format nowline` does not resolve includes and reports none of them.
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Validation error (parse failure, invalid references, a coded wave-rule include diagnostic such as `NL.E0202`). Warnings alone never produce it, in either diagnostic format. |
+| 1 | Validation error (parse failure, invalid references, any include error such as a missing include `NL.E0203`, a coded wave-rule include diagnostic such as `NL.E0202`). Warnings alone never produce it, in either diagnostic format. |
 | 2 | Usage error (missing input, invalid flags, mutually-exclusive flags, format unavailable in this build, binary output to TTY, file not found, unreadable input, empty stdin, invalid `--diagnostic-format`) |
-| 3 | Output error (cannot write to destination, exporter pipeline failure, an uncoded include error such as an unreadable or circular include) |
+| 3 | Output error (cannot write to destination, exporter pipeline failure) |
 
 ## Piping and Composability
 

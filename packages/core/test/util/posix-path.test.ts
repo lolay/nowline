@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { basename, dirname, resolve } from '../../src/util/posix-path.js';
+import { basename, dirname, isWithin, relative, resolve } from '../../src/util/posix-path.js';
 
 describe('posix-path', () => {
     describe('dirname', () => {
@@ -77,6 +77,41 @@ describe('posix-path', () => {
 
         it('preserves separator style of dir for joins', () => {
             expect(resolve('C:\\root', 'file.nowline')).toBe('C:\\root\\file.nowline');
+        });
+    });
+
+    describe('isWithin', () => {
+        it('holds for the directory itself and anything below it', () => {
+            expect(isWithin('/root', '/root')).toBe(true);
+            expect(isWithin('/root', '/root/a/b.nowline')).toBe(true);
+            expect(isWithin('/root/', '/root/a.nowline')).toBe(true);
+        });
+
+        it('fails for a sibling that shares a prefix, and for a parent', () => {
+            expect(isWithin('/root', '/rootkit/a.nowline')).toBe(false);
+            expect(isWithin('/root/a', '/root')).toBe(false);
+        });
+
+        it('normalizes `..` before comparing', () => {
+            expect(isWithin('/root', '/root/a/../../etc/x.nowline')).toBe(false);
+            expect(isWithin('/root', '/root/a/../b.nowline')).toBe(true);
+        });
+
+        it('handles windows paths, drive letters case-insensitively', () => {
+            expect(isWithin('C:\\root', 'c:/root/a.nowline')).toBe(true);
+            expect(isWithin('C:\\root', 'D:\\root\\a.nowline')).toBe(false);
+        });
+    });
+
+    describe('relative', () => {
+        it('walks down and up with forward slashes', () => {
+            expect(relative('/root', '/root/teams/a.nowline')).toBe('teams/a.nowline');
+            expect(relative('/root/teams', '/root/b.nowline')).toBe('../b.nowline');
+            expect(relative('C:\\root', 'C:\\root\\a.nowline')).toBe('a.nowline');
+        });
+
+        it('returns "." for the same directory', () => {
+            expect(relative('/root', '/root')).toBe('.');
         });
     });
 });

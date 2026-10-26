@@ -8,6 +8,7 @@
 import {
     buildWavePlan,
     collectDocumentDiagnostics,
+    type IncludePolicy,
     isRoutedResolveDiagnostic,
     type NowlineFile,
     type NowlineServices,
@@ -57,6 +58,8 @@ export interface StageInputs {
      * caller to report. Omitted: every include error counts.
      */
     isToleratedIncludeError?: (diagnostic: ResolveDiagnostic) => boolean;
+    /** Where includes may be read from (`resolveIncludes`). Omitted: anywhere. */
+    includePolicy?: IncludePolicy;
 }
 
 export type StageResult =
@@ -142,13 +145,16 @@ export async function stageRoadmap(inputs: StageInputs): Promise<StageResult> {
     const resolved = await resolveIncludes(ast, inputs.sourcePath, {
         services: inputs.services.Nowline,
         readFile: inputs.readSource,
+        includePolicy: inputs.includePolicy,
     });
 
     // An uncoded include error is more fundamental than the wave-rule
     // errors: the first one wins and hides the routed diagnostics.
     const isTolerated = inputs.isToleratedIncludeError ?? (() => false);
-    const errors = resolved.diagnostics.filter((d) => d.severity === 'error' && !isTolerated(d));
-    const routed = resolved.diagnostics.filter(isRoutedResolveDiagnostic);
+    const isCounted = (d: ResolveDiagnostic): boolean => d.severity !== 'error' || !isTolerated(d);
+    const errors = resolved.diagnostics.filter((d) => d.severity === 'error' && isCounted(d));
+    // A tolerated error is coded (NL.E0203) but stays the caller's to report.
+    const routed = resolved.diagnostics.filter((d) => isRoutedResolveDiagnostic(d) && isCounted(d));
     const legacy = errors.find((d) => !isRoutedResolveDiagnostic(d));
     if (legacy) {
         return { kind: 'include-error', document, legacy, routed: [], resolved };

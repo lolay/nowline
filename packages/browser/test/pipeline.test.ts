@@ -242,7 +242,7 @@ swimlane eng "Engineering"
         ]);
     });
 
-    it('keeps an uncoded include error as an include row, verbatim', async () => {
+    it('reports an unreadable include as a coded row at the include path', async () => {
         const result = await renderSource(parent, {
             filePath: '/workspace/main.nowline',
             readFile: async () => {
@@ -254,18 +254,18 @@ swimlane eng "Engineering"
         expect(result.diagnostics).toEqual([
             {
                 severity: 'error',
-                code: 'include',
-                message: 'Could not read include "./other.nowline": boom',
+                code: 'NL.E0203',
+                message: 'Cannot read include "./other.nowline": boom',
                 file: '/workspace/main.nowline',
                 line: 3,
-                column: 1,
+                column: 9,
             },
         ]);
     });
 
-    // REGRESSION: an uncoded include error takes precedence; the wave-rule
-    // diagnostics reported alongside it are dropped.
-    it('reports only the include row when wave-rule errors also occur', async () => {
+    // Every include error is coded, so it no longer hides the wave-rule
+    // diagnostics reported alongside it.
+    it('reports an unreadable include with the wave-rule errors', async () => {
         const result = await renderSource(
             parent.replace(
                 'include "./other.nowline"',
@@ -284,12 +284,13 @@ swimlane eng "Engineering"
         expect(result.diagnostics).toEqual([
             {
                 severity: 'error',
-                code: 'include',
-                message: 'Could not read include "./missing.nowline": boom',
+                code: 'NL.E0203',
+                message: 'Cannot read include "./missing.nowline": boom',
                 file: '/workspace/main.nowline',
                 line: 4,
-                column: 1,
+                column: 9,
             },
+            expect.objectContaining({ code: 'NL.E0202', line: 3 }),
         ]);
     });
 });
