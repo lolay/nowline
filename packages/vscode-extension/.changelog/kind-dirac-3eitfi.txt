@@ -1,3 +1,0 @@
-```release-note:fixed
-The preview's diagnostics table suggests the bare wave id for a misspelled `wave:` value (`Did you mean 'build'?`, not `'wave:build ('`).
-```

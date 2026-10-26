@@ -1,3 +1,0 @@
-```release-note:fixed
-The preview reports a missing or unreadable include, a circular or duplicate include, and a `start:` mismatch with its code (`NL.E0203` to `NL.E0207`) at the include's path, alongside any wave-rule errors, instead of an uncoded `include` row that hid them.
-```

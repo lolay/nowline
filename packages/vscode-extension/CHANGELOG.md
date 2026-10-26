@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0] - 2026-10-26
+
+### Fixed
+
+- The preview reports a missing or unreadable include, a circular or duplicate include, and a `start:` mismatch with its code (`NL.E0203` to `NL.E0207`) at the include's path, alongside any wave-rule errors, instead of an uncoded `include` row that hid them.
+- The preview's diagnostics table suggests the bare wave id for a misspelled `wave:` value (`Did you mean 'build'?`, not `'wave:build ('`).
+
 ## [0.10.0] - 2026-10-24
 
 ## [0.9.0] - 2026-10-23

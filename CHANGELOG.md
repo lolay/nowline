@@ -4,6 +4,24 @@ All notable changes to Nowline are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Don't edit this file in a PR: add a fragment to [`.changelog/`](./.changelog/README.md), and the release cut folds every pending fragment into a new `## [X.Y.Z]` section (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)). The `## [Unreleased]` section below predates fragments; the next release folds it in and drops the heading.
 
+## [0.11.0] - 2026-10-26
+
+### Added
+
+- `--include-root <dir>` confines includes to a directory: every include, at any depth, must be a relative path that resolves, symlinks followed, inside `<dir>`, or it is `NL.E0208` and nothing is read. With stdin, includes resolve against `<dir>` instead of the working directory, and diagnostics in an included file name it relative to `<dir>`.
+- `--no-includes` turns includes off: every `include` is `NL.E0209` ("Includes are not supported in this context") and nothing is read from disk. For a service that validates untrusted source on stdin.
+- An include chain deeper than 16 includes stops with `NL.E0210`, so resolution is bounded even through a symlinked directory that contains itself.
+
+### Fixed
+
+- An include that cannot be read (missing file, directory, permission denied, or not a `.nowline` file) is now error `NL.E0203` on the `include` line, exit 1, instead of exit 3 ("output error") with an OS message that named the absolute path. The other include errors are coded too, on the same line: a cycle `NL.E0204` (caught before the file is read again), a duplicate include `NL.E0205`, an isolate without a roadmap `NL.E0206`, and a `start:` mismatch `NL.E0207`. They are reported with the wave-rule diagnostics instead of hiding them, in the CLI, `--serve`, the export kernel (`IncludeResolveError`), MCP (`validate` and `render` now report them) and the browser (rows carry the code and the path's column, not `include`).
+- A misspelled `wave:` value (`NL.E1101`) now gets the bare wave id as its `suggestion` (`build`, not `wave:build (`) in `--diagnostic-format json`, the text output's "did you mean", and the MCP server's diagnostics, in every locale. Coded diagnostics take their suggestion from the message arguments instead of parsing the rendered message.
+- Text diagnostics no longer repeat the suggestion: a message like `Did you mean "status"?` used to get an extra English `— did you mean 'status'?` appended, even under `--locale=fr`.
+
+### Security
+
+- A caller that validates untrusted source can now stop includes from reading other files, with `--no-includes` or `--include-root`. By default, as before, an include from stdin resolves against the working directory and may read any `.nowline` file the process can, and a parse error in that file quotes its first token; a hosted validator should pass one of the two flags.
+
 ## [0.10.0] - 2026-10-24
 
 ### Added
