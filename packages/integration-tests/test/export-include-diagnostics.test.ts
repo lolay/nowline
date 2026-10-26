@@ -62,17 +62,19 @@ const lane = (name: string, wave?: string): string =>
     `swimlane ${name}\n  item ${name}-x duration:1w${wave ? ` wave:${wave}` : ''}\n`;
 
 describe('export kernel: include diagnostics', () => {
-    it('an uncoded include error stays a plain Error with the same message', async () => {
+    it('an unreadable include throws IncludeResolveError carrying NL.E0203', async () => {
         const err = await thrown(
             exportSvg({
                 'program.nowline': `include "./missing.nowline"\nroadmap r "R"\n${lane('a')}`,
             }),
         );
-        expect(err).toBeInstanceOf(Error);
-        expect(err).not.toBeInstanceOf(IncludeResolveError);
+        expect(err).toBeInstanceOf(IncludeResolveError);
         expect((err as Error).message).toBe(
-            `@nowline/export: include error in ${at('program.nowline')}: Could not read include "./missing.nowline": ENOENT: ${at('missing.nowline')}`,
+            `@nowline/export: include error in ${at('program.nowline')}: Cannot read include "./missing.nowline": ENOENT: ${at('missing.nowline')}`,
         );
+        expect(
+            (err as IncludeResolveError).diagnostics.map((d) => [d.code, d.sourcePath, d.line]),
+        ).toEqual([['NL.E0203', at('program.nowline'), 0]]);
     });
 
     it('a wave-rule error throws IncludeResolveError carrying the diagnostics', async () => {
@@ -114,15 +116,19 @@ describe('export kernel: include diagnostics', () => {
         ]);
     });
 
-    it('an uncoded include error wins over a wave-rule error', async () => {
+    it('an unreadable include is reported with the wave-rule error, first', async () => {
         const err = await thrown(
             exportSvg({
                 'program.nowline': `include "./c.nowline"\ninclude "./missing.nowline"\nroadmap r "R"\n${WAVES}${lane('a', 'w1')}`,
                 'c.nowline': lane('c'),
             }),
         );
-        expect(err).not.toBeInstanceOf(IncludeResolveError);
-        expect((err as Error).message).toContain('Could not read include "./missing.nowline"');
+        expect(err).toBeInstanceOf(IncludeResolveError);
+        expect((err as Error).message).toContain('Cannot read include "./missing.nowline"');
+        expect((err as IncludeResolveError).diagnostics.map((d) => d.code)).toEqual([
+            'NL.E0203',
+            'NL.E0202',
+        ]);
     });
 
     it('reports wave-rule warnings through onResolveDiagnostics and still exports', async () => {

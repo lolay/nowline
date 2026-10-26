@@ -26,6 +26,7 @@ export {
 export * from './generated/ast.js';
 export * from './generated/module.js';
 export { ALL_CODES, type MessageCode } from './i18n/codes.js';
+export type * from './i18n/include-message-types.js';
 export {
     type MessageArgs,
     type MessageBundle,
@@ -36,8 +37,10 @@ export type * from './i18n/wave-message-types.js';
 export {
     type IncludedSyntaxError,
     type IncludeMode,
+    type IncludePolicy,
     type IsolatedRegion,
     isRoutedResolveDiagnostic,
+    MAX_INCLUDE_DEPTH,
     type ResolveDiagnostic,
     type ResolvedConfig,
     type ResolvedContent,

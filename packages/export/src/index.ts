@@ -16,6 +16,7 @@
 
 import {
     createNowlineServices,
+    type IncludePolicy,
     type NowlineFile,
     type NowlineServices,
     type RawDiagnostic,
@@ -49,13 +50,14 @@ export {
 export type { StagedRoadmap, StageResult } from '@nowline/renderer';
 
 /**
- * Thrown when include resolution reports a wave-rule error (a coded or
- * `rule: 'wave'` diagnostic, specs/waves.md §6.1) and no other include error.
- * `message` is the same `@nowline/export: include error in …` text as the
- * plain include error; `diagnostics` carries every resolver diagnostic, errors
- * and warnings, so a surface can report the routed ones (see
- * `isRoutedResolveDiagnostic`) with file and line, like validator diagnostics.
- * Every other include error stays a plain `Error`.
+ * Thrown when include resolution reports a routed error (a coded include
+ * error such as NL.E0203, a wave rule, or an included file's syntax error;
+ * specs/waves.md §6.1). Every include error the resolver reports is coded.
+ * `message` is `@nowline/export: include error in …` with the first error's
+ * text; `diagnostics` carries every resolver diagnostic, errors and
+ * warnings, so a surface can report the routed ones (see
+ * `isRoutedResolveDiagnostic`) with file and line, like validator
+ * diagnostics. An uncoded error (none today) would stay a plain `Error`.
  */
 export class IncludeResolveError extends Error {
     readonly diagnostics: ResolveDiagnostic[];
@@ -285,6 +287,8 @@ export interface StageForExportOptions {
     document?: StageInputs['document'];
     /** The caller's Langium services, which built `document`. Omitted: the kernel's own. */
     services?: StageInputs['services'];
+    /** Where includes may be read from (`resolveIncludes`). Omitted: anywhere the host reads. */
+    includePolicy?: IncludePolicy;
 }
 
 /**
@@ -308,6 +312,7 @@ export function stageForExport(
         assetResolver: hostAssetResolver(host),
         document: options.document,
         layout: inputs,
+        includePolicy: options.includePolicy,
     });
 }
 

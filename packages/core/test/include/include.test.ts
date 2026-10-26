@@ -1471,14 +1471,14 @@ swimlane platform "Backlog"
             );
             expect(localizeResolveDiagnostic('fr', d)).not.toBe(d.message);
             const uncoded: ResolveDiagnostic = {
-                severity: 'error',
-                message: 'Could not read include',
+                severity: 'warning',
+                message: 'Person "sam" from a.nowline is shadowed',
                 sourcePath: '/x',
             };
-            expect(localizeResolveDiagnostic('fr', uncoded)).toBe('Could not read include');
+            expect(localizeResolveDiagnostic('fr', uncoded)).toBe(uncoded.message);
         });
 
-        it('pre-existing include diagnostics carry no code or args keys', async () => {
+        it('every include error is coded and routed; shadow warnings stay uncoded', async () => {
             const result = await resolveAt({
                 'program.nowline': [
                     'include "./a.nowline"',
@@ -1498,14 +1498,23 @@ swimlane platform "Backlog"
                 'loop.nowline': 'include "./program.nowline"\n',
                 's.nowline': 'roadmap s "S" start:2026-02-02\n',
             });
-            const messages = result.diagnostics.map((d) => d.message).join('\n');
-            expect(messages).toMatch(/Duplicate include/);
-            expect(messages).toMatch(/Could not read include/);
-            expect(messages).toMatch(/Cannot isolate/);
-            expect(messages).toMatch(/Circular include/);
-            expect(messages).toMatch(/start:/);
-            expect(messages).toMatch(/shadowed/);
-            for (const d of result.diagnostics) {
+            const errors = result.diagnostics.filter((d) => d.severity === 'error');
+            expect(errors.map((d) => [d.code, d.sourcePath, d.line])).toEqual([
+                ['NL.E0205', abs('program.nowline'), 1],
+                ['NL.E0203', abs('program.nowline'), 2],
+                ['NL.E0206', abs('program.nowline'), 3],
+                ['NL.E0204', abs('loop.nowline'), 0],
+                ['NL.E0207', abs('program.nowline'), 5],
+            ]);
+            for (const d of errors) expect(isRoutedResolveDiagnostic(d)).toBe(true);
+            expect(errors[3].message).toBe(
+                'Circular include: "./program.nowline" is already being included (program.nowline → loop.nowline → program.nowline).',
+            );
+            const warnings = result.diagnostics.filter((d) => d.severity === 'warning');
+            expect(warnings.map((d) => d.message)).toEqual([
+                'Person "sam" from a.nowline is shadowed by the parent\'s definition.',
+            ]);
+            for (const d of warnings) {
                 expect(
                     Object.keys(d).filter((k) => k === 'code' || k === 'args' || k === 'rule'),
                 ).toEqual([]);

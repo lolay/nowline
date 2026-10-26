@@ -117,6 +117,8 @@ nowline roadmap.nowline --headless               # bundled DejaVu fonts (determi
 | `-w, --width <px>`    | fit content  | Maximum canvas width. The timeline shrinks to fit (down to 1 px/day); spilled captions can still overflow. |
 | `--non-working <mode>` | (file key, else `hide`) | `hide` \| `show`. How a business calendar's non-working days appear: collapsed, or drawn as shaded bands. Overrides the file's `default roadmap non-working:` key; omit it to let the key apply. Also accepted by `--serve`. |
 | `--asset-root <dir>`  | `.nowlinerc` `assetRoot`, else input dir | Root for `logo:` / image refs. |
+| `--include-root <dir>` | (off)       | Read includes only from inside `<dir>`: an absolute path, a `..` or a symlink that leaves it is `NL.E0208`, and nothing outside is read. Stdin includes resolve against `<dir>`, never the cwd; included files are named relative to it. Flag only. |
+| `--no-includes`       | (off)        | Read no includes: every `include` is `NL.E0209` ("includes are not supported in this context"). For validating untrusted source. Flag only; exclusive with `--include-root`. |
 
 ### Format-specific options
 
@@ -214,9 +216,9 @@ Mutual exclusivity rules (all exit 2 with a message):
 | Code | Meaning |
 |------|---------|
 | 0    | Success |
-| 1    | Validation error (including a wave rule across included files, e.g. `NL.E0202`) |
+| 1    | Validation error (including any include error, e.g. a missing include `NL.E0203`, and a wave rule across included files, e.g. `NL.E0202`) |
 | 2    | Usage error (missing input, bad flags, unsupported format, file not found, empty stdin, invalid `--diagnostic-format`, binary→TTY refusal) |
-| 3    | Output error (cannot write to destination, exporter failure, page too small for margin, unresolvable include) |
+| 3    | Output error (cannot write to destination, exporter failure, page too small for margin) |
 
 ## Configuration: `.nowlinerc`
 

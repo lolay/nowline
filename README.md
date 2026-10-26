@@ -166,9 +166,9 @@ nowline --init my-project --template=teams  # use the teams template
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Validation error (parse failure, invalid reference, a wave rule across included files) |
+| 1 | Validation error (parse failure, invalid reference, any include error such as a missing include, a wave rule across included files) |
 | 2 | Usage error (missing input, bad flags, unsupported format, file not found, empty stdin, invalid `--diagnostic-format`, binary→TTY refusal) |
-| 3 | Output error (cannot write to destination, unresolvable include) |
+| 3 | Output error (cannot write to destination) |
 
 ### Manual
 

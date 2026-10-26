@@ -515,14 +515,19 @@ describe('@nowline/mcp — wave-rule include diagnostics', () => {
         expect((structured.diagnostics[0] as Diag & { column: number }).column).toBe(10);
     });
 
-    it('validate leaves an uncoded include error out, as before', async () => {
+    const missingParentPath = () => path.join(tmpDir, 'waves', 'missing-parent.nowline');
+    const comboParentPath = () => path.join(tmpDir, 'waves', 'combo-parent.nowline');
+
+    it('validate reports a missing include as NL.E0203 on its include line', async () => {
         const result = await client.callTool({
             name: 'validate',
             arguments: { path: 'waves/missing-parent.nowline' },
         });
         const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
-        expect(structured.ok).toBe(true);
-        expect(structured.diagnostics).toEqual([]);
+        expect(structured.ok).toBe(false);
+        expect(structured.diagnostics.map(brief)).toEqual([
+            ['NL.E0203', 'error', missingParentPath(), 3],
+        ]);
     });
 
     it('render returns structured diagnostics for NL.E0202', async () => {
@@ -558,60 +563,54 @@ describe('@nowline/mcp — wave-rule include diagnostics', () => {
         ]);
     });
 
-    it('render keeps the plain include error for an uncoded include failure', async () => {
+    it('render returns structured diagnostics for a missing include', async () => {
         const result = await client.callTool({
             name: 'render',
             arguments: { path: 'waves/missing-parent.nowline', format: 'svg', now: '2026-01-15' },
         });
         expect(result.isError).toBe(true);
-        const text = result.content
-            .filter((c) => c.type === 'text')
-            .map((c) => (c as { text: string }).text)
-            .join('\n');
-        expect(text).toContain('@nowline/export: include error in');
-        expect(text).toContain('Could not read include "./missing.nowline"');
+        expect(diagnosticsOf(result).diagnostics.map(brief)).toEqual([
+            ['NL.E0203', 'error', missingParentPath(), 3],
+        ]);
     });
 
-    // REGRESSION: an uncoded include error takes precedence over wave-rule
-    // diagnostics (specs/waves.md §6.1) on every path.
-    const comboText = (result: Awaited<ReturnType<Client['callTool']>>) =>
-        result.content
-            .filter((c) => c.type === 'text')
-            .map((c) => (c as { text: string }).text)
-            .join('\n');
-
-    it('render reports only the include error when wave-rule errors also occur', async () => {
+    // Every include error is coded, so a missing include no longer hides the
+    // wave-rule diagnostics reported alongside it (specs/waves.md §6.1).
+    it('render reports a missing include with the wave-rule errors', async () => {
         const result = await client.callTool({
             name: 'render',
             arguments: { path: 'waves/combo-parent.nowline', format: 'svg', now: '2026-01-15' },
         });
         expect(result.isError).toBe(true);
-        const text = comboText(result);
-        expect(text).toContain('@nowline/export: include error in');
-        expect(text).toContain('Could not read include "./missing.nowline"');
-        expect(text).not.toContain('NL.E0202');
+        expect(diagnosticsOf(result).diagnostics.map(brief)).toEqual([
+            ['NL.E0203', 'error', comboParentPath(), 4],
+            ['NL.E0202', 'error', comboParentPath(), 3],
+        ]);
     });
 
-    it('render in preview mode drops wave-rule diagnostics behind an uncoded include error', async () => {
-        // The preview path never ran the kernel, so before waves a missing
-        // include still returned the preview. Wave-rule errors must not change
-        // that: the combined case previews exactly like the missing include alone.
+    it('render in preview mode reports a missing include with the wave-rule errors', async () => {
         const preview = await client.callTool({
             name: 'render',
             arguments: { path: 'waves/combo-parent.nowline', now: '2026-01-15', preview: true },
         });
-        expect(preview.isError).toBeFalsy();
-        expect(comboText(preview)).not.toContain('NL.E0202');
+        expect(preview.isError).toBe(true);
+        expect(diagnosticsOf(preview).diagnostics.map(brief)).toEqual([
+            ['NL.E0203', 'error', comboParentPath(), 4],
+            ['NL.E0202', 'error', comboParentPath(), 3],
+        ]);
     });
 
-    it('validate drops wave-rule diagnostics behind an uncoded include error', async () => {
+    it('validate reports a missing include with the wave-rule errors', async () => {
         const result = await client.callTool({
             name: 'validate',
             arguments: { path: 'waves/combo-parent.nowline' },
         });
         const structured = result.structuredContent as { ok: boolean; diagnostics: Diag[] };
-        expect(structured.ok).toBe(true);
-        expect(structured.diagnostics).toEqual([]);
+        expect(structured.ok).toBe(false);
+        expect(structured.diagnostics.map(brief)).toEqual([
+            ['NL.E0203', 'error', comboParentPath(), 4],
+            ['NL.E0202', 'error', comboParentPath(), 3],
+        ]);
     });
 });
 

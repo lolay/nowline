@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:032668f06f1c5fa404d9e94021ed15b045372a5d155f3eac56cec4daffaf6630
+.\" translated-from: nowline.1 sha256:4f113445e5c8d41932dcdeb46732a884ed1f960b28bdb2becd0060ad4cde539c
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -377,6 +377,44 @@ chargées (par défaut\ : la clé
 de
 .Pa .nowlinerc ,
 puis le dossier du fichier d'entrée).
+.It Fl -include-root Ar dossier
+Ne lire les inclusions qu'à l'intérieur de
+.Ar dossier .
+Chaque
+.Cm include ,
+à toute profondeur, doit être un chemin relatif qui se résout, liens
+symboliques suivis, vers un fichier
+.Pa .nowline
+situé dans
+.Ar dossier \ ;
+un chemin absolu, un
+.Pa ..
+qui en sort ou un lien symbolique qui pointe au dehors est l'erreur
+.Sy NL.E0208
+sur la ligne
+.Cm include ,
+et rien n'est lu.
+Avec l'entrée standard, les inclusions relatives se résolvent par
+rapport à
+.Ar dossier ,
+jamais par rapport au dossier de travail.
+Les diagnostics d'un fichier inclus le nomment relativement à
+.Ar dossier .
+Un
+.Ar dossier
+inexistant ou qui n'est pas un dossier termine avec le code 2.
+Indicateur seulement\ : il n'y a pas de clé
+.Pa .nowlinerc .
+.It Fl -no-includes
+Ne lire aucune inclusion\ : chaque
+.Cm include
+est l'erreur
+.Sy NL.E0209
+.Pq Dq les includes ne sont pas pris en charge dans ce contexte
+sur sa ligne, et rien n'est lu sur le disque.
+Pour les appelants qui valident une source non fiable.
+Incompatible avec
+.Fl -include-root .
 .El
 .Sh OPTIONS SPÉCIFIQUES AU FORMAT
 .Bl -tag -width Fl
@@ -592,7 +630,17 @@ ne s'appliquent qu'en ligne de commande.
 Succès.
 .It 1
 Erreur de validation (analyse en échec, référence invalide, etc.), y
-compris les règles de vagues vérifiées à travers les fichiers inclus,
+compris toute erreur d'inclusion (inclusion manquante, illisible,
+circulaire, en double ou trop profonde,
+.Cm start:
+différent, ou inclusion refusée par
+.Fl -include-root
+ou
+.Fl -no-includes ,
+.Sy NL.E0203
+à
+.Sy NL.E0210 )
+et les règles de vagues vérifiées à travers les fichiers inclus,
 comme
 .Sy NL.E0202 .
 Elles sont signalées comme les diagnostics du validateur, au fichier et
@@ -603,10 +651,7 @@ mutuellement exclusifs, format non pris en charge, fichier introuvable,
 sortie binaire vers un terminal, entrée illisible).
 .It 3
 Erreur de sortie (impossible d'écrire à la destination, échec du
-pipeline d'export), y compris une inclusion impossible à résoudre
-(inclusion illisible, circulaire ou en double,
-.Cm start:
-différent).
+pipeline d'export).
 .El
 .Sh EXEMPLES
 Produire le SVG par défaut dans le dossier courant\ :

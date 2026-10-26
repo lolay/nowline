@@ -356,6 +356,44 @@ Directory from which logo / image assets may be loaded
 key of
 .Pa .nowlinerc ,
 then the input file's directory).
+.It Fl -include-root Ar dir
+Read includes only from inside
+.Ar dir .
+Every
+.Cm include ,
+at any depth, must be a relative path that resolves, symbolic links
+followed, to a
+.Pa .nowline
+file inside
+.Ar dir ;
+an absolute path, a
+.Pa ..
+that leaves it, or a symbolic link that points out of it is error
+.Sy NL.E0208
+on the
+.Cm include
+line, and nothing is read.
+With standard input, relative includes resolve against
+.Ar dir ,
+never the working directory.
+Diagnostics in an included file name it relative to
+.Ar dir .
+A
+.Ar dir
+that does not exist or is not a directory exits with status 2.
+Flag only: there is no
+.Pa .nowlinerc
+key.
+.It Fl -no-includes
+Read no includes: every
+.Cm include
+is error
+.Sy NL.E0209
+.Pq Dq includes are not supported in this context
+on its line, and nothing is read from disk.
+For callers that validate untrusted source.
+Cannot be combined with
+.Fl -include-root .
 .El
 .Sh FORMAT-SPECIFIC OPTIONS
 .Bl -tag -width Fl
@@ -567,7 +605,18 @@ apply only on the command line.
 Success.
 .It 1
 Validation error (parse failure, invalid reference, etc.), including
-the wave rules checked across included files, such as
+every include error (a missing, unreadable, circular, duplicate or too
+deep include, a mismatched
+.Cm start: ,
+or one that
+.Fl -include-root
+or
+.Fl -no-includes
+refuses,
+.Sy NL.E0203
+to
+.Sy NL.E0210 )
+and the wave rules checked across included files, such as
 .Sy NL.E0202 .
 Those are reported like validator diagnostics, at the file and line
 they point into.
@@ -576,10 +625,7 @@ Usage error (missing input, bad flags, mutually-exclusive flags,
 unsupported format, file not found, binary output to TTY, unreadable
 input).
 .It 3
-Output error (cannot write to destination, exporter pipeline failure),
-including an include that cannot be resolved (unreadable, circular or
-duplicate include, mismatched
-.Cm start: ) .
+Output error (cannot write to destination, exporter pipeline failure).
 .El
 .Sh EXAMPLES
 Render the default SVG to the current directory:

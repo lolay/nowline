@@ -208,9 +208,9 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
         });
     }, 15000);
 
-    // REGRESSION: an uncoded include error keeps its pre-waves form: one
-    // `${sourcePath}: ${message}` line sent to browsers, nothing on stderr.
-    it('broadcasts a missing include as before, without stderr', async () => {
+    // A missing include is coded (NL.E0203): reported like a validator
+    // diagnostic, to browsers and on stderr.
+    it('reports a missing include as NL.E0203 at its include line', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'parent.nowline');
             await fs.writeFile(
@@ -236,14 +236,10 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
             try {
                 await waitForReady(port);
                 const first = await fetchPayloadEvent(`http://127.0.0.1:${port}/events`);
-                expect(first).toEqual({
-                    event: 'error',
-                    data:
-                        `${source}: Could not read include "./missing.nowline": ` +
-                        `ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'`,
-                });
-                expect(stderr).not.toContain('error:');
-                expect(stderr).not.toContain('missing.nowline');
+                const header = `${source}:1:9 error: Cannot read include "./missing.nowline": file not found.`;
+                expect(first.event).toBe('error');
+                expect(first.data).toContain(header);
+                expect(stderr).toContain(header);
             } finally {
                 child.kill('SIGTERM');
                 await new Promise((r) => setTimeout(r, 150));
@@ -252,10 +248,9 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
         });
     }, 15000);
 
-    // REGRESSION: an uncoded include error takes precedence over wave-rule
-    // diagnostics (specs/waves.md §6.1). With both present, the broadcast
-    // is the legacy one-line payload alone and nothing goes to stderr.
-    it('reports only the missing include when wave-rule errors also occur', async () => {
+    // Every include error is coded, so a missing include is reported with
+    // the wave-rule diagnostics, not instead of them (specs/waves.md §6.1).
+    it('reports a missing include with the wave-rule errors', async () => {
         await withTempDir(async (dir) => {
             const source = path.join(dir, 'parent.nowline');
             await fs.writeFile(
@@ -297,15 +292,12 @@ describeBuilt('--serve integration (requires `pnpm build`)', () => {
             try {
                 await waitForReady(port);
                 const first = await fetchPayloadEvent(`http://127.0.0.1:${port}/events`);
-                expect(first).toEqual({
-                    event: 'error',
-                    data:
-                        `${source}: Could not read include "./missing.nowline": ` +
-                        `ENOENT: no such file or directory, open '${path.join(dir, 'missing.nowline')}'`,
-                });
-                expect(stderr).not.toContain('error');
-                expect(stderr).not.toContain('NL.E0202');
-                expect(stderr).not.toContain('child.nowline');
+                expect(first.event).toBe('error');
+                expect(first.data).toContain(
+                    `${source}:4:9 error: Cannot read include "./missing.nowline": file not found.`,
+                );
+                expect(first.data).toContain(`${source}:3:1 error: Included "./child.nowline"`);
+                expect(stderr).toContain(`${source}:4:9 error: Cannot read include`);
             } finally {
                 child.kill('SIGTERM');
                 await new Promise((r) => setTimeout(r, 150));
