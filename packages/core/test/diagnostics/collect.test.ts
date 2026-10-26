@@ -6,8 +6,10 @@ import {
     isBuiltinParseDiagnostic,
     type LangiumLikeDiagnostic,
     resolveDiagnosticCode,
+    resolveDiagnosticSuggestion,
 } from '../../src/diagnostics/index.js';
 import type { NowlineFile } from '../../src/generated/ast.js';
+import { tr } from '../../src/i18n/index.js';
 import { getServices } from '../helpers.js';
 
 let counter = 0;
@@ -113,5 +115,107 @@ describe('extractSuggestion', () => {
 
     it('returns undefined when there is no suggestion', () => {
         expect(extractSuggestion('Something went wrong')).toBeUndefined();
+    });
+});
+
+describe('resolveDiagnosticSuggestion', () => {
+    const unknown = {
+        reason: 'unknown' as const,
+        value: 'bild',
+        declared: ['plan', 'build'],
+        suggestion: { id: 'build', title: 'Build' },
+    };
+
+    // The E1101 template renders `wave:build ("Build")`; the suggestion is the
+    // bare id, the token a client puts in place of `bild`.
+    it('reads NL.E1101 from its args, not the rendered message', () => {
+        for (const locale of ['en-US', 'fr']) {
+            const message = tr(locale, 'NL.E1101', unknown);
+            expect(message).toContain('wave:build');
+            expect(
+                resolveDiagnosticSuggestion(message, { code: 'NL.E1101', args: [unknown] }),
+            ).toBe('build');
+        }
+    });
+
+    it('reads an untitled NL.E1101 suggestion and the not-a-wave variant', () => {
+        const untitled = { ...unknown, suggestion: { id: 'build' } };
+        expect(
+            resolveDiagnosticSuggestion(tr('en-US', 'NL.E1101', untitled), {
+                code: 'NL.E1101',
+                args: [untitled],
+            }),
+        ).toBe('build');
+        const notAWave = {
+            reason: 'not-a-wave' as const,
+            value: 'alpha',
+            kind: 'item' as const,
+            suggestion: { id: 'alpha2', title: 'Alpha 2' },
+        };
+        expect(
+            resolveDiagnosticSuggestion(tr('en-US', 'NL.E1101', notAWave), {
+                code: 'NL.E1101',
+                args: [notAWave],
+            }),
+        ).toBe('alpha2');
+    });
+
+    it('is undefined for an NL.E1101 with nothing to suggest', () => {
+        const none = { reason: 'list' as const, value: '[a, b]' };
+        expect(
+            resolveDiagnosticSuggestion(tr('en-US', 'NL.E1101', none), {
+                code: 'NL.E1101',
+                args: [none],
+            }),
+        ).toBeUndefined();
+    });
+
+    it('reads NL.W0700 from its args in every locale', () => {
+        const args = { key: 'statsu', entity: 'item "one"', suggested: 'status' };
+        for (const locale of ['en-US', 'fr']) {
+            const message = tr(locale, 'NL.W0700', args);
+            expect(resolveDiagnosticSuggestion(message, { code: 'NL.W0700', args: [args] })).toBe(
+                'status',
+            );
+        }
+        const none = { ...args, suggested: '' };
+        expect(
+            resolveDiagnosticSuggestion(tr('en-US', 'NL.W0700', none), {
+                code: 'NL.W0700',
+                args: [none],
+            }),
+        ).toBeUndefined();
+    });
+
+    it('does not parse the message of a coded diagnostic', () => {
+        expect(
+            resolveDiagnosticSuggestion('Did you mean "x"?', { code: 'NL.E0600', args: [] }),
+        ).toBeUndefined();
+    });
+
+    it('falls back to the message for an uncoded diagnostic', () => {
+        expect(
+            resolveDiagnosticSuggestion(
+                'Unknown reference "bulid". Did you mean "build"?',
+                undefined,
+            ),
+        ).toBe('build');
+    });
+
+    it('gives the wave id for a misspelled wave: in a built document', async () => {
+        const doc = await build(`nowline v1
+
+roadmap r "R" start:2026-01-05
+
+wave plan "Plan"
+wave build "Build"
+swimlane a "A"
+  item one "One" duration:1w wave:bild
+`);
+        const diag = (doc.diagnostics ?? []).find(
+            (d) => resolveDiagnosticCode(d as LangiumLikeDiagnostic) === 'NL.E1101',
+        );
+        expect(diag).toBeDefined();
+        expect(resolveDiagnosticSuggestion(diag!.message, diag!.data)).toBe('build');
     });
 });

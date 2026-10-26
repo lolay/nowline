@@ -314,6 +314,19 @@ describe('fromResolveDiagnostic', () => {
         expect(fromResolveDiagnostic(coded).line).toBe(5);
     });
 
+    it('suggests the bare wave id in any locale', () => {
+        const args = {
+            reason: 'unknown' as const,
+            value: 'w9',
+            declared: ['w1'],
+            suggestion: { id: 'w1', title: 'Wave 1' },
+        };
+        const withSuggestion = { ...coded, message: tr('en-US', 'NL.E1101', args), args: [args] };
+        expect(fromResolveDiagnostic(withSuggestion).suggestion).toBe('w1');
+        expect(fromResolveDiagnostic(withSuggestion, 'fr').suggestion).toBe('w1');
+        expect(fromResolveDiagnostic(coded).suggestion).toBeUndefined();
+    });
+
     it("takes the column from a routed diagnostic's range", () => {
         const range = { start: { line: 4, character: 21 }, end: { line: 4, character: 28 } };
         const row = fromResolveDiagnostic({ ...coded, range });

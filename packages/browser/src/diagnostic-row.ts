@@ -1,5 +1,4 @@
 import {
-    extractSuggestion,
     inferCodeFromMessage,
     isRoutedResolveDiagnostic,
     type LangiumLikeDiagnostic,
@@ -8,6 +7,7 @@ import {
     type ParserErrorLike,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
+    resolveDiagnosticSuggestion,
 } from '@nowline/core';
 import type { LayoutInsight } from '@nowline/layout';
 
@@ -45,7 +45,7 @@ export function fromLangiumDiagnostic(diag: LangiumLikeDiagnostic, file: string)
         // panel, then falls back to Langium's `code`, then a message heuristic.
         code: resolveDiagnosticCode(diag),
         message: diag.message,
-        suggestion: extractSuggestion(diag.message),
+        suggestion: resolveDiagnosticSuggestion(diag.message, diag.data),
         file,
         line: (diag.range?.start.line ?? 0) + 1,
         column: (diag.range?.start.character ?? 0) + 1,
@@ -107,7 +107,10 @@ export function fromResolveDiagnostic(diag: ResolveDiagnostic, locale?: string):
         };
     }
     const message = locale ? localizeResolveDiagnostic(locale, diag) : diag.message;
-    const suggestion = extractSuggestion(message);
+    const suggestion = resolveDiagnosticSuggestion(
+        message,
+        diag.code === undefined ? undefined : { code: diag.code, args: diag.args ?? [] },
+    );
     return {
         severity: diag.severity,
         code: diag.code ?? inferCodeFromMessage(diag.message),

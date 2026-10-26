@@ -21,6 +21,7 @@ export {
     type RawDiagnostic,
     type RawDiagnosticOrigin,
     resolveDiagnosticCode,
+    resolveDiagnosticSuggestion,
     stableValidatorCode,
 } from './diagnostics/index.js';
 export * from './generated/ast.js';

@@ -395,13 +395,14 @@ Whatever the policy, include resolution is bounded on its own, without relying o
 Default text format renders biome / oxc-style frames via `@babel/code-frame`:
 
 ```
-roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did you mean 'auth-refactor'?
-  5 |   item auth-refactor "Auth refactor" size:l
-  6 |   parallel after:auth-refactor
-> 7 |     group audit-track "Audit Track" labels:security
-    |                                     ^^^^^^^^^^^^^^^
-  8 |       item audit-log "Audit log v2" size:xl before:code-freeze
+roadmap.nowline:8:30 error: Wave "bild" is not declared. Declared waves: plan, build. Add "wave bild" above the first swimlane that uses it. Did you mean wave:build ("Build")?
+  6 | wave build "Build"
+  7 | swimlane a "A"
+> 8 |   item one "One" duration:1w wave:bild
+    |                               ^^^^^^^^^
 ```
+
+The header is the message as the operator's locale renders it. A message with a suggestion offers it in its own words, so the header adds nothing for it; the JSON `suggestion` field below carries the bare token.
 
 `--diagnostic-format text|json` selects how diagnostics are written to stderr; any other value is a usage error (exit 2). When the flag is not given, `--dry-run` combined with `--format=json` defaults to `json` (so `nowline - --dry-run --format=json` is the machine-readable invocation), and every other run defaults to `text`. An explicit `--diagnostic-format text` overrides that default.
 
@@ -420,7 +421,7 @@ type Diagnostic = {
 };
 ```
 
-`code` is the stable validator code (`NL.E0600`, `NL.W0700`, ...) when the diagnostic has one, `parse-error` or `lex-error` for syntax errors, and a legacy string such as `validation` for validator messages that predate stable codes. `suggestion` is present when the message offers a "did you mean" target.
+`code` is the stable validator code (`NL.E0600`, `NL.W0700`, ...) when the diagnostic has one, `parse-error` or `lex-error` for syntax errors, and a legacy string such as `validation` for validator messages that predate stable codes. `suggestion` is present when the message offers a "did you mean" target, and holds the bare token to put in place of the offending one (`status` for a misspelled property key, `build` for a misspelled `wave:` value), the same in every locale. A coded diagnostic takes it from the arguments its message is built from (`resolveDiagnosticSuggestion` in `@nowline/core`); only an uncoded one falls back to parsing the message.
 
 **Include diagnostics.** Every include error (a missing or unreadable include `NL.E0203`, a cycle `NL.E0204`, a duplicate `NL.E0205`, an isolate without a roadmap `NL.E0206`, a `start:` mismatch `NL.E0207`, an include the policy refuses `NL.E0208` / `NL.E0209`, a chain too deep `NL.E0210`; Include rules in `specs/dsl.md`) and the wave rules that need the included files (include rule 12 `NL.E0202`, the wave checks on included files, and the cross-file `NL.E0300`; `specs/waves.md` §6.1) are reported by include resolution, not by the validator, and so are an included file's lexer and parser errors (include rule 13 in `specs/dsl.md`). An include error points at the path string on the `include` line of the file that names it. The CLI reports them exactly like validator diagnostics: `file` is the file the diagnostic points into (an included file is named relative to the input's directory as given, e.g. `examples/teams/web.nowline`, or relative to `--include-root` when it is set), `line` is 1-based and the span covers that line, the message is localized like any validator message, and they share the run's one text report or JSON document with the validator's diagnostics. They are checked only when the input itself has no validation errors. An error among them exits 1. An included file's syntax error is reported exactly as checking that file on its own reports it (same position, message, and `lex-error` / `parse-error` code). No include problem exits 3. `--format nowline` does not resolve includes and reports none of them.
 

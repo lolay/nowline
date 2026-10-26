@@ -312,9 +312,9 @@ export function checkNoRawStyleProperties(
 //     NL.E1104 / NL.E1105 where it is not allowed)
 //   - the keys a wave may not take (already NL.E1105)
 //
-// Suggests the closest known key within 2 edits when one exists, so the
-// existing `DID_YOU_MEAN_RE` in `packages/cli/src/diagnostics/adapt.ts` picks
-// it up as a structured suggestion alongside the rendered message.
+// Suggests the closest known key within 2 edits when one exists; the
+// `suggested` arg is also the diagnostic's structured suggestion (see
+// `resolveDiagnosticSuggestion` in `packages/core/src/diagnostics/index.ts`).
 export function checkUnknownEntityProperties(
     node: {
         $type: string;
