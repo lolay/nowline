@@ -39,24 +39,15 @@ function renderOne(
     return `${header}\n${frame}`;
 }
 
+// The message is printed as is. A diagnostic with a `suggestion` already
+// offers it in the message's own words and locale ("Did you mean ...?"), so
+// the header adds nothing for it.
 function renderHeader(diag: CliDiagnostic, useColor: boolean): string {
     const loc = `${diag.file}:${diag.line}:${diag.column}`;
     const severityWord = diag.severity === 'error' ? 'error' : 'warning';
-    if (!useColor) {
-        const suffix = diag.suggestion ? ` — did you mean '${diag.suggestion}'?` : '';
-        return `${loc} ${severityWord}: ${stripSuggestion(diag.message, diag.suggestion)}${suffix}`;
-    }
+    if (!useColor) return `${loc} ${severityWord}: ${diag.message}`;
     const coloredLoc = chalk.cyan(loc);
     const coloredSeverity =
         diag.severity === 'error' ? chalk.red.bold(severityWord) : chalk.yellow.bold(severityWord);
-    const message = stripSuggestion(diag.message, diag.suggestion);
-    const suggestion = diag.suggestion
-        ? ` ${chalk.dim('—')} did you mean ${chalk.green(`'${diag.suggestion}'`)}?`
-        : '';
-    return `${coloredLoc} ${coloredSeverity}: ${message}${suggestion}`;
-}
-
-function stripSuggestion(message: string, suggestion: string | undefined): string {
-    if (!suggestion) return message;
-    return message.replace(/ —\s*did you mean ['"]?[^'"?]+['"]?\??/i, '').trimEnd();
+    return `${coloredLoc} ${coloredSeverity}: ${diag.message}`;
 }

@@ -379,13 +379,14 @@ Existing files are silently overwritten — matches POSIX redirection (`> file`)
 Default text format renders biome / oxc-style frames via `@babel/code-frame`:
 
 ```
-roadmap.nowline:7:34 error: Unknown reference 'auth-refactro' in after — did you mean 'auth-refactor'?
-  5 |   item auth-refactor "Auth refactor" size:l
-  6 |   parallel after:auth-refactor
-> 7 |     group audit-track "Audit Track" labels:security
-    |                                     ^^^^^^^^^^^^^^^
-  8 |       item audit-log "Audit log v2" size:xl before:code-freeze
+roadmap.nowline:8:30 error: Wave "bild" is not declared. Declared waves: plan, build. Add "wave bild" above the first swimlane that uses it. Did you mean wave:build ("Build")?
+  6 | wave build "Build"
+  7 | swimlane a "A"
+> 8 |   item one "One" duration:1w wave:bild
+    |                               ^^^^^^^^^
 ```
+
+The header is the message as the operator's locale renders it. A message with a suggestion offers it in its own words, so the header adds nothing for it; the JSON `suggestion` field below carries the bare token.
 
 `--diagnostic-format text|json` selects how diagnostics are written to stderr; any other value is a usage error (exit 2). When the flag is not given, `--dry-run` combined with `--format=json` defaults to `json` (so `nowline - --dry-run --format=json` is the machine-readable invocation), and every other run defaults to `text`. An explicit `--diagnostic-format text` overrides that default.
 

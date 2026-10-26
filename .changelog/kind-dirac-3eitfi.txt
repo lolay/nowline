@@ -1,3 +1,7 @@
 ```release-note:fixed
 A misspelled `wave:` value (`NL.E1101`) now gets the bare wave id as its `suggestion` (`build`, not `wave:build (`) in `--diagnostic-format json`, the text output's "did you mean", and the MCP server's diagnostics, in every locale. Coded diagnostics take their suggestion from the message arguments instead of parsing the rendered message.
 ```
+
+```release-note:fixed
+Text diagnostics no longer repeat the suggestion: a message like `Did you mean "status"?` used to get an extra English `— did you mean 'status'?` appended, even under `--locale=fr`.
+```
