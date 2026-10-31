@@ -1,0 +1,8 @@
+nowline v1
+
+roadmap large-swimlane-title "Starter" start:2026-01-05 scale:1w author:"Engineering roadmap"
+
+swimlane engineering "Engineering — Platform & Infrastructure Track"
+  item research "Research"  duration:3w status:done
+  item design   "Design"    duration:2w status:in-progress remaining:50%
+  item build    "Build"     duration:3w status:planned

@@ -1,0 +1,13 @@
+nowline v1
+
+// Child of waves-isolate.nowline. Re-declares the same waves so it renders
+// on its own and agrees with the parent.
+
+roadmap ios-app "iOS" start:2026-01-05 scale:1w calendar:full
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane ios "iOS"
+  item ios-offline "Offline mode" duration:4w wave:w1
+  item ios-push "Push" duration:1w wave:w2

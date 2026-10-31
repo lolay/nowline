@@ -1,0 +1,48 @@
+// Tall-roadmap readability fixture — exercises the opt-in
+// `timeline-position:both` mirrored bottom date strip and the
+// `minor-grid:true` per-tick faint grid. Several swimlanes keep
+// the canvas tall so scrolling the rendered SVG hides the top
+// strip; the mirrored bottom strip keeps date context visible.
+
+nowline v1
+
+config
+
+scale
+  name: weeks
+  label-every: 4
+  label: "W{n}"
+
+default item shadow:subtle
+default swimlane padding:sm spacing:none
+default roadmap padding:md header-height:md font:sans timeline-position:both minor-grid:true
+
+roadmap nested-both-headers "Bottom Timeline + Minor Grid" author:"Acme Platform" start:2026-01-05
+
+size sm effort:3d
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
+
+anchor kickoff date:2026-01-06
+milestone gtm-launch "GTM Launch" date:2026-09-14 after:[platform-api, mobile-android]
+
+swimlane platform "Platform"
+  item platform-api "API gateway" size:xl after:kickoff status:in-progress remaining:60%
+  item platform-eventing "Eventing layer" size:lg
+  item platform-search "Search v2" size:lg
+
+swimlane mobile "Mobile"
+  item mobile-ios "iOS shell refresh" size:lg after:platform-api
+  item mobile-android "Android parity" size:lg after:mobile-ios
+  item mobile-offline "Offline mode" size:md
+
+swimlane web "Web"
+  item web-redesign "Web redesign" size:xl after:kickoff
+  item web-billing "Billing portal" size:md after:web-redesign
+  item web-admin "Admin console v2" size:lg
+
+swimlane data "Data"
+  item data-warehouse "Warehouse upgrade" size:lg after:kickoff
+  item data-pipelines "Pipeline refactor" size:lg after:data-warehouse
+  item data-bi "BI dashboards" size:md
