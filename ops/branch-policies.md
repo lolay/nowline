@@ -123,7 +123,7 @@ Two workflows on `lolay/nowline` still push to `main` using identities other tha
     id: app-token
     uses: actions/create-github-app-token@v3
     with:
-        app-id: ${{ vars.RELEASE_APP_ID }}
+        app-id: "3789687"
         private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
         permission-contents: write
   ```
@@ -138,10 +138,9 @@ Add to `lolay/nowline`:
 
 | Kind | Name | Value |
 |---|---|---|
-| variable | `RELEASE_APP_ID` | `3789687` |
 | secret | `RELEASE_APP_PRIVATE_KEY` | Generate fresh at <https://github.com/settings/apps/lolay-nowline-release> → Private keys → Generate a private key. Pipe the `.pem` via stdin into `gh secret set` to preserve newlines: `gh secret set RELEASE_APP_PRIVATE_KEY -R lolay/nowline < lolay-nowline-release.<date>.private-key.pem` |
 
-The App is already installed on `lolay/nowline` and the bypass is already on the ruleset, so neither this script nor the runbook needs an update — only the workflow files change.
+The App id (`3789687`) is not a secret, so it is written into the workflow rather than kept as a repository variable, which an empty value would break silently. The App is already installed on `lolay/nowline` and the bypass is already on the ruleset, so neither this script nor the runbook needs an update — only the workflow files change.
 
 ### Verification after either migration
 

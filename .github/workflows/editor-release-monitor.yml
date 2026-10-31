@@ -12,7 +12,7 @@ name: Editor release monitor
 # lolay-nowline-release App (see ops/branch-policies.md §6). The App is a
 # bypass actor on the main ruleset; GITHUB_TOKEN / github-actions[bot] is not.
 #
-# Requires repo variable RELEASE_APP_ID and secret RELEASE_APP_PRIVATE_KEY.
+# Requires secret RELEASE_APP_PRIVATE_KEY (the App id is a literal below).
 # See ops/branch-policies.md §6 for setup.
 
 on:
@@ -36,7 +36,9 @@ jobs:
               id: app-token
               uses: actions/create-github-app-token@v3
               with:
-                  app-id: ${{ vars.RELEASE_APP_ID }}
+                  # lolay-nowline-release: not a secret, so a literal rather
+                  # than a variable that could be left unset.
+                  app-id: "3789687"
                   private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
             - name: Checkout
