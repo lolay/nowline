@@ -1630,8 +1630,8 @@ swimlane "Platform"
 
 roadmap r "R" start:2026-04-06 scale:2w
 
-label a-fairly-long-label-id "A"
-label another-long-label-id "B"
+label a-fairly-long-label-id "A fairly long label title"
+label another-long-label-id "Another long label title"
 
 swimlane "Platform"
   item wide "Internationalization of\\nthe billing service" duration:9.375d labels:[a-fairly-long-label-id, another-long-label-id]
@@ -1646,6 +1646,25 @@ swimlane "Platform"
         }
         const bottom = Math.max(...wide.labelChips.map((c) => c.box.y + c.box.height));
         expect(bottom + 3 + 4).toBeLessThanOrEqual(wide.box.y + wide.box.height);
+    });
+
+    it('paints the label title on its chip, falling back to the id (#236)', async () => {
+        // The id is a file-wide unique key (`team-web` because `team web`
+        // exists); the chip reads the title, as size chips do.
+        const src = `nowline v1
+
+roadmap r "R" start:2026-11-02
+
+label team-web "web"
+label untitled
+size small "S" effort:1w
+
+swimlane a "A"
+  item x "X" size:small labels:[team-web, untitled]
+`;
+        const { model } = await layout(src);
+        const x = find(items(model.swimlanes[0].children), 'x');
+        expect(x.labelChips.map((chip) => chip.text)).toEqual(['web', 'untitled']);
     });
 });
 

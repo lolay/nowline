@@ -203,9 +203,10 @@ export function buildLabelChip(
     maxWidth?: number,
 ): PositionedLabelChip {
     const style = resolveLabelChipStyle(label, ctx);
-    // Prefer the short name (id) when it exists — chips inside an item bar
-    // are tight; the long title risks overflowing.
-    const text = label.name ?? label.title ?? '';
+    // Title first, id as fallback, matching size and status chips. The id is
+    // a file-wide unique key and often carries a prefix the reader shouldn't
+    // see; chip overflow is the author's to manage by keeping titles short.
+    const text = label.title ?? label.name ?? '';
     const padKey = style.padding === 'none' ? 'xs' : style.padding;
     const pad = PADDING_PX[padKey as keyof typeof PADDING_PX];
     let width = Math.max(20, Math.round(text.length * 5.5 + pad * 2));

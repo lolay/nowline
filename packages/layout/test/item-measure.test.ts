@@ -187,9 +187,9 @@ ${between}  item second "Second" duration:2w
         const pair = await layoutPair(
             roadmap(
                 '"Chips" duration:1w labels:[a-fairly-long-label-id, another-long-label-id, third-long-label-id]',
-                `label a-fairly-long-label-id "A"
-label another-long-label-id "B"
-label third-long-label-id "C"
+                `label a-fairly-long-label-id "A fairly long label title"
+label another-long-label-id "Another long label title"
+label third-long-label-id "A third long label title"
 `,
             ),
         );
@@ -202,7 +202,7 @@ label third-long-label-id "C"
         const pair = await layoutPair(
             roadmap(
                 '"Go" duration:1d link:https://github.com/acme/team/issues/1 labels:[a-fairly-long-label-id]',
-                'label a-fairly-long-label-id "A"\n',
+                'label a-fairly-long-label-id "A fairly long label title"\n',
             ),
         );
         expect(pair.first.iconSpills).toBe(true);

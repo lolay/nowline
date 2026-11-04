@@ -579,7 +579,7 @@ Labels render as **chiclets** — small, pill-shaped badges (`corner-radius:full
 
 - **Shape**: pill shape via `corner-radius:full` (system default for labels). Users can override to any `corner-radius` value.
 - **Colors**: background and text color from the label's resolved style (`bg`, `text`). If no style, use a neutral default (light gray bg, dark text).
-- **Text**: label title in a smaller text size than the entity title (auto-derived, similar to description text rules).
+- **Text**: the label's `title`, falling back to its id verbatim when there is no title (the same rule as the size chip), in a smaller text size than the entity title (auto-derived, similar to description text rules).
 - **Multiple labels**: render left-to-right in declaration order, with a small horizontal gap between chiclets, **left-aligned** to the bar's caption inset.
 - **Natural width, never truncated**: every chiclet renders at its natural text-fit width. Chips never shrink, never clip, never get capped to fit inside the bar.
 - **Inside the bar — single row**: when the full chip row fits within the bar's effective inner width, every chip renders on a single horizontal row just above the bottom progress strip, left-aligned to the caption inset. The bar's height stays at `bandwidth()`.
