@@ -90,8 +90,9 @@ without duplicating the markdown.
 Rendering is byte-deterministic: the same source, inputs and CLI version
 produce the same bytes. The one input that moves on its own is the
 now-line, which defaults to today. Hide it (`now: '-'`) or pin it to a
-date, and an unchanged roadmap renders an identical image, so the commit
-step finds nothing to commit. The action doesn't need to know what the PR
+date, and an unchanged roadmap renders an identical image: the action
+leaves the file alone, `changed-files` comes back empty and `changed` is
+`'false'`, and the commit step finds nothing to commit. The action doesn't need to know what the PR
 touched; git does that.
 
 ```yaml
@@ -178,7 +179,7 @@ Things that bite:
 | `format`       | `svg` or `png`                                                                             | `svg`              |
 | `theme`        | `light`, `dark`, or `grayscale` (`greyscale` alias)                                        | `light`            |
 | `now`          | `-` hides the now-line; a date pins it (`YYYY-MM-DD` or an ISO 8601 instant). Empty draws today, so the image changes daily. | (empty)            |
-| `args`         | Extra arguments appended to every `nowline` call, for options without an input here (e.g. `--width 1600`). Whitespace-split, quotes group; appended last, so they override (but leave `-o` alone: `changed-files` reports the `output` input). | (empty)            |
+| `args`         | Extra arguments appended to every `nowline` call, for options without an input here (e.g. `--width 1600`). Whitespace-split, quotes group; appended last, so they override (but leave `-o` alone: the action renders to a temp file and compares it with `output`). | (empty)            |
 | `non-working`  | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. | (empty)            |
 | `cli-version`  | Version of `@nowline/cli` to install on the runner. Defaults to the action version.        | (action version)   |
 
