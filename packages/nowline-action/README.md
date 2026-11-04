@@ -194,8 +194,10 @@ Things that bite:
 
 ## How it works under the hood
 
-1. Installs `@nowline/cli@<cli-version>` globally on the runner
-   (skipped when the requested version is already on PATH).
+1. Installs `@nowline/cli@<cli-version>` into a directory under
+   `$RUNNER_TEMP` and adds it to PATH (skipped when the requested version
+   is already on PATH). It never installs globally, so it needs no
+   `actions/setup-node` step and works with the runner image's own Node.
 2. Shells out to `nowline <input> -o <output> -f <format> -t <theme>`
    for each render, adding `--non-working <value>` and `--now <value>`
    only when those inputs are set (older CLIs reject unknown flags, so a

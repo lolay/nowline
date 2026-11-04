@@ -1,3 +1,6 @@
+import * as os from 'node:os';
+import * as path from 'node:path';
+
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 
@@ -7,9 +10,16 @@ import { ACTION_VERSION } from './version.js';
 /**
  * Ensure `nowline` is on PATH at the requested version.
  *
- * If `nowline version` already prints the requested version, skip the install
- * (saves the 5-10s cold-start hit on every run). Otherwise `npm install -g
- * @nowline/cli@<version>`.
+ * If `nowline --version` already prints the requested version, skip the
+ * install (saves the 5-10s cold-start hit on every run). Otherwise install
+ * `@nowline/cli@<version>` into a prefix under `$RUNNER_TEMP` and add its
+ * `node_modules/.bin` to PATH, for this step and (via `GITHUB_PATH`) later
+ * ones.
+ *
+ * Not `npm install -g`: on a runner without `actions/setup-node` the global
+ * prefix is `/usr/local`, and npm links the CLI's man pages into
+ * `/usr/local/share/man`, which the runner user can't write (#243). A local
+ * install links no man pages and touches no system directory.
  *
  * The CLI's version output is the SemVer string (e.g. `0.2.0`) for releases or
  * `0.2.0+abc1234[.dirty]` for dev builds. Substring match against the SemVer
@@ -23,9 +33,39 @@ export async function ensureCli(requestedVersion?: string): Promise<string> {
         return version;
     }
 
-    core.info(`installing @nowline/cli@${version}`);
-    await exec.exec('npm', ['install', '-g', `@nowline/cli@${version}`]);
+    const plan = cliInstallPlan(version, process.env.RUNNER_TEMP || os.tmpdir());
+    core.info(`installing @nowline/cli@${version} into ${plan.prefix}`);
+    await exec.exec('npm', plan.npmArgs);
+    core.addPath(plan.binDir);
     return version;
+}
+
+export interface CliInstallPlan {
+    /** The directory npm installs into; the CLI lands in its `node_modules`. */
+    prefix: string;
+    /** Where npm links the `nowline` bin; added to PATH after the install. */
+    binDir: string;
+    npmArgs: string[];
+}
+
+/**
+ * Where and how {@link ensureCli} installs the CLI. Pure, so it is
+ * unit-testable without running npm.
+ */
+export function cliInstallPlan(version: string, runnerTemp: string): CliInstallPlan {
+    const prefix = path.join(runnerTemp, 'nowline-cli', version);
+    return {
+        prefix,
+        binDir: path.join(prefix, 'node_modules', '.bin'),
+        npmArgs: [
+            'install',
+            '--prefix',
+            prefix,
+            '--no-audit',
+            '--no-fund',
+            `@nowline/cli@${version}`,
+        ],
+    };
 }
 
 async function isCliAtVersion(version: string): Promise<boolean> {
