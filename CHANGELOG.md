@@ -4,6 +4,20 @@ All notable changes to Nowline are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Don't edit this file in a PR: add a fragment to [`.changelog/`](./.changelog/README.md), and the release cut folds every pending fragment into a new `## [X.Y.Z]` section (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)). The `## [Unreleased]` section below predates fragments; the next release folds it in and drops the heading.
 
+## [0.12.0] - 2026-11-04
+
+### Added
+
+- GitHub Action: `now` input sets the now-line date (`-` hides it, or a date pins it), so a committed image of an unchanged roadmap renders byte-identical and the commit step skips it. Without it the now-line defaults to today and the image changes daily.
+- GitHub Action: `args` input appends extra arguments to every `nowline` call, for CLI options the action has no input for.
+- GitHub Action: `changed` output, `'true'` when any file changed and `'false'` otherwise.
+
+### Fixed
+
+- `NL.E0004` (at least one swimlane) counts swimlanes from `roadmap:merge` includes and `roadmap:isolate` regions, so a roadmap whose content all comes from includes validates (#235).
+- Label chips show the label's title, falling back to its id when there is no title, matching size and status chips. Previously the id won whenever both were set, so `label team-web "web"` painted `team-web`.
+- GitHub Action: `changed-files` lists only files whose content changed. A diagram that renders byte-identical to the file on disk is no longer rewritten or listed, so a step gated on `changed-files != ''` stops running on every build.
+
 ## [0.11.0] - 2026-10-26
 
 ### Added

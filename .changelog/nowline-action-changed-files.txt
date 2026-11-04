@@ -1,7 +1,0 @@
-```release-note:fixed
-GitHub Action: `changed-files` lists only files whose content changed. A diagram that renders byte-identical to the file on disk is no longer rewritten or listed, so a step gated on `changed-files != ''` stops running on every build.
-```
-
-```release-note:added
-GitHub Action: `changed` output, `'true'` when any file changed and `'false'` otherwise.
-```
