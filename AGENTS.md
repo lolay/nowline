@@ -73,6 +73,7 @@ Specs ship in-repo so PRs update them alongside code. Skim the relevant spec bef
 - [`specs/milestones.md`](./specs/milestones.md), [`specs/releasing.md`](./specs/releasing.md) — roadmap and release process.
 - [`specs/ci.md`](./specs/ci.md) — what CI runs on which platform and event, and why.
 - [`specs/handoffs/`](./specs/handoffs/) — version-controlled handoffs between milestones.
+- [`specs/milestones.md` § Review gate](./specs/milestones.md#review-gate) — a milestone that lands on `main` gets a review of `main`, run by the session that starts the next milestone, before planning it.
 
 ## Don't do this
 
