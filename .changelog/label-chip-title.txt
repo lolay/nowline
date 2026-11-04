@@ -1,0 +1,3 @@
+```release-note:fixed
+Label chips show the label's title, falling back to its id when there is no title, matching size and status chips. Previously the id won whenever both were set, so `label team-web "web"` painted `team-web`.
+```

@@ -510,6 +510,8 @@ A `label` line follows the universal `[id] ["title"]` pattern and accepts:
 - `style:id` — reference to a named style declared in config. Styles the label's own chip/badge.
 - Universal properties — `labels:`, `link:`, and the `description` sub-directive.
 
+The id is the lookup key on entities (`labels:enterprise`). The chip renders the label's optional `title` when provided, falling back to the id verbatim, the same rule as size and status chips. That lets the id carry a prefix it needs to stay unique in the file's one namespace (`label team-web "web"` alongside `team web`) while the chip reads `web`. Chip width follows the text, so authors who want compact chips keep titles short or omit them.
+
 Raw style properties (`bg`, `fg`, `text`, `border`, etc.) are **not** allowed on a `label` line. When an author wants a variant — e.g. a red-background `security` chip, or a dotted-border `low-confidence` chip — they declare a fresh named style in config (`style enterprise-red` with `bg: red` indented beneath, etc.) and reference it from the label.
 
 A label's style applies only to the label's own chip/badge as rendered on a host entity — it never styles the host entity itself. If an author wants every entity tagged `enterprise` to appear blue, they set `style:enterprise-look` on those entities directly or via `default item style:enterprise-look`.
