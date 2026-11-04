@@ -29,12 +29,17 @@ right after this one. The composition examples below show both.
       mode: file
       input: docs/roadmap.nowline
       output: docs/roadmap.svg
+      now: '-'
 
 - uses: stefanzweifel/git-auto-commit-action@v5
   with:
       commit_message: 'render nowline diagrams [skip ci]'
       file_pattern: 'docs/roadmap.svg'
 ```
+
+`now: '-'` hides the now-line. Without it the CLI draws today's date, so
+the image changes every day even when the roadmap hasn't. See
+[Commit only when the roadmap changes](#commit-only-when-the-roadmap-changes).
 
 Then in `README.md`:
 
@@ -49,6 +54,7 @@ Then in `README.md`:
   with:
       mode: markdown
       files: '**/*.md'
+      now: '-'
 
 - uses: stefanzweifel/git-auto-commit-action@v5
   with:
@@ -79,6 +85,72 @@ without duplicating the markdown.
           .nowline/
 ```
 
+## Commit only when the roadmap changes
+
+Rendering is byte-deterministic: the same source, inputs and CLI version
+produce the same bytes. The one input that moves on its own is the
+now-line, which defaults to today. Hide it (`now: '-'`) or pin it to a
+date, and an unchanged roadmap renders an identical image, so the commit
+step finds nothing to commit. The action doesn't need to know what the PR
+touched; git does that.
+
+```yaml
+on:
+    pull_request:
+        paths: ['**/*.nowline', '.nowlinerc']
+
+jobs:
+    render:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.head_ref }}
+
+            - uses: lolay/nowline-action@v0
+              with:
+                  input: docs/roadmap.nowline
+                  output: docs/roadmap.svg
+                  now: '-'
+
+            - uses: stefanzweifel/git-auto-commit-action@v5
+              with:
+                  commit_message: 'render roadmap'
+                  file_pattern: docs/roadmap.svg
+```
+
+The `paths` filter only saves runner time; the byte comparison is what
+decides whether to commit, so a change to an included file or a CLI
+upgrade still lands.
+
+To keep a now-line that only moves when the roadmap does, pin it to the
+date of the last commit that touched the file. That needs the full
+history (`fetch-depth: 0` on checkout); in a shallow clone every file's
+last commit is the head commit, and the date moves on every push:
+
+```yaml
+- id: date
+  run: echo "date=$(git log -1 --format=%ad --date=short -- docs/roadmap.nowline)" >> "$GITHUB_OUTPUT"
+
+- uses: lolay/nowline-action@v0
+  with:
+      input: docs/roadmap.nowline
+      output: docs/roadmap.svg
+      now: ${{ steps.date.outputs.date }}
+```
+
+Things that bite:
+
+- Pushing back to the PR branch needs `ref: ${{ github.head_ref }}`, and
+  doesn't work for PRs from forks: `GITHUB_TOKEN` can't write to them.
+- Commits made with `GITHUB_TOKEN` don't trigger workflows. No loop, but
+  required checks won't rerun on the render commit either.
+- A new CLI version can change the bytes. Pin the action tag
+  (`@vX.Y.Z`) or `cli-version` if you'd rather take those renders on
+  purpose.
+
 ## Drift detection (no commit, fail CI on drift)
 
 ```yaml
@@ -86,6 +158,7 @@ without duplicating the markdown.
   with:
       mode: markdown
       files: '**/*.md'
+      now: '-'
 
 - name: Fail if rendered output drifted from committed
   shell: bash
@@ -104,6 +177,8 @@ without duplicating the markdown.
 | `output-dir`   | Directory where markdown-mode rendered images are written, relative to the repo root       | `.nowline/`        |
 | `format`       | `svg` or `png`                                                                             | `svg`              |
 | `theme`        | `light`, `dark`, or `grayscale` (`greyscale` alias)                                        | `light`            |
+| `now`          | `-` hides the now-line; a date pins it (`YYYY-MM-DD` or an ISO 8601 instant). Empty draws today, so the image changes daily. | (empty)            |
+| `args`         | Extra arguments appended to every `nowline` call, for options without an input here (e.g. `--width 1600`). Whitespace-split, quotes group; appended last, so they override (but leave `-o` alone: `changed-files` reports the `output` input). | (empty)            |
 | `non-working`  | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. | (empty)            |
 | `cli-version`  | Version of `@nowline/cli` to install on the runner. Defaults to the action version.        | (action version)   |
 
@@ -120,9 +195,10 @@ without duplicating the markdown.
 1. Installs `@nowline/cli@<cli-version>` globally on the runner
    (skipped when the requested version is already on PATH).
 2. Shells out to `nowline <input> -o <output> -f <format> -t <theme>`
-   for each render, adding `--non-working <value>` only when the
-   `non-working` input is set (older CLIs reject unknown flags, so a
-   workflow that does not use the input keeps working against them).
+   for each render, adding `--non-working <value>` and `--now <value>`
+   only when those inputs are set (older CLIs reject unknown flags, so a
+   workflow that does not use the input keeps working against them),
+   then whatever `args` holds.
 3. (Markdown mode) parses each markdown file with
    [`remark`](https://github.com/remarkjs/remark), finds ` ```nowline `
    fenced code blocks, and for each block:
