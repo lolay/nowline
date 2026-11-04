@@ -31,3 +31,9 @@ Bars at true width in `packages/layout`: drop the `MIN_ITEM_WIDTH` clamp and the
 - The exports must not move; if xlsx, msproj or mermaid bytes change, something touched the schedule.
 - `make pre-commit` is the gate. The repo pins Node 26 (`.nvmrc`).
 - ~~Remove or promote `true-width-prototype/` before m4.15 closes.~~ Removed in m4; see above.
+
+## Review
+
+Review: pending, after m4.15's PR merges.
+
+m4.15 has merged (lolay/nowline#174, lolay/nowline#175, lolay/nowline#176, then the specs), so the review is due now: the session that starts the next milestone runs it before planning ([`milestones.md` § Review gate](../milestones.md#review-gate)). There's no `specs/reviews/` log yet, so it runs as a `full` review (r1); that review discharges this gate, and this line then links its record and issue.

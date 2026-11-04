@@ -613,6 +613,8 @@ Depends on: m4.8 (`@nowline/mcp` on npm). Spec updates: [`specs/releasing.md`](.
 
 Handoff: [`specs/handoffs/handoff-m4.9-mcp-marketplace.md`](./handoffs/handoff-m4.9-mcp-marketplace.md)
 
+Review gate: when m4.9 lands on `main`, the session that starts the next milestone reviews `main` before planning it ([Review gate](#review-gate)).
+
 ### m4.5 — IDE Expansion (timing TBD)
 
 Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is independent of m4 (Embed); slots after m4 in the chain so the public embed ships before plugin work begins.
@@ -622,6 +624,8 @@ Extend IDE support beyond VS Code/Cursor. Depends on m3 (LSP server) and is inde
 - JetBrains plugin
 
 Spec: [`specs/ide.md`](./ide.md)
+
+Review gate: when m4.5 lands on `main`, the session that starts the next milestone reviews `main` before planning it ([Review gate](#review-gate)).
 
 ### m4.6 — Windows distribution (timing TBD)
 
@@ -644,6 +648,8 @@ Depends on: m2a (original distribution pipeline) and m2l (man-page-style multi-c
 
 Spec: [`specs/scoop-bucket.md`](./scoop-bucket.md), [`specs/cli-distribution.md`](./cli-distribution.md) Windows section.
 
+Review gate: when m4.6 lands on `main`, the session that starts the next milestone reviews `main` before planning it ([Review gate](#review-gate)).
+
 ### m4.10 — macOS notarization (timing TBD)
 
 Code-sign and notarize the macOS `bun compile` binaries so direct GitHub-Release downloads stop tripping Gatekeeper. This is the macOS parallel to the Windows `.exe` Authenticode signing folded into m4.6. Homebrew installs already work unsigned because `brew install` strips the `com.apple.quarantine` xattr and handles the trust transfer (see [`specs/homebrew-tap.md`](./homebrew-tap.md)); this milestone closes the gap for users who download the raw binary off the Releases page instead.
@@ -663,13 +669,15 @@ Depends on: m2a (the release pipeline that builds and uploads the macOS binaries
 
 Spec: [`specs/homebrew-tap.md`](./homebrew-tap.md), [`specs/cli-distribution.md`](./cli-distribution.md).
 
+Review gate: when m4.10 lands on `main`, the session that starts the next milestone reviews `main` before planning it ([Review gate](#review-gate)).
+
 ### ~~m4.11 — Scheduler unification (R1)~~
 
 Make engine C (`scheduleRoadmap`) the one day-level scheduler. Engine B, the date window's own content-end walk, was a copy of C's walker; the window is now a projection of C's result (`RoadmapSchedule.extent`) and the copy is deleted. Engine A keeps placing pixels but reads the window, durations, start terms and wave floor dates from shared code. The wave plan and schedule are built once per export and carried on `ExportInputs`. Every migration step is byte-identical. The follow-ups F1 to F8 then settled the divergences between the engines, each with a changelog block and its own snapshot bumps: `after:` is the exports' meaning everywhere (an item starts after both the previous lane item and its references, also on a group track of a parallel), the minimum bar width, a group's caption spill and the 8 px track gutter stay out of the lane cursor, item `date:` and `start:` pins are removed, an isolated region's own anchors resolve in the chart, a status dot sits inside a bar only from 24 px, and a caption that runs past the chart's end is cut one column past it. Engine A now floors every start from C and warm-starts its barrier passes from C's. The register held only the six clamped bars' own drawn widths (presentation) until m4.15 drew every bar on its dates. Status: **implemented** (m1 to m3 and F1 to F8); gaps found along the way are listed in the spec's §9 "Known open gaps".
 
 Depends on: m2o, m2p. Independent of m4.12 and m4.13. Spec: [`specs/scheduler-unification.md`](./scheduler-unification.md).
 
-### m4.12 — Core AST, style and calendar utilities (R3)
+### ~~m4.12 — Core AST, style and calendar utilities (R3)~~
 
 Add `ast-walk.ts`, `style-chain.ts`, `calendar-declarations.ts`, `props.ts` and `value-tables.ts` to `@nowline/core`, exported through an unstable `@nowline/core/internal` subpath, and move the validator, resolver, layout and LSP copies onto them. Removes the include-resolver to validator import, splits the validator into per-feature modules behind the unchanged `NowlineValidator`, makes layout's date parsing strict, and removes `effectiveWave` and `leadWave`.
 
@@ -677,7 +685,7 @@ Depends on: m2o, m2p. Independent of m4.11 and m4.13. Spec: [`specs/core-ast-uti
 
 Status: **implemented** (migration milestones m1-m3 of the spec; strict dates also reach the validator, spec §7 decision 5).
 
-### m4.13 — Shared surface options and one staging function (R4)
+### ~~m4.13 — Shared surface options and one staging function (R4)~~
 
 One options schema (theme, width, now, page size, non-working, asset root) and one `.nowlinerc` merge in `@nowline/config`, read by the CLI, `--serve`, MCP and the VS Code extension; one `stageRoadmap` (parse, resolve includes, load assets, lay out) in `@nowline/renderer`, called by the export kernel, the browser pipeline, `--serve` and MCP insights. `--serve` stops ignoring `--width`, `--no-links` and `--strict`, the logo is read once, one width rule applies everywhere, and MCP's `now` default becomes the local civil date with an optional `timezone`.
 
@@ -734,6 +742,17 @@ m4.10 (macOS notarization) only needs m2a (the release pipeline that builds and 
 m4.11 to m4.14 are internal refactors from the v0.8.6 review. They change no user-facing feature: every migration step keeps every sample render byte-identical, and the few deliberate output changes (m4.11's F1 to F8, m4.14's F1 and L2) each land with a planned step and name their snapshot bumps. m4.11, m4.12 and m4.13 touch mostly separate packages and can run in parallel; m4.14 rewrites the same layout code as m4.11, so its steps that touch `RoadmapNode.place` wait for m4.11's m1 and m2.
 
 m1 is the critical foundation — every subsequent milestone depends on the DSL, parser, and typed AST it produces.
+
+## Review gate
+
+Each milestone that lands on `main` is followed by a review of `main`, not only of its own PRs, so drift from other work that merged meanwhile is caught too. The [codebase-review standard](https://github.com/GaryRudolph/public/blob/main/plugins/personal/skills/personal-standards/standards/codebase-review.md) has the details; in short:
+
+- **Who and when.** The session that starts the next milestone runs it first, before planning, once the previous milestone's PR has merged. If it hasn't merged, that session stops and says so. The milestone handoff carries `Review: pending, after m{N}'s PR merges` until the review runs, then links its record and issue.
+- **What.** An incremental review of every line since the last anchor logged in `specs/reviews/` (a `full` review when there's no log yet), plus a drift pass and a fix review of earlier open findings.
+- **What it changes.** Its decisions and high findings fold into the next milestone's plan; a high finding in code the previous milestone wrote is a step there, not a follow-up.
+- **How it lands.** The review is its own PR (register, summary, log row) plus a tracking issue. Fixes are separate PRs that cite the finding IDs.
+
+A plan that ships several milestones in one PR gets one review, after that PR merges. Plan workers never run it; it sits between plans.
 
 ## Beyond m4.15
 
