@@ -1,3 +1,0 @@
-```release-note:fixed
-The GitHub Action installs `@nowline/cli` into a directory under `$RUNNER_TEMP` and adds it to PATH instead of running `npm install -g`, so it works on a stock `ubuntu-latest` runner without `actions/setup-node` (#243).
-```
