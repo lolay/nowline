@@ -56,6 +56,7 @@ import {
 } from '../util/posix-path.js';
 import { isRealIsoDate } from '../util/props.js';
 import { checkIncludedReferences } from './include-references.js';
+import { checkMergedSwimlanes } from './include-swimlanes.js';
 import {
     checkWaveAgreement,
     hasParseErrors,
@@ -157,8 +158,9 @@ export interface ResolveDiagnostic {
     range?: ResolveRange;
     /**
      * Stable code of a coded diagnostic: every include error (NL.E0203 to
-     * NL.E0210), the wave rules (specs/waves.md §7.4), and an included
-     * file's unresolved reference (NL.E0302). Absent on the shadow
+     * NL.E0210), the wave rules (specs/waves.md §7.4), an included
+     * file's unresolved reference (NL.E0302), and a root whose merged result
+     * has no swimlane (NL.E0004). Absent on the shadow
      * warnings, an included file's syntax error, and WV8.
      */
     code?: MessageCode;
@@ -186,7 +188,7 @@ export type IncludedSyntaxError = Extract<RawDiagnostic, { origin: 'lexer' | 'pa
 /**
  * True for a resolver diagnostic that consumers report like a validator
  * diagnostic (file, line, localized, exit 1): a coded one (every include
- * error, the wave rules and NL.E0302), one from the wave checks, or an
+ * error, the wave rules, NL.E0302 and NL.E0004), one from the wave checks, or an
  * included file's syntax error. What is left is the uncoded shadow warnings
  * (specs/waves.md §6.1).
  */
@@ -326,6 +328,9 @@ export async function resolveIncludes(
     // References never cross a file boundary; report each included file's
     // unresolved ones in that file (an included file is never validated).
     ctx.diagnostics.push(...checkIncludedReferences(absPath, ctx.edges));
+    // Structural rule 6 holds for the merged result, isolated regions included;
+    // the validator defers it here for a file whose includes can add a swimlane.
+    ctx.diagnostics.push(...checkMergedSwimlanes(file, absPath, content, ctx.diagnostics));
     return {
         config,
         content,
