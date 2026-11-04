@@ -1218,7 +1218,7 @@ The parser enforces these rules and produces clear error messages with file posi
 3. Every entity must have at least an identifier or a title (or both).
 4. File structure must follow the section order: `nowline` directive (optional), includes, `config`, `roadmap`. The `nowline` directive, if present, must be the first non-comment, non-blank line.
 5. The `nowline` directive version must match `v\d+`. If the version is newer than the parser supports, emit an error identifying the required version.
-6. At least one swimlane is required in the merged result.
+6. At least one swimlane is required in the merged result (`NL.E0004`, on the `roadmap` declaration). Swimlanes from `roadmap:merge` includes and from `roadmap:isolate` regions count, so a file whose only content comes from includes is valid; `roadmap:ignore` includes do not. The validator reads only its own file, so it applies the rule only to a file with no includes or only `roadmap:ignore` ones; for any other file `resolveIncludes` applies it after every include is resolved, and stays silent when it has already reported an error (an unreadable or unparsable include may be the one that holds the swimlane).
 7. Indentation must be consistent within a file — either spaces or tabs, not both. Mixed indentation is a parse error identifying the first offending line.
 8. `label` declarations must appear in the roadmap section, not under `config`. A `label` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.
 9. `size` declarations must appear in the roadmap section, not under `config`. A `size` line placed before `roadmap` is an error. The error message should suggest moving the declaration under `roadmap`.

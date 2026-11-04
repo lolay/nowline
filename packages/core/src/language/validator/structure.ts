@@ -13,6 +13,7 @@ import type {
 import { isStyleDeclaration, isSwimlaneDeclaration } from '../../generated/ast.js';
 import { propKey } from '../../util/props.js';
 import { forEachDeclaredId } from '../ast-walk.js';
+import { swimlaneRuleNeedsIncludes } from '../include-swimlanes.js';
 import { acceptTr, locationOf } from './support.js';
 import {
     BCP47_RE,
@@ -174,7 +175,10 @@ export function checkIndentationConsistency(file: NowlineFile, accept: Validatio
 }
 
 // --- Rule 6: At least one swimlane ---
+// The rule is about the merged result. A file with an include that can add a
+// swimlane is left to the include resolver (`checkMergedSwimlanes`).
 export function checkSwimlaneRequired(file: NowlineFile, accept: ValidationAcceptor): void {
+    if (swimlaneRuleNeedsIncludes(file)) return;
     const hasSwimlane = file.roadmapEntries.some(isSwimlaneDeclaration);
     if (file.roadmapDecl && !hasSwimlane) {
         acceptTr(accept, 'error', { node: file.roadmapDecl }, 'NL.E0004');
