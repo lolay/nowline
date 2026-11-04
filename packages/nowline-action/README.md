@@ -109,11 +109,12 @@ without duplicating the markdown.
 
 ## Outputs
 
-| Output          | Description                                                                                                                       |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `rendered`      | Number of diagrams rendered                                                                                                       |
-| `failed`        | Number of diagrams that failed to render                                                                                          |
-| `changed-files` | Newline-separated list of files written or modified. Pair with `git-auto-commit-action` or `create-pull-request` to commit them.  |
+| Output          | Description                                                                                                                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rendered`      | Number of diagrams rendered                                                                                                                                                                                                       |
+| `failed`        | Number of diagrams that failed to render                                                                                                                                                                                          |
+| `changed-files` | Newline-separated list of files whose content changed, including files created. A diagram that renders byte-identical to the file on disk is left untouched and not listed. Pair with `git-auto-commit-action` or `create-pull-request` to commit them. |
+| `changed`       | `'true'` if any file changed, else `'false'`. Gate follow-up steps on this.                                                                                                                                                       |
 
 ## How it works under the hood
 
@@ -133,8 +134,12 @@ without duplicating the markdown.
     - Inserts (or refreshes) an HTML-comment-fenced image reference
       below the block. Idempotent across runs — the same input
       produces the same output and the same markdown.
-4. Emits the list of files that were written via the `changed-files`
-   output, ready to feed into the commit / PR action of your choice.
+4. Renders each diagram to a temp file and replaces the target only
+   when the bytes differ (a missing target counts as different), so
+   an unchanged diagram keeps its file and mtime.
+5. Emits the files that changed via the `changed-files` output (and
+   `changed: 'true'`), ready to feed into the commit / PR action of
+   your choice.
 
 ## Source
 

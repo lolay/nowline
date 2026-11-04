@@ -47,7 +47,9 @@ outputs:
     failed:
         description: 'Number of diagrams that failed to render'
     changed-files:
-        description: 'Newline-separated list of files written or modified by the action. Pair with stefanzweifel/git-auto-commit-action or peter-evans/create-pull-request to commit the result.'
+        description: 'Newline-separated list of files whose content the action changed, including files it created. A diagram that renders byte-identical to the file on disk is left untouched and not listed. Pair with stefanzweifel/git-auto-commit-action or peter-evans/create-pull-request to commit the result.'
+    changed:
+        description: "'true' if any file changed (changed-files is non-empty), else 'false'. Gate follow-up steps on this."
 
 runs:
     using: 'node24'

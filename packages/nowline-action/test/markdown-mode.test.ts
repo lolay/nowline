@@ -30,6 +30,7 @@ vi.mock('../src/cli.js', () => ({
 
 import type { Theme } from '../src/inputs.js';
 import { runMarkdownMode } from '../src/markdown-mode.js';
+import { buildOutputs } from '../src/outputs.js';
 
 const MARKDOWN_FIXTURE = [
     '# Roadmap',
@@ -113,7 +114,26 @@ describe('runMarkdownMode', () => {
         expect(after2).toBe(after1);
         expect(result2.rendered).toBe(2);
         expect(result2.failed).toBe(0);
-        expect(result2.changedFiles.filter((f) => f === 'roadmap.md')).toHaveLength(0);
+        expect(result2.changedFiles).toEqual([]);
+        expect(buildOutputs(result2).changed).toBe('false');
+    });
+
+    it('lists only the image whose render changed', async () => {
+        const inputs = {
+            mode: 'markdown',
+            files: '**/*.md',
+            outputDir: '.nowline/',
+            format: 'svg',
+            theme: 'light',
+        } as const;
+        const first = await runMarkdownMode(inputs);
+        const [stale] = first.changedFiles.filter((f) => f.startsWith('.nowline/'));
+        await fs.writeFile(path.join(workdir, stale), 'stale', 'utf-8');
+
+        const second = await runMarkdownMode(inputs);
+
+        expect(second.changedFiles).toEqual([stale]);
+        expect(buildOutputs(second).changed).toBe('true');
     });
 
     it('returns zero counts when the glob matches no files', async () => {

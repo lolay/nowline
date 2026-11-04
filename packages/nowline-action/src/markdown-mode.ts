@@ -5,10 +5,11 @@ import * as path from 'node:path';
 import * as core from '@actions/core';
 import fastGlob from 'fast-glob';
 
-import { ensureCli, renderOnce } from './cli.js';
+import { ensureCli } from './cli.js';
 import type { ActionInputs, RunResult, Theme } from './inputs.js';
 import { applyEdits, type BlockEdit } from './markdown-edit.js';
 import { type ScannedBlock, scanMarkdown } from './markdown-scan.js';
+import { renderIfChanged } from './render-if-changed.js';
 
 const DEFAULT_GLOB_IGNORE = ['**/node_modules/**', '**/.git/**'];
 
@@ -45,8 +46,8 @@ export async function runMarkdownMode(inputs: ActionInputs): Promise<RunResult> 
         });
         rendered += fileResult.rendered;
         failed += fileResult.failed;
-        for (const renderedPath of fileResult.renderedPaths) {
-            changedFiles.push(toPosixRelative(repoRoot, renderedPath));
+        for (const changedPath of fileResult.changedPaths) {
+            changedFiles.push(toPosixRelative(repoRoot, changedPath));
         }
         if (fileResult.markdownChanged) {
             changedFiles.push(toPosixRelative(repoRoot, mdPath));
@@ -74,7 +75,8 @@ interface FileResult {
     rendered: number;
     failed: number;
     markdownChanged: boolean;
-    renderedPaths: string[];
+    /** Rendered images whose bytes differ from what was on disk. */
+    changedPaths: string[];
 }
 
 interface ProcessMarkdownFileArgs {
@@ -91,7 +93,7 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     const { blocks } = scanMarkdown(source);
 
     if (blocks.length === 0) {
-        return { rendered: 0, failed: 0, markdownChanged: false, renderedPaths: [] };
+        return { rendered: 0, failed: 0, markdownChanged: false, changedPaths: [] };
     }
 
     core.info(
@@ -99,16 +101,18 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     );
 
     const successful: BlockEdit[] = [];
-    const renderedPaths: string[] = [];
+    const changedPaths: string[] = [];
     let rendered = 0;
     let failed = 0;
 
     for (const block of blocks) {
         const outPath = path.join(outputDir, `nowline-${block.slug}.${format}`);
-        const success = await renderBlock({ block, outPath, format, theme, nonWorking });
-        if (success) {
+        const outcome = await renderBlock({ block, outPath, format, theme, nonWorking });
+        if (outcome !== 'failed') {
             rendered += 1;
-            renderedPaths.push(outPath);
+            if (outcome === 'changed') {
+                changedPaths.push(outPath);
+            }
             successful.push({
                 block,
                 imagePath: relativeImagePath(mdPath, outPath),
@@ -119,17 +123,19 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     }
 
     if (successful.length === 0) {
-        return { rendered, failed, markdownChanged: false, renderedPaths };
+        return { rendered, failed, markdownChanged: false, changedPaths };
     }
 
     const updated = applyEdits(source, successful);
     if (updated === source) {
-        return { rendered, failed, markdownChanged: false, renderedPaths };
+        return { rendered, failed, markdownChanged: false, changedPaths };
     }
 
     await fs.writeFile(mdPath, updated, 'utf-8');
-    return { rendered, failed, markdownChanged: true, renderedPaths };
+    return { rendered, failed, markdownChanged: true, changedPaths };
 }
+
+type RenderOutcome = 'changed' | 'unchanged' | 'failed';
 
 interface RenderBlockArgs {
     block: ScannedBlock;
@@ -139,7 +145,7 @@ interface RenderBlockArgs {
     nonWorking?: 'hide' | 'show';
 }
 
-async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
+async function renderBlock(args: RenderBlockArgs): Promise<RenderOutcome> {
     const tmpFile = path.join(
         os.tmpdir(),
         `nowline-action-${args.block.slug}-${process.pid}.nowline`,
@@ -147,18 +153,18 @@ async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
 
     try {
         await fs.writeFile(tmpFile, args.block.source, 'utf-8');
-        await renderOnce({
+        const changed = await renderIfChanged({
             input: tmpFile,
             output: args.outPath,
             format: args.format,
             theme: args.theme,
             nonWorking: args.nonWorking,
         });
-        return true;
+        return changed ? 'changed' : 'unchanged';
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         core.error(`failed to render block ${args.block.slug}: ${message}`);
-        return false;
+        return 'failed';
     } finally {
         await fs.unlink(tmpFile).catch(() => undefined);
     }
