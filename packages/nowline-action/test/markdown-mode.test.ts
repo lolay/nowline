@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const renderCalls = vi.hoisted(() => [] as Array<{ nonWorking?: 'hide' | 'show' }>);
+const nowCalls = vi.hoisted(() => [] as Array<{ now?: string; extraArgs?: readonly string[] }>);
 
 vi.mock('../src/cli.js', () => ({
     ensureCli: vi.fn(async () => '0.0.0-test'),
@@ -15,8 +16,11 @@ vi.mock('../src/cli.js', () => ({
             format: 'svg' | 'png';
             theme: Theme;
             nonWorking?: 'hide' | 'show';
+            now?: string;
+            extraArgs?: readonly string[];
         }) => {
             renderCalls.push({ nonWorking: args.nonWorking });
+            nowCalls.push({ now: args.now, extraArgs: args.extraArgs });
             await fs.mkdir(path.dirname(args.output), { recursive: true });
             const source = await fs.readFile(args.input, 'utf-8');
             await fs.writeFile(
@@ -71,6 +75,7 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
         });
 
         expect(result.rendered).toBe(2);
@@ -99,6 +104,7 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
         });
         const after1 = await fs.readFile(path.join(workdir, 'roadmap.md'), 'utf-8');
 
@@ -108,6 +114,7 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
         });
         const after2 = await fs.readFile(path.join(workdir, 'roadmap.md'), 'utf-8');
 
@@ -145,6 +152,7 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
         });
 
         expect(result).toEqual({ rendered: 0, failed: 0, changedFiles: [] });
@@ -159,6 +167,7 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
         });
 
         expect(result.rendered).toBe(0);
@@ -173,6 +182,7 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
             nonWorking: 'show',
         });
         expect(renderCalls).toEqual([{ nonWorking: 'show' }, { nonWorking: 'show' }]);
@@ -185,7 +195,25 @@ describe('runMarkdownMode', () => {
             outputDir: '.nowline/',
             format: 'svg',
             theme: 'light',
+            extraArgs: [],
         });
         expect(renderCalls).toEqual([{ nonWorking: undefined }, { nonWorking: undefined }]);
+    });
+
+    it('passes now and extra args through to every block render', async () => {
+        nowCalls.length = 0;
+        await runMarkdownMode({
+            mode: 'markdown',
+            files: '**/*.md',
+            outputDir: '.nowline/',
+            format: 'svg',
+            theme: 'light',
+            now: '-',
+            extraArgs: ['--width', '1200'],
+        });
+        expect(nowCalls).toEqual([
+            { now: '-', extraArgs: ['--width', '1200'] },
+            { now: '-', extraArgs: ['--width', '1200'] },
+        ]);
     });
 });

@@ -1,0 +1,7 @@
+```release-note:added
+GitHub Action: `now` input sets the now-line date (`-` hides it, or a date pins it), so a committed image of an unchanged roadmap renders byte-identical and the commit step skips it. Without it the now-line defaults to today and the image changes daily.
+```
+
+```release-note:added
+GitHub Action: `args` input appends extra arguments to every `nowline` call, for CLI options the action has no input for.
+```

@@ -37,6 +37,14 @@ inputs:
         description: "hide or show: how a business calendar's non-working days appear. Leave empty to follow the roadmap's own `default roadmap non-working:` key (then hide). Needs a CLI that supports --non-working; the flag is passed only when this is set."
         required: false
         default: ''
+    now:
+        description: "Date for the now-line: `-` hides it, a date pins it (YYYY-MM-DD, or a full ISO 8601 instant like 2026-01-15T09:00:00Z). Leave empty to draw today, which changes the image every day. Use `-` or a fixed date for images you commit, so an unchanged roadmap renders byte-identical output."
+        required: false
+        default: ''
+    args:
+        description: "Extra arguments appended to every `nowline` render call, for CLI options this action has no input for (e.g. `--width 1600`). Split on whitespace; single or double quotes group a value with spaces; nothing is expanded. Appended last, so a repeated flag here overrides the action's own."
+        required: false
+        default: ''
     cli-version:
         description: 'Version of @nowline/cli to install on the runner. Defaults to the action version (lock-step).'
         required: false

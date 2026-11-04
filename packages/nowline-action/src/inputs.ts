@@ -1,5 +1,8 @@
 import * as core from '@actions/core';
-import { normalizeThemeName, THEME_NAMES, type ThemeName } from '@nowline/layout';
+import { normalizeThemeName, resolveToday, THEME_NAMES, type ThemeName } from '@nowline/layout';
+
+import type { RenderOptions } from './cli.js';
+import { splitArgs } from './split-args.js';
 
 export type Mode = 'file' | 'markdown';
 export type Format = 'svg' | 'png';
@@ -17,6 +20,10 @@ export interface ActionInputs {
     theme: Theme;
     /** Undefined when the input is empty, so the file's own key still applies. */
     nonWorking?: NonWorking;
+    /** `-` or a date for `--now`; undefined leaves the CLI default (today). */
+    now?: string;
+    /** Extra CLI arguments, appended after every flag the Action sets. */
+    extraArgs: readonly string[];
     cliVersion?: string;
 }
 
@@ -63,6 +70,28 @@ function readNonWorking(): NonWorking | undefined {
     return raw;
 }
 
+function readNow(): string | undefined {
+    const raw = core.getInput('now');
+    if (raw === '') return undefined;
+    // Layout's parser, the one the CLI's `--now` uses, so the Action accepts
+    // exactly what the CLI does and a typo fails here, not mid-render.
+    if (raw === '-' || resolveToday({ now: raw })) return raw;
+    throw new Error(
+        `now must be "-" or a date like 2026-01-15 or 2026-01-15T09:00:00Z (got "${raw}")`,
+    );
+}
+
+/** The render options every CLI call in a run shares. */
+export function renderOptions(inputs: ActionInputs): RenderOptions {
+    return {
+        format: inputs.format,
+        theme: inputs.theme,
+        nonWorking: inputs.nonWorking,
+        now: inputs.now,
+        extraArgs: inputs.extraArgs,
+    };
+}
+
 export function parseInputs(): ActionInputs {
     const mode = readMode();
     const input = core.getInput('input') || undefined;
@@ -85,6 +114,8 @@ export function parseInputs(): ActionInputs {
         format: readFormat(),
         theme: readTheme(),
         nonWorking: readNonWorking(),
+        now: readNow(),
+        extraArgs: splitArgs(core.getInput('args')),
         cliVersion,
     };
 }
