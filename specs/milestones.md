@@ -677,7 +677,7 @@ Make engine C (`scheduleRoadmap`) the one day-level scheduler. Engine B, the dat
 
 Depends on: m2o, m2p. Independent of m4.12 and m4.13. Spec: [`specs/scheduler-unification.md`](./scheduler-unification.md).
 
-### m4.12 — Core AST, style and calendar utilities (R3)
+### ~~m4.12 — Core AST, style and calendar utilities (R3)~~
 
 Add `ast-walk.ts`, `style-chain.ts`, `calendar-declarations.ts`, `props.ts` and `value-tables.ts` to `@nowline/core`, exported through an unstable `@nowline/core/internal` subpath, and move the validator, resolver, layout and LSP copies onto them. Removes the include-resolver to validator import, splits the validator into per-feature modules behind the unchanged `NowlineValidator`, makes layout's date parsing strict, and removes `effectiveWave` and `leadWave`.
 
@@ -685,7 +685,7 @@ Depends on: m2o, m2p. Independent of m4.11 and m4.13. Spec: [`specs/core-ast-uti
 
 Status: **implemented** (migration milestones m1-m3 of the spec; strict dates also reach the validator, spec §7 decision 5).
 
-### m4.13 — Shared surface options and one staging function (R4)
+### ~~m4.13 — Shared surface options and one staging function (R4)~~
 
 One options schema (theme, width, now, page size, non-working, asset root) and one `.nowlinerc` merge in `@nowline/config`, read by the CLI, `--serve`, MCP and the VS Code extension; one `stageRoadmap` (parse, resolve includes, load assets, lay out) in `@nowline/renderer`, called by the export kernel, the browser pipeline, `--serve` and MCP insights. `--serve` stops ignoring `--width`, `--no-links` and `--strict`, the logo is read once, one width rule applies everywhere, and MCP's `now` default becomes the local civil date with an optional `timezone`.
 
