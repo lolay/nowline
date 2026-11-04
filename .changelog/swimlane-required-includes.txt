@@ -1,0 +1,3 @@
+```release-note:fixed
+`NL.E0004` (at least one swimlane) counts swimlanes from `roadmap:merge` includes and `roadmap:isolate` regions, so a roadmap whose content all comes from includes validates (#235).
+```
