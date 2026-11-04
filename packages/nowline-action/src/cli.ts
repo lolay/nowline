@@ -40,6 +40,9 @@ async function isCliAtVersion(version: string): Promise<boolean> {
     }
 }
 
+/** Everything about a render except which file goes in and where it lands. */
+export type RenderOptions = Omit<RenderArgs, 'input' | 'output'>;
+
 export interface RenderArgs {
     input: string;
     output: string;
@@ -47,17 +50,24 @@ export interface RenderArgs {
     theme: Theme;
     /** Undefined leaves `--non-working` off, so the file's own key applies. */
     nonWorking?: 'hide' | 'show';
+    /** `-` or a date; undefined leaves `--now` off, so the CLI draws today. */
+    now?: string;
+    /** Appended last, so a repeated flag here wins (the CLI keeps the last value). */
+    extraArgs?: readonly string[];
 }
 
 /**
  * The argument list for `nowline <input> -o <output> -f <format> -t <theme>`,
- * plus `--non-working <mode>` only when it is set. A CLI older than the
- * display option rejects an unknown flag, so an unset input must not mention
- * it. Pure, so it is unit-testable without running the CLI.
+ * plus `--non-working <mode>` and `--now <date>` only when set, then any
+ * extra arguments. A CLI older than the display option rejects an unknown
+ * flag, so an unset input must not mention it. Pure, so it is unit-testable
+ * without running the CLI.
  */
 export function buildRenderArgs(args: RenderArgs): string[] {
     const argv = [args.input, '-o', args.output, '-f', args.format, '-t', args.theme];
     if (args.nonWorking) argv.push('--non-working', args.nonWorking);
+    if (args.now) argv.push('--now', args.now);
+    if (args.extraArgs) argv.push(...args.extraArgs);
     return argv;
 }
 

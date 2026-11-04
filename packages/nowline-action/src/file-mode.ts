@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 
 import { ensureCli, renderOnce } from './cli.js';
-import type { ActionInputs, RunResult } from './inputs.js';
+import { type ActionInputs, type RunResult, renderOptions } from './inputs.js';
 
 export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
     if (!inputs.input || !inputs.output) {
@@ -17,11 +17,9 @@ export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
     try {
         core.info(`rendering ${inputs.input} -> ${inputs.output}`);
         await renderOnce({
+            ...renderOptions(inputs),
             input: inputs.input,
             output: inputs.output,
-            format: inputs.format,
-            theme: inputs.theme,
-            nonWorking: inputs.nonWorking,
         });
         rendered = 1;
         changedFiles.push(inputs.output);
