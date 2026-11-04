@@ -136,7 +136,8 @@ without duplicating the markdown.
       produces the same output and the same markdown.
 4. Renders each diagram to a temp file and replaces the target only
    when the bytes differ (a missing target counts as different), so
-   an unchanged diagram keeps its file and mtime.
+   an unchanged diagram keeps its file and mtime. A replaced file
+   keeps the rendered file's timestamps.
 5. Emits the files that changed via the `changed-files` output (and
    `changed: 'true'`), ready to feed into the commit / PR action of
    your choice.

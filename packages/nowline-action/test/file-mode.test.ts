@@ -7,12 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RenderArgs } from '../src/cli.js';
 
 const calls = vi.hoisted(() => [] as RenderArgs[]);
+const RENDERED_AT = vi.hoisted(() => new Date('2021-06-15T12:00:00Z'));
 
 vi.mock('../src/cli.js', () => ({
     ensureCli: vi.fn(async () => '0.0.0-test'),
     renderOnce: vi.fn(async (args: RenderArgs) => {
         calls.push(args);
         await fs.writeFile(args.output, `<!-- mock ${args.format}/${args.theme} -->\n`, 'utf-8');
+        await fs.utimes(args.output, RENDERED_AT, RENDERED_AT);
     }),
 }));
 
@@ -94,6 +96,14 @@ describe('runFileMode: changed-files', () => {
 
         expect(result.changedFiles).toEqual(['roadmap.svg']);
         expect(await fs.readFile('roadmap.svg', 'utf-8')).toBe('<!-- mock svg/light -->\n');
+    });
+
+    it("gives a replaced output the rendered file's timestamps", async () => {
+        await fs.writeFile('roadmap.svg', 'stale', 'utf-8');
+
+        await runFileMode(BASE);
+
+        expect((await fs.stat('roadmap.svg')).mtime.getTime()).toBe(RENDERED_AT.getTime());
     });
 
     it('leaves the existing output untouched when the render fails', async () => {

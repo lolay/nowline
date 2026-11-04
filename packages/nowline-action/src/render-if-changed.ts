@@ -7,7 +7,8 @@ import { type RenderArgs, renderOnce } from './cli.js';
 /**
  * Render into a scratch file and only replace `args.output` when the bytes
  * differ, so `changed-files` lists real modifications and an unchanged image
- * keeps its mtime. A missing output counts as changed.
+ * keeps its mtime. A missing output counts as changed. A replaced output takes
+ * the rendered file's timestamps.
  *
  * Returns whether the output changed. Throws when the render fails; the
  * existing output is left untouched in that case.
@@ -25,7 +26,8 @@ export async function renderIfChanged(args: RenderArgs): Promise<boolean> {
             return false;
         }
         // Copy rather than rename: the temp dir may sit on another filesystem.
-        await fs.copyFile(tmpOutput, args.output);
+        // `copyFile` can't keep timestamps; `cp` can (like `cp -p`).
+        await fs.cp(tmpOutput, args.output, { preserveTimestamps: true });
         return true;
     } finally {
         await fs.rm(tmpDir, { recursive: true, force: true });
