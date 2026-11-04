@@ -55,6 +55,37 @@ describe('buildRenderArgs', () => {
         const args = buildRenderArgs({ ...BASE, nonWorking: 'hide' });
         expect(args.slice(-2)).toEqual(['--non-working', 'hide']);
     });
+
+    it('never mentions --now when it is unset', () => {
+        expect(buildRenderArgs(BASE)).not.toContain('--now');
+    });
+
+    it('passes --now verbatim, - included', () => {
+        expect(buildRenderArgs({ ...BASE, now: '-' }).slice(-2)).toEqual(['--now', '-']);
+        expect(buildRenderArgs({ ...BASE, now: '2026-01-15' }).slice(-2)).toEqual([
+            '--now',
+            '2026-01-15',
+        ]);
+    });
+
+    it('appends extra args after every flag the Action sets, so they win', () => {
+        const args = buildRenderArgs({
+            ...BASE,
+            nonWorking: 'show',
+            now: '-',
+            extraArgs: ['-t', 'dark', '--width', '1200'],
+        });
+        expect(args.slice(7)).toEqual([
+            '--non-working',
+            'show',
+            '--now',
+            '-',
+            '-t',
+            'dark',
+            '--width',
+            '1200',
+        ]);
+    });
 });
 
 // The same three assertions against the built CLI, when it is present: the

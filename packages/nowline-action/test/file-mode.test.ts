@@ -22,6 +22,7 @@ const BASE: ActionInputs = {
     outputDir: '.nowline/',
     format: 'svg',
     theme: 'light',
+    extraArgs: [],
 };
 
 describe('runFileMode: non-working', () => {
@@ -39,5 +40,25 @@ describe('runFileMode: non-working', () => {
         await runFileMode(BASE);
         expect(calls).toHaveLength(1);
         expect(calls[0].nonWorking).toBeUndefined();
+    });
+});
+
+describe('runFileMode: now and args', () => {
+    beforeEach(() => {
+        calls.length = 0;
+    });
+
+    it('passes now and extra args through to the CLI call', async () => {
+        await runFileMode({ ...BASE, now: '-', extraArgs: ['--width', '1200'] });
+        expect(calls).toHaveLength(1);
+        expect(calls[0].now).toBe('-');
+        expect(calls[0].extraArgs).toEqual(['--width', '1200']);
+        expect(calls[0].input).toBe('roadmap.nowline');
+        expect(calls[0].output).toBe('roadmap.svg');
+    });
+
+    it('leaves now undefined when the input is unset', async () => {
+        await runFileMode(BASE);
+        expect(calls[0].now).toBeUndefined();
     });
 });

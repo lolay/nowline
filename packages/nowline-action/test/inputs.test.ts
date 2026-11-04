@@ -11,6 +11,8 @@ const INPUT_KEYS = [
     'INPUT_FORMAT',
     'INPUT_THEME',
     'INPUT_NON-WORKING',
+    'INPUT_NOW',
+    'INPUT_ARGS',
     'INPUT_CLI-VERSION',
 ];
 
@@ -123,5 +125,69 @@ describe('parseInputs: non-working', () => {
     it('rejects an unknown value', () => {
         setInputs({ mode: 'markdown', 'non-working': 'maybe' });
         expect(() => parseInputs()).toThrow(/non-working must be "hide" or "show" \(got "maybe"\)/);
+    });
+});
+
+describe('parseInputs: now', () => {
+    beforeEach(() => {
+        for (const key of INPUT_KEYS) delete process.env[key];
+    });
+
+    afterEach(() => {
+        for (const key of INPUT_KEYS) delete process.env[key];
+    });
+
+    it('leaves now undefined when the input is empty, so the CLI draws today', () => {
+        setInputs({ mode: 'markdown', now: '' });
+        expect(parseInputs().now).toBeUndefined();
+    });
+
+    it('accepts - to suppress the now-line', () => {
+        setInputs({ mode: 'markdown', now: '-' });
+        expect(parseInputs().now).toBe('-');
+    });
+
+    it('accepts a bare date and an ISO instant verbatim', () => {
+        setInputs({ mode: 'markdown', now: '2026-01-15' });
+        expect(parseInputs().now).toBe('2026-01-15');
+        setInputs({ mode: 'markdown', now: '2026-01-15T09:00:00Z' });
+        expect(parseInputs().now).toBe('2026-01-15T09:00:00Z');
+    });
+
+    it('rejects a non-date and an impossible day', () => {
+        setInputs({ mode: 'markdown', now: 'today' });
+        expect(() => parseInputs()).toThrow(/now must be "-" or a date .*\(got "today"\)/);
+        setInputs({ mode: 'markdown', now: '2026-02-30' });
+        expect(() => parseInputs()).toThrow(/got "2026-02-30"/);
+    });
+});
+
+describe('parseInputs: args', () => {
+    beforeEach(() => {
+        for (const key of INPUT_KEYS) delete process.env[key];
+    });
+
+    afterEach(() => {
+        for (const key of INPUT_KEYS) delete process.env[key];
+    });
+
+    it('is empty when the input is empty', () => {
+        setInputs({ mode: 'markdown' });
+        expect(parseInputs().extraArgs).toEqual([]);
+    });
+
+    it('splits on whitespace, newlines included', () => {
+        setInputs({ mode: 'markdown', args: '--now -\n  --width 1200' });
+        expect(parseInputs().extraArgs).toEqual(['--now', '-', '--width', '1200']);
+    });
+
+    it('keeps a quoted value with spaces as one argument', () => {
+        setInputs({ mode: 'markdown', args: `--locale "en US" --x 'a b' ""` });
+        expect(parseInputs().extraArgs).toEqual(['--locale', 'en US', '--x', 'a b', '']);
+    });
+
+    it('rejects an unclosed quote', () => {
+        setInputs({ mode: 'markdown', args: '--x "oops' });
+        expect(() => parseInputs()).toThrow(/unclosed " quote/);
     });
 });

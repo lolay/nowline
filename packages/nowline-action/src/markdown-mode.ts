@@ -5,8 +5,8 @@ import * as path from 'node:path';
 import * as core from '@actions/core';
 import fastGlob from 'fast-glob';
 
-import { ensureCli, renderOnce } from './cli.js';
-import type { ActionInputs, RunResult, Theme } from './inputs.js';
+import { ensureCli, type RenderOptions, renderOnce } from './cli.js';
+import { type ActionInputs, type RunResult, renderOptions } from './inputs.js';
 import { applyEdits, type BlockEdit } from './markdown-edit.js';
 import { type ScannedBlock, scanMarkdown } from './markdown-scan.js';
 
@@ -39,9 +39,7 @@ export async function runMarkdownMode(inputs: ActionInputs): Promise<RunResult> 
         const fileResult = await processMarkdownFile({
             mdPath,
             outputDir,
-            format: inputs.format,
-            theme: inputs.theme,
-            nonWorking: inputs.nonWorking,
+            options: renderOptions(inputs),
         });
         rendered += fileResult.rendered;
         failed += fileResult.failed;
@@ -80,13 +78,11 @@ interface FileResult {
 interface ProcessMarkdownFileArgs {
     mdPath: string;
     outputDir: string;
-    format: 'svg' | 'png';
-    theme: Theme;
-    nonWorking?: 'hide' | 'show';
+    options: RenderOptions;
 }
 
 async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileResult> {
-    const { mdPath, outputDir, format, theme, nonWorking } = args;
+    const { mdPath, outputDir, options } = args;
     const source = await fs.readFile(mdPath, 'utf-8');
     const { blocks } = scanMarkdown(source);
 
@@ -104,8 +100,8 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
     let failed = 0;
 
     for (const block of blocks) {
-        const outPath = path.join(outputDir, `nowline-${block.slug}.${format}`);
-        const success = await renderBlock({ block, outPath, format, theme, nonWorking });
+        const outPath = path.join(outputDir, `nowline-${block.slug}.${options.format}`);
+        const success = await renderBlock({ block, outPath, options });
         if (success) {
             rendered += 1;
             renderedPaths.push(outPath);
@@ -134,9 +130,7 @@ async function processMarkdownFile(args: ProcessMarkdownFileArgs): Promise<FileR
 interface RenderBlockArgs {
     block: ScannedBlock;
     outPath: string;
-    format: 'svg' | 'png';
-    theme: Theme;
-    nonWorking?: 'hide' | 'show';
+    options: RenderOptions;
 }
 
 async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
@@ -148,11 +142,9 @@ async function renderBlock(args: RenderBlockArgs): Promise<boolean> {
     try {
         await fs.writeFile(tmpFile, args.block.source, 'utf-8');
         await renderOnce({
+            ...args.options,
             input: tmpFile,
             output: args.outPath,
-            format: args.format,
-            theme: args.theme,
-            nonWorking: args.nonWorking,
         });
         return true;
     } catch (err) {
