@@ -259,7 +259,7 @@ The GitHub Action is the solution for contexts where the embed script cannot run
 **Source:** `packages/nowline-action/` in this monorepo.
 **Marketplace mirror:** `lolay/nowline-action` (write-only; populated by `release.yml` on each tag with the compiled `action.yml` + `dist/`. Exists because GitHub Marketplace requires `action.yml` at repo root).
 **License:** Apache 2.0.
-**Milestone:** m3.5 — sequenced before m4 so the GitHub-bound rendering path lands first. The action shells out to `@nowline/cli`. At dev time that's a workspace symlink so cross-cutting PRs stay atomic; at runtime the action `npm install -g`s the CLI version that matches its tag, so the published artifact consumes the CLI exactly the way an external user would.
+**Milestone:** m3.5 — sequenced before m4 so the GitHub-bound rendering path lands first. The action shells out to `@nowline/cli`. At dev time that's a workspace symlink so cross-cutting PRs stay atomic; at runtime the action `npm install`s the CLI version that matches its tag into a prefix under `$RUNNER_TEMP` and adds its `node_modules/.bin` to PATH (never `-g`: a global install links the man pages into `/usr/local/share/man`, which a stock runner can't write), so the published artifact consumes the CLI exactly the way an external user would.
 
 ### Render-only contract
 
