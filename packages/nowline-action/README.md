@@ -90,8 +90,9 @@ without duplicating the markdown.
 Rendering is byte-deterministic: the same source, inputs and CLI version
 produce the same bytes. The one input that moves on its own is the
 now-line, which defaults to today. Hide it (`now: '-'`) or pin it to a
-date, and an unchanged roadmap renders an identical image, so the commit
-step finds nothing to commit. The action doesn't need to know what the PR
+date, and an unchanged roadmap renders an identical image: the action
+leaves the file alone, `changed-files` comes back empty and `changed` is
+`'false'`, and the commit step finds nothing to commit. The action doesn't need to know what the PR
 touched; git does that.
 
 ```yaml
@@ -178,17 +179,18 @@ Things that bite:
 | `format`       | `svg` or `png`                                                                             | `svg`              |
 | `theme`        | `light`, `dark`, or `grayscale` (`greyscale` alias)                                        | `light`            |
 | `now`          | `-` hides the now-line; a date pins it (`YYYY-MM-DD` or an ISO 8601 instant). Empty draws today, so the image changes daily. | (empty)            |
-| `args`         | Extra arguments appended to every `nowline` call, for options without an input here (e.g. `--width 1600`). Whitespace-split, quotes group; appended last, so they override (but leave `-o` alone: `changed-files` reports the `output` input). | (empty)            |
+| `args`         | Extra arguments appended to every `nowline` call, for options without an input here (e.g. `--width 1600`). Whitespace-split, quotes group; appended last, so they override (but leave `-o` alone: the action renders to a temp file and compares it with `output`). | (empty)            |
 | `non-working`  | `hide` or `show`: how a business calendar's non-working days appear. Empty follows the roadmap's own `default roadmap non-working:` key, then `hide`. | (empty)            |
 | `cli-version`  | Version of `@nowline/cli` to install on the runner. Defaults to the action version.        | (action version)   |
 
 ## Outputs
 
-| Output          | Description                                                                                                                       |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `rendered`      | Number of diagrams rendered                                                                                                       |
-| `failed`        | Number of diagrams that failed to render                                                                                          |
-| `changed-files` | Newline-separated list of files written or modified. Pair with `git-auto-commit-action` or `create-pull-request` to commit them.  |
+| Output          | Description                                                                                                                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rendered`      | Number of diagrams rendered                                                                                                                                                                                                       |
+| `failed`        | Number of diagrams that failed to render                                                                                                                                                                                          |
+| `changed-files` | Newline-separated list of files whose content changed, including files created. A diagram that renders byte-identical to the file on disk is left untouched and not listed. Pair with `git-auto-commit-action` or `create-pull-request` to commit them. |
+| `changed`       | `'true'` if any file changed, else `'false'`. Gate follow-up steps on this.                                                                                                                                                       |
 
 ## How it works under the hood
 
@@ -209,8 +211,13 @@ Things that bite:
     - Inserts (or refreshes) an HTML-comment-fenced image reference
       below the block. Idempotent across runs — the same input
       produces the same output and the same markdown.
-4. Emits the list of files that were written via the `changed-files`
-   output, ready to feed into the commit / PR action of your choice.
+4. Renders each diagram to a temp file and replaces the target only
+   when the bytes differ (a missing target counts as different), so
+   an unchanged diagram keeps its file and mtime. A replaced file
+   keeps the rendered file's timestamps.
+5. Emits the files that changed via the `changed-files` output (and
+   `changed: 'true'`), ready to feed into the commit / PR action of
+   your choice.
 
 ## Source
 

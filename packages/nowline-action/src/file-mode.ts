@@ -1,7 +1,8 @@
 import * as core from '@actions/core';
 
-import { ensureCli, renderOnce } from './cli.js';
+import { ensureCli } from './cli.js';
 import { type ActionInputs, type RunResult, renderOptions } from './inputs.js';
+import { renderIfChanged } from './render-if-changed.js';
 
 export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
     if (!inputs.input || !inputs.output) {
@@ -16,13 +17,17 @@ export async function runFileMode(inputs: ActionInputs): Promise<RunResult> {
 
     try {
         core.info(`rendering ${inputs.input} -> ${inputs.output}`);
-        await renderOnce({
+        const changed = await renderIfChanged({
             ...renderOptions(inputs),
             input: inputs.input,
             output: inputs.output,
         });
         rendered = 1;
-        changedFiles.push(inputs.output);
+        if (changed) {
+            changedFiles.push(inputs.output);
+        } else {
+            core.info(`${inputs.output} unchanged`);
+        }
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         core.error(`failed to render ${inputs.input}: ${message}`);

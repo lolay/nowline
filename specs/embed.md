@@ -340,7 +340,8 @@ The action:
 |--------|-------------|
 | `rendered` | Number of diagrams rendered |
 | `failed` | Number of diagrams that failed to render |
-| `changed-files` | Newline-separated list of files written or modified by the action. Pair with `git-auto-commit-action` or `create-pull-request` to commit them. |
+| `changed-files` | Newline-separated list of files whose content the action changed, including files it created. Each diagram renders to a temp file first; one that is byte-identical to the file on disk is left untouched and not listed. Pair with `git-auto-commit-action` or `create-pull-request` to commit them. |
+| `changed` | `'true'` if any file changed (`changed-files` is non-empty), else `'false'`. Gate follow-up steps on this. |
 
 ### How It Works Under the Hood
 

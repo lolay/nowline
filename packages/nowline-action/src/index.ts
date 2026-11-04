@@ -3,6 +3,7 @@ import * as core from '@actions/core';
 import { runFileMode } from './file-mode.js';
 import { parseInputs } from './inputs.js';
 import { runMarkdownMode } from './markdown-mode.js';
+import { buildOutputs } from './outputs.js';
 
 async function main(): Promise<void> {
     try {
@@ -10,9 +11,9 @@ async function main(): Promise<void> {
         const result =
             inputs.mode === 'markdown' ? await runMarkdownMode(inputs) : await runFileMode(inputs);
 
-        core.setOutput('rendered', String(result.rendered));
-        core.setOutput('failed', String(result.failed));
-        core.setOutput('changed-files', result.changedFiles.join('\n'));
+        for (const [name, value] of Object.entries(buildOutputs(result))) {
+            core.setOutput(name, value);
+        }
 
         if (result.failed > 0) {
             core.setFailed(
