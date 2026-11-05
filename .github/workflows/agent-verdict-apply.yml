@@ -2,6 +2,10 @@ name: Agent verdict apply
 
 # Reads a verdict marker from a newly-posted issue or PR comment and applies
 # the proposed state label, gated by:
+#   (0) the comment author must be trusted (.github/scripts/verdict-author-gate.sh):
+#       a maintainer with write permission, or the Copilot coding agent for its
+#       stop verdicts only (agent-done, originator-input, maintainer-decide). Anyone else's marker is ignored
+#       silently (r1.f4),
 #   (a) any `originator-*` or `maintainer-*` label currently present blocks
 #       any `agent-*` verdict (the override check — humans win unconditionally),
 #   (b) the proposed verdict must be in the per-state allowed-verdicts list
@@ -13,11 +17,13 @@ name: Agent verdict apply
 #       `<!-- agent-verdict: <label> -->` form was mangled by gh-aw's T6
 #       Markdown Safety transformations and silently dropped by the parser.)
 #
-# Triggered by issue_comment.created on both issues and PRs. Author-agnostic
-# by design: verdicts emitted by gh-aw phase orchestrators (via the
-# safe-outputs.add-comment channel), by Copilot coding-agent sessions (their
-# empty-diff fallback path inside agent-deep / agent-exec), and by human
-# moderators using the same marker syntax all flow through this workflow.
+# Triggered by issue_comment.created on both issues and PRs. Verdicts emitted
+# by gh-aw phase orchestrators (via the safe-outputs.add-comment channel, posted
+# as the GH_AW_GITHUB_TOKEN owner), by Copilot coding-agent sessions (their
+# empty-diff fallback path inside agent-deep / agent-exec), and by maintainers
+# using the same marker syntax all flow through this workflow. The author gate
+# (0) runs before any label read or write: the label is applied with a write
+# PAT, so the next phase's gh-aw role gate passes whoever wrote the comment.
 #
 # Uses GH_AW_AGENT_TOKEN (not GITHUB_TOKEN) so the resulting labeled event
 # fires downstream phase workflows. Same loop-prevention finding as
@@ -85,8 +91,27 @@ jobs:
           echo "found=true" >> "$GITHUB_OUTPUT"
           echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
 
-      - name: Apply verdict with state-machine and override check
+      # Sparse checkout of the gate script only. issue_comment runs on the
+      # default branch, so this is trusted code, never a PR head.
+      - name: Check out the author gate
         if: steps.parse.outputs.found == 'true'
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Check verdict author
+        id: author
+        if: steps.parse.outputs.found == 'true'
+        env:
+          VERDICT: ${{ steps.parse.outputs.verdict }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_AUTHOR_TYPE: ${{ github.event.comment.user.type }}
+          COMMENT_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: .github/scripts/verdict-author-gate.sh
+
+      - name: Apply verdict with state-machine and override check
+        if: steps.parse.outputs.found == 'true' && steps.author.outputs.trusted == 'true'
         env:
           VERDICT: ${{ steps.parse.outputs.verdict }}
         run: |
