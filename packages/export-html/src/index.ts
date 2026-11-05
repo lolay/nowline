@@ -35,7 +35,11 @@ export async function exportHtml(
     svg: string,
     options: HtmlOptions = {},
 ): Promise<string> {
-    const title = escapeText(options.title ?? roadmapTitle(inputs.ast.roadmapDecl ?? undefined));
+    const rawTitle = options.title ?? roadmapTitle(inputs.ast.roadmapDecl ?? undefined);
+    const title = escapeText(rawTitle);
+    // The title is user-controlled and DSL strings unescape `\"`, so the
+    // attribute needs quote escaping that `<title>` text content doesn't.
+    const ariaLabel = escapeAttr(rawTitle);
     const generator = escapeAttr(options.generator ?? 'nowline (m2c)');
     const surfaceColor = inputs.model.backgroundColor;
 
@@ -52,7 +56,7 @@ export async function exportHtml(
     lines.push('</style>');
     lines.push('</head>');
     lines.push('<body>');
-    lines.push(`<main id="nowline-viewport" role="img" aria-label="${title}">`);
+    lines.push(`<main id="nowline-viewport" role="img" aria-label="${ariaLabel}">`);
     lines.push(svg.trimEnd());
     lines.push('</main>');
     lines.push('<noscript><style>#nowline-viewport { overflow: auto; }</style></noscript>');
