@@ -222,6 +222,8 @@ Locale, strict, width, and asset-root stay settings-only — they aren't things 
 
 **Save PNG** (the preview toolbar "Save" button) and the **copy-PNG fallback temp file** both use the kernel (`@nowline/export` via `exportInProcess`) and are byte-for-byte identical to `Nowline: Export… → PNG`. The in-clipboard PNG is the only exception.
 
+**What gets exported.** Save, the copy-PNG fallback and `Nowline: Export…` write the diagram the preview drew. With a preview open for the file they use the text and resolved options of its last render: the editor's text, unsaved edits included, and the theme, now-line (with `nowline.preview.timezone`), locale, link visibility, non-working display and asset root that `resolvePreviewOptions` produced from the toolbar, settings, `.nowlinerc` and editor. The text goes to the kernel as is; the file is not re-read, so an untitled document exports too. With no preview open, `Export…` resolves the same chain once from the editor's text (or the file, when it isn't open). Canvas width is the exception: exports read `nowline.export.width`, not the preview's width. The CLI override below reads the file from disk.
+
 **CLI override escape hatch.** If `nowline.export.cliPath` is set to an explicit path (anything other than the default `'nowline'`), the command shells out to that binary instead — preserving exact CLI-identical output for environments where that matters. The existing in-webview SVG and browser-canvas-PNG toolbar buttons are unaffected.
 
 **.vsix footprint.** The compressed marketplace bundle is approximately 2.5 MB (extension.cjs ~4 MB minified + resvg.wasm ~2.4 MB + server.cjs ~0.6 MB). This is larger than the pre-m3e footprint (~2 MB) but well within the VS Code Marketplace recommended limit.

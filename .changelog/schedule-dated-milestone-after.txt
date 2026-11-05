@@ -1,0 +1,3 @@
+```release-note:fixed
+An item, group or parallel with `after:` a dated milestone now starts on the milestone's date in the XLSX export's Items sheet, as the chart draws it, instead of where its lane would otherwise start it. With waves, the Mermaid export's wave-end milestones and the XLSX wave spans follow. Inside an isolated region, the chart now resolves `after:` the region's own dated milestone too.
+```

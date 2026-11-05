@@ -200,6 +200,21 @@ export function scheduleRoadmap(
         }
     }
 
+    // Pre-seed dated milestones the same way: an item, group or parallel
+    // `after:<dated milestone>` resolves to the milestone's day, as engine A
+    // seeds date-pinned anchors and milestones together before it places
+    // (`phases/place.ts`). After-only milestones still resolve after the lanes.
+    const seedDatedMilestones = (
+        milestones: ResolvedContent['milestones'],
+        into: Map<string, number>,
+    ): void => {
+        for (const [id, ms] of milestones) {
+            const d = parseIsoDate(propValue(ms.properties, 'date'));
+            if (d) into.set(id, dayOf(d));
+        }
+    };
+    seedDatedMilestones(resolved.content.milestones, milestoneEnd);
+
     // The id maps one walk resolves `after:` against: the main lanes share
     // the maps above; an isolated region gets fresh maps.
     interface WalkScope {
@@ -334,6 +349,7 @@ export function scheduleRoadmap(
                 reachMax(day);
             }
         }
+        seedDatedMilestones(content.milestones, regionMilestoneEnd);
         const { walkLane, resolveAfterDay } = makeWalker(
             {
                 itemEnd: regionItemEnd,
