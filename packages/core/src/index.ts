@@ -83,3 +83,4 @@ export {
 } from './language/waves-plan.js';
 export { TEMPLATE_NAMES, type TemplateName } from './templates.js';
 export { singleLine } from './util/single-line.js';
+export { isWebLink } from './util/web-link.js';

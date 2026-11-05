@@ -10,6 +10,7 @@
 // it.
 
 import type { EntityProperty, ItemDeclaration, LabelDeclaration } from '@nowline/core';
+import { isWebLink } from '@nowline/core';
 import { deriveTotalEffortDays, resolveDuration } from '../calendar.js';
 import {
     capacityIconDxTerms,
@@ -184,7 +185,9 @@ function resolveActorDisplay(
 }
 
 export function parseLinkIcon(link: string | undefined): { icon: LinkIconKind; href?: string } {
-    if (!link) return { icon: 'none' };
+    // A non-web link is NL.E0414; drop it here too, so a caller that skips
+    // validation never gets a `javascript:` (or any other scheme) href.
+    if (!link || !isWebLink(link)) return { icon: 'none' };
     const lower = link.toLowerCase();
     if (lower.includes('linear.app')) return { icon: 'linear', href: link };
     if (lower.includes('github.com')) return { icon: 'github', href: link };

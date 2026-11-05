@@ -283,6 +283,8 @@ export const messages: MessageBundle = {
         `La date inline «\u00A0${a.date}\u00A0» dans «\u00A0${a.key}:\u00A0» exige que la roadmap déclare «\u00A0start:\u00A0». Ajoutez start:AAAA-MM-JJ à la roadmap.`,
     'NL.E0413': (a: { key: string; date: string; start: string }) =>
         `La date inline «\u00A0${a.date}\u00A0» dans «\u00A0${a.key}:\u00A0» précède le début de la roadmap (${a.start}).`,
+    'NL.E0414': (a: { value: string }) =>
+        `Lien invalide «\u00A0${a.value}\u00A0». Utilisez une URL absolue en http:// ou https://.`,
 
     // Ancre / jalon / note de bas de page
     'NL.E0500': (a: { name: string }) =>

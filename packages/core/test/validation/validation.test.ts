@@ -1855,3 +1855,62 @@ describe('NL.E0405: an impossible day on any date key', () => {
         expect(await coded(source)).toEqual([]);
     });
 });
+
+// r1.f5: `link:` is a URL (specs/dsl.md "Links"), and the renderer writes it
+// into a live `<a href>`, so anything but an absolute http(s) URL is an error.
+describe('NL.E0414: link must be an http(s) URL', () => {
+    const NBSP = '\u00A0';
+    const HEAD = 'roadmap r\n';
+    type Coded = { code: 'NL.E0414'; args: [{ value: string }] };
+
+    async function codes(source: string): Promise<(string | undefined)[]> {
+        const r = await parse(source);
+        return r.diagnostics.map((d) => (d.data as Coded | undefined)?.code);
+    }
+
+    it('rejects a javascript: link on an item, in English and French', async (): Promise<void> => {
+        const r = await parse(
+            `${HEAD}swimlane s\n  item x duration:1w link:"javascript:alert(document.domain)"\n`,
+        );
+        const found = r.diagnostics.filter(
+            (d) => (d.data as Coded | undefined)?.code === 'NL.E0414',
+        );
+        expect(found.map((d) => d.message)).toEqual([
+            'Invalid link "javascript:alert(document.domain)". Use an absolute http:// or https:// URL.',
+        ]);
+        expect(found[0].severity).toBe(1);
+        const { code, args } = found[0].data as Coded;
+        expect(tr('fr', code, ...args)).toBe(
+            `Lien invalide «${NBSP}javascript:alert(document.domain)${NBSP}». Utilisez une URL absolue en http:// ou https://.`,
+        );
+    });
+
+    it.each([
+        ['a data: URL', 'link:"data:text/html,<b>x</b>"'],
+        ['a relative path', 'link:"./docs/spec.md"'],
+        ['a bare identifier', 'link:spec'],
+        ['a scheme-relative URL', 'link:"//evil.example"'],
+    ])('rejects %s', async (_name, prop): Promise<void> => {
+        expect(await codes(`${HEAD}swimlane s\n  item x duration:1w ${prop}\n`)).toEqual([
+            'NL.E0414',
+        ]);
+    });
+
+    it('checks link: on every entity, not only items', async (): Promise<void> => {
+        const source =
+            `roadmap r start:2026-01-05\n` +
+            `label l "L" link:"javascript:a()"\n` +
+            `person p "P" link:"javascript:b()"\n` +
+            `milestone m date:2026-01-05 link:"javascript:c()"\n` +
+            `swimlane s link:"javascript:d()"\n  item x duration:1w\n`;
+        expect(await codes(source)).toEqual(['NL.E0414', 'NL.E0414', 'NL.E0414', 'NL.E0414']);
+    });
+
+    it.each([
+        ['a bare https URL', 'link:https://github.com/acme/auth/issues/123'],
+        ['a bare http URL', 'link:http://intranet.example/spec'],
+        ['a quoted https URL', 'link:"https://linear.app/acme/issue/ENG-1"'],
+    ])('accepts %s', async (_name, prop): Promise<void> => {
+        expect(await codes(`${HEAD}swimlane s\n  item x duration:1w ${prop}\n`)).toEqual([]);
+    });
+});
