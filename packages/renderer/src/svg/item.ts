@@ -3,7 +3,7 @@
 // indicators, link icon, overflow tail and label chips, plus the capacity suffix
 // and inline date pins that lanes and containers reuse.
 
-import { isWebLink } from '@nowline/core';
+import { isAllowedLink } from '@nowline/core';
 import type { InlineDatePin, PositionedCapacity, PositionedItem, Theme } from '@nowline/layout';
 import {
     CORNER_RADIUS_PX,
@@ -567,9 +567,9 @@ function renderItemLinkIcon(i: PositionedItem, options: RenderOptions, palette: 
         });
         const inner = tileRect + glyph;
         // Defence in depth behind NL.E0414 and layout's parseLinkIcon: only an
-        // http(s) URL becomes a live <a href>.
+        // http(s) or mailto: URL becomes a live <a href>.
         const link =
-            i.linkHref && isWebLink(i.linkHref)
+            i.linkHref && isAllowedLink(i.linkHref)
                 ? tag('a', { href: i.linkHref, target: '_blank', rel: 'noopener' }, inner)
                 : inner;
         parts.push(link);

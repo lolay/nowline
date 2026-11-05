@@ -284,7 +284,7 @@ export const messages: MessageBundle = {
     'NL.E0413': (a: { key: string; date: string; start: string }) =>
         `La date inline «\u00A0${a.date}\u00A0» dans «\u00A0${a.key}:\u00A0» précède le début de la roadmap (${a.start}).`,
     'NL.E0414': (a: { value: string }) =>
-        `Lien invalide «\u00A0${a.value}\u00A0». Utilisez une URL absolue en http:// ou https://.`,
+        `Lien invalide «\u00A0${a.value}\u00A0». Utilisez une URL absolue en http:// ou https://, ou une URL «\u00A0mailto:\u00A0» entre guillemets.`,
 
     // Ancre / jalon / note de bas de page
     'NL.E0500': (a: { name: string }) =>

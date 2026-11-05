@@ -258,7 +258,7 @@ export const messages = {
     'NL.E0413': (a: { key: string; date: string; start: string }) =>
         `Inline date "${a.date}" in "${a.key}:" is before roadmap start ${a.start}.`,
     'NL.E0414': (a: { value: string }) =>
-        `Invalid link "${a.value}". Use an absolute http:// or https:// URL.`,
+        `Invalid link "${a.value}". Use an absolute http:// or https:// URL, or a quoted "mailto:" URL.`,
 
     // Anchor / milestone / footnote
     'NL.E0500': (a: { name: string }) => `Anchor "${a.name}" requires a "date:" property.`,

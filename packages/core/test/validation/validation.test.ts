@@ -1857,8 +1857,9 @@ describe('NL.E0405: an impossible day on any date key', () => {
 });
 
 // r1.f5: `link:` is a URL (specs/dsl.md "Links"), and the renderer writes it
-// into a live `<a href>`, so anything but an absolute http(s) URL is an error.
-describe('NL.E0414: link must be an http(s) URL', () => {
+// into a live `<a href>`, so anything but an absolute http(s) URL or a
+// mailto: URL is an error.
+describe('NL.E0414: link must be an http(s) or mailto: URL', () => {
     const NBSP = '\u00A0';
     const HEAD = 'roadmap r\n';
     type Coded = { code: 'NL.E0414'; args: [{ value: string }] };
@@ -1876,12 +1877,12 @@ describe('NL.E0414: link must be an http(s) URL', () => {
             (d) => (d.data as Coded | undefined)?.code === 'NL.E0414',
         );
         expect(found.map((d) => d.message)).toEqual([
-            'Invalid link "javascript:alert(document.domain)". Use an absolute http:// or https:// URL.',
+            'Invalid link "javascript:alert(document.domain)". Use an absolute http:// or https:// URL, or a quoted "mailto:" URL.',
         ]);
         expect(found[0].severity).toBe(1);
         const { code, args } = found[0].data as Coded;
         expect(tr('fr', code, ...args)).toBe(
-            `Lien invalide «${NBSP}javascript:alert(document.domain)${NBSP}». Utilisez une URL absolue en http:// ou https://.`,
+            `Lien invalide «${NBSP}javascript:alert(document.domain)${NBSP}». Utilisez une URL absolue en http:// ou https://, ou une URL «${NBSP}mailto:${NBSP}» entre guillemets.`,
         );
     });
 
@@ -1910,6 +1911,7 @@ describe('NL.E0414: link must be an http(s) URL', () => {
         ['a bare https URL', 'link:https://github.com/acme/auth/issues/123'],
         ['a bare http URL', 'link:http://intranet.example/spec'],
         ['a quoted https URL', 'link:"https://linear.app/acme/issue/ENG-1"'],
+        ['a quoted mailto: URL', 'link:"mailto:ops@acme.example"'],
     ])('accepts %s', async (_name, prop): Promise<void> => {
         expect(await codes(`${HEAD}swimlane s\n  item x duration:1w ${prop}\n`)).toEqual([]);
     });

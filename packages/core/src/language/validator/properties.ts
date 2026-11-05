@@ -9,8 +9,8 @@ import {
     isItemDeclaration,
     isSwimlaneDeclaration,
 } from '../../generated/ast.js';
+import { isAllowedLink } from '../../util/allowed-link.js';
 import { isRealIsoDate, propKey } from '../../util/props.js';
-import { isWebLink } from '../../util/web-link.js';
 import { describeNode, suggestKey } from '../validator-utils.js';
 import { isWaveBannedProperty } from '../waves.js';
 import { acceptTr, isIdentifier } from './support.js';
@@ -120,7 +120,7 @@ export function checkPropertyValues(prop: EntityProperty, accept: ValidationAcce
             break;
 
         case 'link':
-            if (val && !isWebLink(val)) {
+            if (val && !isAllowedLink(val)) {
                 acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0414', {
                     value: val,
                 });
