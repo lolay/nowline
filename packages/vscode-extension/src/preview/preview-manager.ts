@@ -52,7 +52,7 @@ export class PreviewManager {
     /**
      * Open a preview for `sourceUri`, or reveal the existing one. Opening
      * the source document text first guarantees the in-memory document is
-     * available to readSourceText() inside the panel.
+     * available to readDocumentText() inside the panel.
      */
     async openOrReveal(
         sourceUri: vscode.Uri,
@@ -139,9 +139,9 @@ export class PreviewManager {
     }
 
     /** Push a new settings snapshot to every open panel. */
-    propagateSettings(settings: PreviewSettings, themeChanged: boolean): void {
+    propagateSettings(settings: PreviewSettings): void {
         for (const p of this.previews.values()) {
-            p.updateSettings(settings, themeChanged);
+            p.updateSettings(settings);
         }
     }
 
