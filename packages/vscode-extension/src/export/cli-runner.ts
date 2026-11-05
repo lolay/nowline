@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
-import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
-import { resolveExportWidth } from '../preview/option-resolver.js';
+import { type ResolvedRenderOptions, resolveExportWidth } from '../preview/option-resolver.js';
+import type { ExportSource } from './export-source.js';
 import { type ExportFormat, exportInProcess } from './in-process.js';
 
 /** Snapshot of `nowline.export.*` settings; resolved by extension.ts. */
@@ -26,43 +26,11 @@ export interface RunExportArgs {
     settings: ExportSettings;
     outputChannel: vscode.OutputChannel;
     /**
-     * Resolved theme to use for the export. When a preview panel is open for
-     * the source file its current theme (including toolbar overrides) wins;
-     * otherwise the caller should resolve `nowline.preview.theme` against the
-     * active VS Code color theme. Defaults to `'light'` when omitted.
+     * The text and resolved options to export: the open preview's last render,
+     * or the document resolved by the preview's chain when no preview is open.
+     * The CLI override reads the file from disk instead of this text.
      */
-    theme?: ThemeName;
-    /**
-     * Resolved now-line anchor. Pass a `Date` (UTC midnight) to pin the
-     * now-line; pass `null` to suppress it (mirrors `--now -`); leave
-     * `undefined` to default to today. When a preview panel is open, pass
-     * `NowlinePreview.resolvedToday()` so the export matches the preview.
-     */
-    today?: Date | null;
-    /**
-     * Resolved operator-chain locale. When a preview panel is open, pass
-     * `NowlinePreview.resolvedLocale()` so axis labels / now-pill text match
-     * the preview. `undefined` defaults to `en-US`.
-     */
-    locale?: string;
-    /**
-     * Whether link icons are shown. When a preview panel is open, pass
-     * `NowlinePreview.resolvedShowLinks()` so link visibility matches the
-     * preview. `undefined` defaults to links shown.
-     */
-    showLinks?: boolean;
-    /**
-     * Resolved non-working display. When a preview panel is open, pass
-     * `NowlinePreview.resolvedNonWorking()` so the export matches the preview.
-     * `undefined` leaves the choice to the roadmap's own
-     * `default roadmap non-working:` key.
-     */
-    nonWorking?: NonWorkingDisplay;
-    /**
-     * Resolved asset root (`resolveExportAssetRoot`): the directory logo and
-     * image assets load from. `undefined` uses the source file's directory.
-     */
-    assetRoot?: string;
+    source: ExportSource;
 }
 
 /**
@@ -150,18 +118,7 @@ const EXPORT_TARGETS: ExportTarget[] = [
  * See `specs/ide.md` § Export to other formats.
  */
 export async function runExportCommand(args: RunExportArgs): Promise<void> {
-    const {
-        sourceUri,
-        settings,
-        outputChannel,
-        theme,
-        today,
-        locale,
-        showLinks,
-        nonWorking,
-        assetRoot,
-    } = args;
-    const noLinks = showLinks === undefined ? undefined : !showLinks;
+    const { sourceUri, settings, outputChannel, source } = args;
 
     // Reject a bad width before any prompt, the same way on both export paths.
     try {
@@ -194,14 +151,13 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
     if (useCliOverride) {
         // Explicit cliPath: delegate to the external CLI binary unchanged.
         const cliPath = resolveCliPath(settings.cliPath, sourceUri);
-        const cliArgs = buildCliArgs(target, sourceUri.fsPath, dest.fsPath, settings, {
-            theme,
-            today,
-            locale,
-            noLinks,
-            nonWorking,
-            assetRoot,
-        });
+        const cliArgs = buildCliArgs(
+            target,
+            sourceUri.fsPath,
+            dest.fsPath,
+            settings,
+            source.options,
+        );
         outputChannel.appendLine(`$ ${quote(cliPath)} ${cliArgs.map(quote).join(' ')}`);
         try {
             await runCli(cliPath, cliArgs, sourceDir, outputChannel);
@@ -219,19 +175,7 @@ export async function runExportCommand(args: RunExportArgs): Promise<void> {
         // Default path: in-process export — no CLI install required.
         outputChannel.appendLine(`Nowline: exporting ${target.format} (in-process)…`);
         try {
-            const result = await exportInProcess(
-                sourceUri.fsPath,
-                target.format as ExportFormat,
-                settings,
-                {
-                    today,
-                    theme,
-                    locale,
-                    noLinks,
-                    nonWorking,
-                    assetRoot,
-                },
-            );
+            const result = await exportInProcess(source, target.format as ExportFormat, settings);
             const bytes = result.isBinary
                 ? (result.rendered as Uint8Array)
                 : new TextEncoder().encode(result.rendered as string);
@@ -307,31 +251,23 @@ function buildCliArgs(
     sourcePath: string,
     destPath: string,
     settings: ExportSettings,
-    overrides: {
-        theme?: ThemeName;
-        today?: Date | null;
-        locale?: string;
-        noLinks?: boolean;
-        nonWorking?: NonWorkingDisplay;
-        assetRoot?: string;
-    } = {},
+    options: ResolvedRenderOptions,
 ): string[] {
-    const { theme, today, locale, noLinks, nonWorking, assetRoot } = overrides;
+    const { theme, today, locale, showLinks, nonWorking, assetRoot } = options;
     const args: string[] = [sourcePath, '-f', target.format, '-o', destPath];
-    if (theme) args.push('--theme', theme);
-    // `null`  → suppress the now-line (CLI: `--now -`)
-    // `Date`  → pin to that date (CLI: `--now YYYY-MM-DD`)
-    // missing → let the CLI default to today (no flag)
+    args.push('--theme', theme);
+    // `null` → suppress the now-line (CLI: `--now -`)
+    // `Date` → pin to that date (CLI: `--now YYYY-MM-DD`)
     if (today === null) {
         args.push('--now', '-');
-    } else if (today instanceof Date) {
+    } else {
         const y = today.getUTCFullYear();
         const m = String(today.getUTCMonth() + 1).padStart(2, '0');
         const d = String(today.getUTCDate()).padStart(2, '0');
         args.push('--now', `${y}-${m}-${d}`);
     }
     if (locale) args.push('--locale', locale);
-    if (noLinks) args.push('--no-links');
+    if (!showLinks) args.push('--no-links');
     // Only when set: a CLI older than the display option rejects an unknown
     // flag, and unset must let the file's own key apply.
     if (nonWorking) args.push('--non-working', nonWorking);
