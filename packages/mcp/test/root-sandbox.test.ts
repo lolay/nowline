@@ -343,6 +343,57 @@ describe('includes are confined to the root', () => {
     });
 });
 
+// ---- A root reached through a link ------------------------------------------
+
+describe('a root configured through a directory link', () => {
+    // macOS's temp dir is one: /var is a link to /private/var.
+    let linkClient: Client;
+    let rootLink: string;
+    let closeLink: () => Promise<void>;
+
+    beforeAll(async () => {
+        rootLink = path.join(base, 'root-link');
+        symlinkSync(root, rootLink, 'junction');
+        writeFileSync(path.join(root, 'sub', 'broken.nowline'), 'nowline v1\n\nswimlane @@@\n');
+        const server = createMcpServer({ allowedRoot: rootLink });
+        linkClient = new Client({ name: 'sandbox-link-client', version: '1.0.0' });
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        await server.connect(serverTransport);
+        await linkClient.connect(clientTransport);
+        closeLink = async () => {
+            await clientTransport.close().catch(() => {});
+            await serverTransport.close().catch(() => {});
+        };
+    });
+
+    afterAll(async () => {
+        await closeLink();
+    });
+
+    it('names an included file by the configured spelling of the root', async () => {
+        const result = await linkClient.callTool({
+            name: 'validate',
+            arguments: { source: roadmap('Linked', './sub/broken.nowline') },
+        });
+        const { diagnostics } = result.structuredContent as {
+            diagnostics: { code: string; file: string }[];
+        };
+        expect(diagnostics.length).toBeGreaterThan(0);
+        expect(diagnostics.map((d) => d.file)).toContain(
+            path.join(rootLink, 'sub', 'broken.nowline'),
+        );
+    });
+
+    it('still refuses an include that leaves the root (NL.E0208)', async () => {
+        const result = await linkClient.callTool({
+            name: 'validate',
+            arguments: { source: roadmap('Linked', './out-dir/other.nowline') },
+        });
+        expect(diagnosticCodes(result)).toContain('NL.E0208');
+        expect(allText(result)).not.toContain('OUTSIDE-LANE-MARKER');
+    });
+});
+
 // ---- Guard unit -------------------------------------------------------------
 
 describe('guardPath', () => {
@@ -355,6 +406,7 @@ describe('guardPath', () => {
         const guarded = await guardPath('sub/new.nowline', staticRoots(root), ['.nowline']);
         expect(guarded.abs).toBe(path.join(root, 'sub', 'new.nowline'));
         expect(guarded.root).toBe(await realPathAllowingMissing(root));
+        expect(guarded.displayRoot).toBe(root);
         expect(guarded.real).toBe(path.join(guarded.root, 'sub', 'new.nowline'));
     });
 });

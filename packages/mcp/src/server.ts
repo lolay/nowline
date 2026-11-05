@@ -16,7 +16,12 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/server';
 import type { SurfaceOptions } from '@nowline/config';
-import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
+import {
+    type IncludePolicy,
+    type NowlineFile,
+    parseNowlineJson,
+    printNowlineFile,
+} from '@nowline/core';
 import {
     acceptStagedRoadmap,
     type ExportFormat,
@@ -60,6 +65,7 @@ import { type McpResolvedOptions, resolveMcpOptions } from './options.js';
 import {
     type GuardedPath,
     guardPath,
+    includePolicyFor,
     isWithin,
     NOWLINE_EXTENSIONS,
     OUTPUT_EXTENSIONS,
@@ -246,6 +252,7 @@ async function sourceAndPath(
             abs: path.join(roots.primary, 'unnamed.nowline'),
             real: path.join(root, 'unnamed.nowline'),
             root,
+            displayRoot: roots.primary,
         };
         return { source: args.source, filePath: target.abs, target };
     }
@@ -458,13 +465,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                         doc,
                         source,
                         {
-                            sourcePath: target.real,
+                            sourcePath: target.abs,
                             today: options.today,
                             locale: 'en-US',
                             theme: 'light',
                         },
                         createNodeHostEnv(target),
-                        target.root,
+                        includePolicyFor(target),
                     );
                     diagnostics.push(...stageRoutedDiagnostics(stage));
                     if (stage.kind === 'staged') insights = layoutInsightsFromStage(stage);
@@ -774,7 +781,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const format: ExportFormat = args.format ?? 'svg';
             const today = options.today;
             const inputs: RenderInputs = {
-                sourcePath: target.real,
+                sourcePath: target.abs,
                 today,
                 locale: 'en-US',
                 theme: options.theme,
@@ -793,7 +800,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
             // One stage serves the render, the insights and the include check.
-            const stage = await stageMcpRoadmap(blocked.doc, source, inputs, host, target.root);
+            const stage = await stageMcpRoadmap(
+                blocked.doc,
+                source,
+                inputs,
+                host,
+                includePolicyFor(target),
+            );
             if (stage.kind === 'invalid') {
                 return diagnosticsErrorResponse(
                     filePath,
@@ -834,7 +847,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                           bytes,
                           inputs,
                           host,
-                          target.root,
+                          includePolicyFor(target),
                       )
                     : [];
 
@@ -1014,7 +1027,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             const format: ExportFormat = args.format as NonRenderFormat;
             const inputs: RenderInputs = {
-                sourcePath: target.real,
+                sourcePath: target.abs,
                 today: options.today,
                 locale: 'en-US',
                 theme: options.theme,
@@ -1033,7 +1046,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             let bytes: Uint8Array;
             try {
                 const staged = acceptStagedRoadmap(
-                    await stageMcpRoadmap(blocked.doc, source, inputs, host, target.root),
+                    await stageMcpRoadmap(
+                        blocked.doc,
+                        source,
+                        inputs,
+                        host,
+                        includePolicyFor(target),
+                    ),
                     inputs,
                 );
                 bytes = await exportStaged(staged, format, inputs, host);
@@ -1237,14 +1256,20 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     // takes no `now`; the kernel still wants a concrete one.
                     const { options } = resolveMcpOptions({});
                     const jsonInputs: RenderInputs = {
-                        sourcePath: target.real,
+                        sourcePath: target.abs,
                         today: options.today,
                         locale: 'en-US',
                         theme: 'light',
                     };
                     const doc = await buildDocument(source);
                     const staged = acceptStagedRoadmap(
-                        await stageMcpRoadmap(doc, source, jsonInputs, host, target.root),
+                        await stageMcpRoadmap(
+                            doc,
+                            source,
+                            jsonInputs,
+                            host,
+                            includePolicyFor(target),
+                        ),
                         jsonInputs,
                     );
                     const jsonBytes = await exportStaged(staged, 'json', jsonInputs, host);
@@ -1582,7 +1607,7 @@ async function buildReviewContentBlocks(
     artifactBytes: Uint8Array,
     inputs: RenderInputs,
     host: HostEnv,
-    includeRoot: string,
+    includePolicy: IncludePolicy,
 ): Promise<ContentBlock[]> {
     const blocks: ContentBlock[] = [
         {
@@ -1611,7 +1636,7 @@ async function buildReviewContentBlocks(
         // A narrower review width is a different layout, so it stages again
         // (the parsed document is reused).
         const reviewStage = acceptStagedRoadmap(
-            await stageMcpRoadmap(doc, source, reviewInputs, host, includeRoot),
+            await stageMcpRoadmap(doc, source, reviewInputs, host, includePolicy),
             reviewInputs,
         );
         inspectionBytes = await exportStaged(reviewStage, 'png', reviewInputs, host);

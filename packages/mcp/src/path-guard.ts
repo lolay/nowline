@@ -11,6 +11,7 @@
 
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
+import type { IncludePolicy } from '@nowline/core';
 import { InputRequiredError, PathOutsideRootError } from './diagnostics.js';
 import { isInsideRoots, type WorkspaceRoots } from './workspace-roots.js';
 
@@ -25,8 +26,10 @@ export interface GuardedPath {
     readonly abs: string;
     /** `abs` with every symlink resolved; what the tool reads or writes. */
     readonly real: string;
-    /** The real allowed root `real` lies in; the include root for a roadmap read from `real`. */
+    /** The real allowed root `real` lies in. */
     readonly root: string;
+    /** The allowed root as configured (symlinks not resolved) that `root` is the real path of. */
+    readonly displayRoot: string;
 }
 
 /** Symlinks followed before giving up, as the kernel's own limit (`ELOOP`). */
@@ -96,14 +99,36 @@ export async function guardPath(
     }
     const real = await realPathAllowingMissing(abs);
     const realRoots = await Promise.all(roots.allowed.map((r) => realPathAllowingMissing(r)));
-    const root = realRoots.find((r) => isWithin(r, real));
-    if (root === undefined) {
+    const index = realRoots.findIndex((r) => isWithin(r, real));
+    if (index === -1) {
         throw new PathOutsideRootError(filePath, roots.allowed.join(', '));
     }
+    const root = realRoots[index];
+    const displayRoot = roots.allowed[index];
     if (extensions && !hasExtension(real, extensions)) {
         throw new InputRequiredError(
             `Path ${filePath} is a link to a file that does not end in ${extensions.join(', ')}.`,
         );
     }
-    return { abs, real, root };
+    return { abs, real, root, displayRoot };
+}
+
+/**
+ * The include policy for a roadmap at `target`: includes stay inside its
+ * root, symlinks resolved. Resolution works in the root's configured
+ * spelling: a real path inside the real root is re-expressed under
+ * `displayRoot`, so include diagnostics name the paths the client used
+ * (macOS's `/var` is `/private/var` once resolved). A real path outside the
+ * real root has no such spelling, stays outside, and is NL.E0208.
+ */
+export function includePolicyFor(target: GuardedPath): IncludePolicy {
+    return {
+        kind: 'rooted',
+        root: target.displayRoot,
+        realPath: async (p) => {
+            const real = await fs.realpath(p);
+            if (!isWithin(target.root, real)) return real;
+            return path.join(target.displayRoot, path.relative(target.root, real));
+        },
+    };
 }
