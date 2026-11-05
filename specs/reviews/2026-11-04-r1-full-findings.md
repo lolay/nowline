@@ -286,7 +286,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `:12` (the `nowline-embed-{prod,dev}` projects, `release.yml` consuming infra WIF outputs via environment variables), `:22` (Dependency Rule), `:140` (Firebase Hosting CDN row) and `:172` (Firebase serves `embed.nowline.io`/`.dev`). `embed.md:192` records the move to jsDelivr; `AGENTS.md` says there's no remaining tie to nowline-infra and no GitHub variables; no workflow references Firebase or WIF.
 - Verified: all four passages read; grep of `.github/` finds no Firebase or WIF use. Someone following this spec would re-add the coupling AGENTS.md prohibits.
 - Recommendation: rewrite the four passages to match `embed.md` § Distribution and drop the infra/WIF text; remove the dead `publish-cdn` Makefile target while there.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#255 (13069c3); its body cites the estate review's r1.f1 (#245), the same change
 
 ### r1.f25 - `architecture.md`'s package graph and descriptions have drifted from the code
 
