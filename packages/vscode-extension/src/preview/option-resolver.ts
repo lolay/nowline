@@ -122,7 +122,8 @@ export function withOptionProblems(
 /**
  * Collapse the resolution chain (toolbar > settings > rc > env > defaults)
  * into a single bag the renderer can consume. Pure function so the panel
- * stays trivially testable and we can re-use it from the export runner.
+ * stays trivially testable. The export paths use the same result: an open
+ * preview's last one, or a fresh call when none is open.
  */
 export function resolvePreviewOptions(ctx: ResolveContext): ResolvedRenderOptions {
     const { values, errors } = resolveOptions(SCHEMA_SPECS, [
@@ -161,11 +162,7 @@ function resolveTheme(ctx: ResolveContext, rcTheme: ThemeName | undefined): Them
     return ctx.isDarkTheme ? 'dark' : 'light';
 }
 
-/**
- * Resolve the now-line anchor for a preview render. Thin wrapper over the
- * shared {@link resolveTodayAnchor} so the live render and the export
- * (`NowlinePreview.resolvedToday()`) can never drift.
- */
+/** Resolve the now-line anchor for a render. Thin wrapper over {@link resolveTodayAnchor}. */
 function resolveTodayForPreview(ctx: ResolveContext): Date | null {
     return resolveTodayAnchor(ctx.toolbarOverrides?.now, ctx.settings.now, ctx.settings.timezone);
 }
@@ -184,9 +181,6 @@ function resolveTodayForPreview(ctx: ResolveContext): Date | null {
  * pipeline treats `undefined` as "no anchor" and the layout then omits the
  * now-line, so the default must be a concrete date for the line to appear —
  * matching the CLI default and the rasterized export.
- *
- * Shared by both the live preview render ({@link resolveTodayForPreview}) and
- * the export path (`NowlinePreview.resolvedToday()`).
  */
 export function resolveTodayAnchor(
     nowOverride: ToolbarOverrides['now'],
@@ -265,11 +259,8 @@ function resolveLocale(ctx: ResolveContext): string | undefined {
  * choice to follow the file, so it beats a `show` or `hide` setting, the way
  * the theme toolbar's `'auto'` beats a forced theme setting. There is no
  * `.nowlinerc` key.
- *
- * Shared by the live render and the export path
- * (`NowlinePreview.resolvedNonWorking()`).
  */
-export function resolveNonWorkingDisplay(
+function resolveNonWorkingDisplay(
     toolbar: ToolbarOverrides['nonWorking'],
     setting: PreviewSettings['nonWorking'],
 ): NonWorkingDisplay | undefined {
@@ -292,34 +283,9 @@ function resolveAssetRoot(
     ctx: ResolveContext,
     rcAssetRoot: string | undefined,
 ): string | undefined {
-    return pickAssetRoot(ctx.settings.assetRoot, rcAssetRoot, ctx.rcPath);
-}
-
-function pickAssetRoot(
-    settingAssetRoot: string,
-    rcAssetRoot: string | undefined,
-    rcPath: string | undefined,
-): string | undefined {
-    if (nonEmpty(settingAssetRoot)) return settingAssetRoot;
+    if (nonEmpty(ctx.settings.assetRoot)) return ctx.settings.assetRoot;
     if (rcAssetRoot === undefined) return undefined;
-    return rcPath ? path.resolve(path.dirname(rcPath), rcAssetRoot) : rcAssetRoot;
-}
-
-const ASSET_ROOT_ONLY = { assetRoot: ASSET_ROOT_SPEC };
-
-/**
- * The asset root an export uses, by the preview's chain: the
- * `nowline.preview.assetRoot` setting, else the rc `assetRoot` (relative to
- * that file), else `undefined` for the source file's directory. Sharing it
- * means a logo the preview finds is found by every export path too.
- */
-export function resolveExportAssetRoot(
-    settingAssetRoot: string,
-    rc: NowlineRc,
-    rcPath: string | undefined,
-): string | undefined {
-    const { values } = resolveOptions(ASSET_ROOT_ONLY, [rcLayer(rc, ASSET_ROOT_ONLY)]);
-    return pickAssetRoot(settingAssetRoot, values.assetRoot, rcPath);
+    return ctx.rcPath ? path.resolve(path.dirname(ctx.rcPath), rcAssetRoot) : rcAssetRoot;
 }
 
 const EXPORT_WIDTH_SETTING = 'nowline.export.width';

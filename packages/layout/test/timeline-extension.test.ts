@@ -187,6 +187,23 @@ swimlane a "A"
         ).toEqual(['afterMilestone']);
     });
 
+    it('names no bar for an item after a dated milestone (r1.f8)', async () => {
+        // The schedule used to resolve `after:gate` to day 0, so the window
+        // ended before `y`, which the chart draws from the milestone's date.
+        expect(
+            (await causesOfSource(`nowline v1
+
+roadmap r "R" start:2026-01-05
+
+swimlane a "A"
+  item x "X" duration:1w
+  item y "Y" duration:1w after:gate
+
+milestone gate "Gate" date:2026-03-02
+`)) ?? [],
+        ).not.toContain('bar');
+    });
+
     it('names a bar the placement draws past the window', async () => {
         // No sample can produce this: it is the bug F3 looks for, so a step
         // moved in front of f2 pushes the bar two weeks past the window.
