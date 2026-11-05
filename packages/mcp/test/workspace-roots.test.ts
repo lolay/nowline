@@ -21,6 +21,9 @@ const MINIMAL = [
     '  item foo "Foo" duration:1w',
 ].join('\n');
 
+/** A `.nowline` path in process.cwd() that does not exist. */
+const CWD_PROBE = () => path.join(process.cwd(), 'nowline-mcp-cwd-probe-missing.nowline');
+
 let base: string;
 let rootA: string;
 let rootB: string;
@@ -188,11 +191,9 @@ describe('client with the roots capability', () => {
 
     it('falls back to cwd when the client lists no roots', async () => {
         const { client, listCalls } = await connect({ advertiseRoots: true, roots: [] });
-        const read = await readPath(client, 'package.json');
-        expect(read.isError).toBeFalsy();
-        expect((read.structuredContent as { path: string }).path).toBe(
-            path.join(process.cwd(), 'package.json'),
-        );
+        // Inside the cwd root, a missing file is NOT_FOUND, not OUT_OF_ROOT.
+        const read = await readPath(client, CWD_PROBE());
+        expect(errorCode(read)).toBe('NL.MCP.NOT_FOUND');
         expect(listCalls()).toBe(1);
     });
 
@@ -202,11 +203,9 @@ describe('client with the roots capability', () => {
             roots: [fileUri(rootA)],
             failRootsList: true,
         });
-        const read = await readPath(client, 'package.json');
-        expect(read.isError).toBeFalsy();
-        expect((read.structuredContent as { path: string }).path).toBe(
-            path.join(process.cwd(), 'package.json'),
-        );
+        // Inside the cwd root, a missing file is NOT_FOUND, not OUT_OF_ROOT.
+        const read = await readPath(client, CWD_PROBE());
+        expect(errorCode(read)).toBe('NL.MCP.NOT_FOUND');
     });
 
     it('never asks the client when an explicit root is configured', async () => {
@@ -227,11 +226,9 @@ describe('client with the roots capability', () => {
 describe('client without the roots capability', () => {
     it('resolves paths against process.cwd()', async () => {
         const { client } = await connect({ advertiseRoots: false });
-        const read = await readPath(client, 'package.json');
-        expect(read.isError).toBeFalsy();
-        expect((read.structuredContent as { path: string }).path).toBe(
-            path.join(process.cwd(), 'package.json'),
-        );
+        // Inside the cwd root, a missing file is NOT_FOUND, not OUT_OF_ROOT.
+        const read = await readPath(client, CWD_PROBE());
+        expect(errorCode(read)).toBe('NL.MCP.NOT_FOUND');
 
         const out = await readPath(client, path.join(rootA, 'alpha.nowline'));
         expect(out.isError).toBe(true);
