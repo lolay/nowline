@@ -6,6 +6,7 @@
 // to its own shape.
 
 import {
+    buildTransientDocument,
     buildWavePlan,
     collectDocumentDiagnostics,
     type IncludePolicy,
@@ -116,13 +117,7 @@ function freshUri(): URI {
 
 async function buildDocument(inputs: StageInputs): Promise<LangiumDocument<NowlineFile>> {
     if (inputs.document) return inputs.document;
-    const { workspace } = inputs.services.shared;
-    const document = workspace.LangiumDocumentFactory.fromString<NowlineFile>(
-        inputs.source,
-        freshUri(),
-    );
-    await workspace.DocumentBuilder.build([document], { validation: true });
-    return document;
+    return buildTransientDocument(inputs.services.shared, inputs.source, freshUri());
 }
 
 function isErrorDiagnostic(raw: RawDiagnostic): boolean {

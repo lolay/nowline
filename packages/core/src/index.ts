@@ -53,6 +53,7 @@ export {
 export type { NowlineAddedServices, NowlineServices } from './language/nowline-module.js';
 export { createNowlineServices, NowlineModule } from './language/nowline-module.js';
 export { NowlineValidator, registerValidationChecks } from './language/nowline-validator.js';
+export { buildTransientDocument } from './language/transient-document.js';
 export {
     assignWaves,
     type CodedWaveFinding,

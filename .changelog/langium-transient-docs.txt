@@ -1,0 +1,3 @@
+```release-note:fixed
+Long-running hosts no longer keep every parsed roadmap in memory. The MCP server (each `validate`, `render`, `export`, `create`, `update` and `share`), `@nowline/browser` (`renderSource` and `parseSource`, behind the VS Code preview, the embed and the MCP App), `stageRoadmap` and `nowline --serve` each held the full syntax tree and source text of every call, about 650 KB per render of a large roadmap. Outputs are unchanged.
+```

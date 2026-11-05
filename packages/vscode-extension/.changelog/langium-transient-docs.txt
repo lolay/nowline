@@ -1,0 +1,3 @@
+```release-note:fixed
+The preview no longer grows in memory as you type: each re-render used to keep the full syntax tree and source text of every keystroke's parse for as long as the preview stayed open.
+```
