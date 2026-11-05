@@ -55,7 +55,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: the workflow runs on every `issue_comment.created`, is "author-agnostic by design" (`:16`), and applies labels with `GH_AW_AGENT_TOKEN`, a write PAT (`.github/AGENT_TRIAGE.md:186`). Its transitions allow `""` to `agent-plan` (`:146`) and `agent-plan` to `agent-deep` (`:147`) on issues, and `""` to `maintainer-pr-safe` on PRs (`:141`). The resulting `labeled` event's actor is the PAT owner, so gh-aw's role gate (`agent-deep.lock.yml:1782`, admin/maintainer/write) passes. `.github/agent-prompts/agent-deep.md:24` accepts any comment starting `## Plan`, whoever wrote it. No workflow checks `author_association`.
 - Verified: read the trigger, token, transition table and role gate; grep finds no author check in any workflow. A merge still needs a maintainer, so the impact is a bypass of the intake trust gate (`AGENT_TRIAGE.md:57`), attacker-directed Copilot sessions and PRs, quota use, and a false `maintainer-pr-safe` signal.
 - Recommendation: act only when `comment.author_association` is OWNER, MEMBER or COLLABORATOR (or the commenter has write permission), plus the gh-aw and Copilot bot logins; in `agent-deep` and `agent-exec`, accept a `## Plan` comment only from the bot or a maintainer.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#251 (36857e4)
 
 ### r1.f5 - `link:` accepts any URL scheme, and `javascript:` reaches `<a href>`
 
