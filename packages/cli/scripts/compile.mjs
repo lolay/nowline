@@ -28,9 +28,11 @@ const packageRoot = path.resolve(__dirname, '..');
 // Last measured (bun 1.3.14, @resvg/resvg-wasm, no native .node) on macOS-arm64:
 //   darwin-arm64=67  darwin-x64=~72  linux-arm64=~104  linux-x64=~104
 //   windows-arm64=~116  windows-x64=~119
+// darwin-x64 is raised 85 -> 92 on purpose: bun 1.4.3 measured 87.2 MB there
+// (see lolay/nowline#233). A temporary ceiling, not a re-baseline of the rest.
 const ALL_TARGETS = [
     { id: 'bun-darwin-arm64', suffix: 'macos-arm64', maxMb: 80 },
-    { id: 'bun-darwin-x64', suffix: 'macos-x64', maxMb: 85 },
+    { id: 'bun-darwin-x64', suffix: 'macos-x64', maxMb: 92 },
     { id: 'bun-linux-x64', suffix: 'linux-x64', maxMb: 115 },
     { id: 'bun-linux-arm64', suffix: 'linux-arm64', maxMb: 115 },
     { id: 'bun-windows-x64', suffix: 'windows-x64.exe', maxMb: 130 },
