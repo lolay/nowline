@@ -34,6 +34,6 @@ Bars at true width in `packages/layout`: drop the `MIN_ITEM_WIDTH` clamp and the
 
 ## Review
 
-Review: [r1 full review](../reviews/2026-11-04-r1-full.md) of `main` at a528705, issue pending.
+Review: [r1 full review](../reviews/2026-11-04-r1-full.md) of `main` at a528705, tracked in lolay/nowline#259.
 
 m4.15 merged (lolay/nowline#174, lolay/nowline#175, lolay/nowline#176, then the specs). With no `specs/reviews/` log yet, the gate ([`milestones.md` § Review gate](../milestones.md#review-gate)) ran as a `full` review, r1, which discharges it. Its decisions and high findings fold into the next milestone's plan.
