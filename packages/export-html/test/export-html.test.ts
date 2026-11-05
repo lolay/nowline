@@ -61,6 +61,23 @@ describe('exportHtml', () => {
         expect(html).toContain('A &amp; B &lt;c&gt;');
     });
 
+    it('escapes quotes in the roadmap title inside aria-label', async () => {
+        // Regression for r1.f3: a DSL title with `\"` must not break out of
+        // the aria-label attribute.
+        const source = MINIMAL_FIXTURE.replace(
+            'roadmap minimal "Minimal Example"',
+            'roadmap minimal "Demo\\" onmouseover=\\"alert(1)\\" & <b>"',
+        );
+        const { inputs, svg } = await svgFor(source);
+        const html = await exportHtml(inputs, svg, { generator: STABLE_GENERATOR });
+        const mainTag = html.match(/<main\b[^>]*>/)?.[0];
+        expect(mainTag).toBe(
+            '<main id="nowline-viewport" role="img" aria-label="Demo&quot; onmouseover=&quot;alert(1)&quot; &amp; &lt;b&gt;">',
+        );
+        // Quotes are harmless in text content, so `<title>` keeps them.
+        expect(html).toContain('<title>Demo" onmouseover="alert(1)" &amp; &lt;b&gt;</title>');
+    });
+
     it('is byte-deterministic given the same input + generator', async () => {
         const { inputs, svg } = await svgFor(MINIMAL_FIXTURE);
         const a = await exportHtml(inputs, svg, { generator: STABLE_GENERATOR });
