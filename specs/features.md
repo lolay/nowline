@@ -82,7 +82,7 @@ Features are assigned to milestones: m1–m4.7 (OSS tooling tracked here) or m4.
 | # | Feature | Identity | Demand | Effort | Score | Notes |
 |---|---------|----------|--------|--------|-------|-------|
 | 31 | Browser embed script | 9 | 9 | 3 | 243 | Mermaid-like embedding |
-| 32 | CDN hosting (`embed.nowline.{io,dev}`) | 3 | 9 | 9 | 243 | Branded URLs in embedders' `view-source`; Firebase-Hosted, two projects (prod tag-driven, dev `main`-driven + per-PR ephemeral channels). Drops jsDelivr/unpkg from docs. |
+| 32 | CDN hosting (jsDelivr) | 3 | 9 | 9 | 243 | jsDelivr serves `@nowline/embed` from the npm tarball: patch pin, minor channel, latest, and the `@next` canary. Replaced the branded `embed.nowline.{io,dev}` Firebase CDN; see [`embed.md`](./embed.md) § Distribution. |
 | 35 | GitHub Action — file mode | 3 | 9 | 3 | 81 | CI rendering |
 | 36 | GitHub Action — markdown mode | 3 | 3 | 3 | 27 | README rendering |
 
