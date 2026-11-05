@@ -1,5 +1,5 @@
 name: 'Setup Node.js + pnpm + install dependencies'
-description: 'Provision pnpm via corepack, set up Node.js with the pnpm cache, then install workspace dependencies with --frozen-lockfile.'
+description: 'Set up Node.js, install the pnpm version pinned in package.json, restore the pnpm cache, then install workspace dependencies with --frozen-lockfile.'
 
 # Composite action so every workflow job that needs the standard
 # pnpm + Node toolchain can share one place to bump versions or change
@@ -8,16 +8,20 @@ description: 'Provision pnpm via corepack, set up Node.js with the pnpm cache, t
 # callers — keeping checkout in the workflow keeps this action
 # parameter-free.
 #
-# pnpm is provisioned via `corepack enable`, which reads the
-# `packageManager: pnpm@<version>` pin from the root package.json.
-# This replaces pnpm/action-setup, which ran a `pnpm self-update` step
-# on Windows that intermittently crashed with STATUS_STACK_BUFFER_OVERRUN
-# (exit 3221226505) — an open upstream bug in pnpm/action-setup#260.
-# Corepack is built into every Node shipped on GitHub-hosted runners and
-# sidesteps the self-installer entirely.
+# pnpm is installed with `npm install -g pnpm@<version>`, reading the
+# version from the `packageManager: pnpm@<version>` pin in the root
+# package.json, so CI runs the pinned pnpm without a runtime self-switch.
+# Corepack is out: Node 25+ no longer bundles it, and `.nvmrc` pins Node
+# 26, so it only worked because `corepack enable` ran against the runner
+# image's preinstalled Node before setup-node. That breaks once the
+# images default to Node 25+. pnpm/action-setup stays out too: its
+# Windows `pnpm self-update` step intermittently crashed with
+# STATUS_STACK_BUFFER_OVERRUN (exit 3221226505), pnpm/action-setup#260.
 #
-# corepack enable must run before setup-node so pnpm is on PATH when
-# setup-node probes the store path for cache: pnpm.
+# setup-node runs twice. The first installs Node; `cache: pnpm` can't go
+# there because setup-node probes `pnpm store path` and pnpm isn't
+# installed yet. The second, with no version input, installs nothing and
+# only restores (and in its post step saves) the pnpm store cache.
 #
 # The Node version is governed by the two-tier policy documented in
 # `CONTRIBUTING.md` § "Toolchain & Supported Versions": by default the
@@ -39,10 +43,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Enable corepack
-      shell: bash
-      run: corepack enable
-
     - name: Setup Node.js
       uses: actions/setup-node@v7
       with:
@@ -51,6 +51,23 @@ runs:
         # specified" warning from actions/setup-node.
         node-version: ${{ inputs.node-version != '' && inputs.node-version || '' }}
         node-version-file: ${{ inputs.node-version == '' && '.nvmrc' || '' }}
+
+    - name: Install pnpm
+      shell: bash
+      run: |
+        # packageManager may carry a +sha512 integrity suffix; npm takes the bare version.
+        version=$(node -p "require('./package.json').packageManager.replace(/^pnpm@/, '').split('+')[0]")
+        npm install -g "pnpm@${version}"
+        # Put npm's global bin on PATH for later steps: on Windows the global
+        # prefix may not be on PATH for the Node setup-node just installed.
+        prefix=$(npm prefix -g)
+        if [ "$RUNNER_OS" = Windows ]; then bin="$prefix"; else bin="$prefix/bin"; fi
+        echo "$bin" >> "$GITHUB_PATH"
+        "$bin/pnpm" --version
+
+    - name: Restore pnpm cache
+      uses: actions/setup-node@v7
+      with:
         cache: pnpm
 
     - name: Install dependencies
