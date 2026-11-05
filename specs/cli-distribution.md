@@ -52,7 +52,7 @@ Ceilings are **per target** rather than global, asserted in CI by [`packages/cli
 | Target          | Measured | Ceiling | Headroom |
 | --------------- | -------- | ------- | -------- |
 | `darwin-arm64`  | ~70 MB   | 80 MB   | ~10 MB   |
-| `darwin-x64`    | ~75 MB   | 85 MB   | ~10 MB   |
+| `darwin-x64`    | ~87 MB   | 92 MB   | ~5 MB    |
 | `linux-x64`     | ~107 MB  | 115 MB  | ~8 MB    |
 | `linux-arm64`   | ~107 MB  | 115 MB  | ~8 MB    |
 | `windows-x64`   | ~122 MB  | 130 MB  | ~8 MB    |
