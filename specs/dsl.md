@@ -1146,7 +1146,7 @@ No quotes around identifiers in lists. Comma-separated, optional spaces.
 
 ### Links
 
-The `link` property takes a bare URL (no quotes). One link per entity.
+The `link` property takes a bare URL (no quotes). One link per entity. The URL is absolute and its scheme is `http` or `https`, or it is a `mailto:` URL, which has to be quoted (`link:"mailto:ops@acme.example"`) because the bare URL token only matches `http(s)://`. Any other value, such as a `javascript:` or `data:` URL, a relative path or a bare identifier, is `NL.E0414` (Validation Rule 16a).
 
 ### Dependencies and Anchoring
 
@@ -1265,6 +1265,7 @@ The parser enforces these rules and produces clear error messages with file posi
 14. `status` values are a built-in value (`planned`, `in-progress` (alias `active`), `done` (alias `completed`), `at-risk`, `blocked`) or a value declared by a `status` declaration in the roadmap section.
 15. A `size:`, `status:`, or `wave:` property reference must resolve to a declaration that appears **earlier in the file** (or in an earlier include, per `config:`/`roadmap:` mode). Forward references are a validation error. The error message should point to both the reference site and suggest the declaration location. For `wave:`, "earlier" means earlier in the roadmap section of the same file than the top-level entry that contains the reference (includes never contribute waves; see Include Rule 12), and the error is `NL.E1101` (WV6).
 16. `labels` values are identifiers (rule 5). Undeclared labels are valid (no config entry required).
+16a. A `link:` value, on any entity, is an absolute `http://` or `https://` URL, or a quoted `mailto:` URL (`NL.E0414`). Quoted or bare, the scheme is what counts: `link:"javascript:alert(1)"`, `link:"./spec.md"` and `link:spec` are errors. The rendered link is a live `<a href>` in the embed, the preview and the HTML export, so the layout and the renderer also drop a non-web link when a caller skips validation.
 17. `remaining` values are either a percentage (`0%`–`100%`) or a single-eng effort literal (`\d+(\.\d+)?[dwmqy]`, e.g. `1w`, `0.5d`). Both forms normalize to a percent of the item's total effort during layout: `percent = remaining_literal ÷ total_effort`, where `total_effort = size.effort` for sized items, or `duration_literal × item_capacity` for duration-literal'd items (`item_capacity` defaults to `1`). When the literal exceeds total effort (computed percent `> 100%`), the layout step emits a soft warning and clamps the painted bar to 100% remaining; rendering is never blocked.
 
 **Capacity**

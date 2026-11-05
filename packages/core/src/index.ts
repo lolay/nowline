@@ -82,4 +82,5 @@ export {
     type WavePlan,
 } from './language/waves-plan.js';
 export { TEMPLATE_NAMES, type TemplateName } from './templates.js';
+export { isAllowedLink } from './util/allowed-link.js';
 export { singleLine } from './util/single-line.js';

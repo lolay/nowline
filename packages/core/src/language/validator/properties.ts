@@ -9,6 +9,7 @@ import {
     isItemDeclaration,
     isSwimlaneDeclaration,
 } from '../../generated/ast.js';
+import { isAllowedLink } from '../../util/allowed-link.js';
 import { isRealIsoDate, propKey } from '../../util/props.js';
 import { describeNode, suggestKey } from '../validator-utils.js';
 import { isWaveBannedProperty } from '../waves.js';
@@ -113,6 +114,14 @@ export function checkPropertyValues(prop: EntityProperty, accept: ValidationAcce
         case 'scale':
             if (val && !DURATION_RE.test(val)) {
                 acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0406', {
+                    value: val,
+                });
+            }
+            break;
+
+        case 'link':
+            if (val && !isAllowedLink(val)) {
+                acceptTr(accept, 'error', { node: prop, property: 'value' }, 'NL.E0414', {
                     value: val,
                 });
             }
