@@ -171,7 +171,7 @@ The point of `convert-to-nowline` is leverage: rather than maintaining brittle i
 ## Transport
 
 - **stdio (primary)** — the harness spawns `npx @nowline/mcp` (or `nowline --mcp`) and communicates over stdin/stdout. This is the default for every MCP CLI harness.
-- **Streamable HTTP (optional, local)** — `nowline --mcp --port <n>` or `@nowline/mcp --port <n>` binds a localhost listener speaking the current MCP **Streamable HTTP** transport for harnesses that prefer HTTP over stdio. Not the default; no TLS; localhost only. The deprecated standalone SSE transport is **not** offered — Streamable HTTP supersedes it.
+- **Streamable HTTP (optional, local)** — `nowline --mcp --port <n>` or `@nowline/mcp --port <n>` binds a localhost listener speaking the current MCP **Streamable HTTP** transport for harnesses that prefer HTTP over stdio. Not the default; no TLS; localhost only. It binds `127.0.0.1`, and because a web page can reach that socket by DNS rebinding, every request must carry a `Host` of `localhost`, `127.0.0.1`, or `[::1]` with the listening port; an `Origin`, when present, must be `http://` on one of those names and the same port. Anything else gets `403` before the MCP layer sees it. Non-browser clients send no `Origin`; a browser page served from another port (another local dev server, a web-based inspector) is refused. The deprecated standalone SSE transport is **not** offered — Streamable HTTP supersedes it.
 
 No remote transport, no OAuth, no network calls to Lolay infrastructure. The server runs as the user with the user's file permissions.
 
