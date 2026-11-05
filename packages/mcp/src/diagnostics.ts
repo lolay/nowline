@@ -3,6 +3,7 @@
 import {
     collectDocumentDiagnostics,
     createNowlineServices,
+    type IncludePolicy,
     inferCodeFromMessage,
     isRoutedResolveDiagnostic,
     type NowlineFile,
@@ -191,15 +192,23 @@ export async function diagnosticsErrorBlock(
  * Stage a validated document once for a tool call: the render, the export,
  * the insights and the routed include diagnostics all read this one result.
  * `doc` is the document `diagnosticsErrorBlock` (or `validate`) already built
- * from `source`, so nothing is parsed again.
+ * from `source`, so nothing is parsed again. `includePolicy` confines
+ * includes as the CLI's `--include-root` does: an absolute include, or one
+ * that leaves the root before or after symlinks are resolved, is NL.E0208
+ * and is not read (`includePolicyFor` builds it for a guarded path).
  */
 export function stageMcpRoadmap(
     doc: Awaited<ReturnType<typeof buildDocument>>,
     source: string,
     inputs: RenderInputs,
     host: HostEnv,
+    includePolicy: IncludePolicy,
 ): Promise<StageResult> {
-    return stageForExport(source, inputs, host, { document: doc, services: getMcpServices() });
+    return stageForExport(source, inputs, host, {
+        document: doc,
+        services: getMcpServices(),
+        includePolicy,
+    });
 }
 
 /**
