@@ -34,7 +34,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: the handler builds `NodeStreamableHTTPServerTransport({ sessionIdGenerator: undefined })` and nothing else; the SDK (`@modelcontextprotocol/server` 2.3.1) defaults `enableDnsRebindingProtection` to false, and no `localhostHostValidation()` / `localhostOriginValidation()` guard is applied. Stateless mode needs no `initialize`. Used by `mcp/src/index.ts:111-113` and `nowline --mcp --port` (`cli/src/commands/mcp.ts:33-38`). `specs/mcp.md:174` promises localhost only; binding `127.0.0.1` doesn't stop a rebinding page.
 - Verified: started `nowline --mcp --port 47812 --root r2` and sent one POST with `Host` and `Origin` set to `attacker.example`, calling `tools/call delete`: 200, and the file was deleted. A second reviewer read `.env` the same way.
 - Recommendation: validate Host and Origin against localhost before `handleRequest`; a test that a foreign Host gets 403. Fix with r1.f1, since together they make any visited page a file reader and deleter.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#252 (26caeaa)
 
 ### r1.f3 - HTML export writes the roadmap title into `aria-label` with text-only escaping
 
