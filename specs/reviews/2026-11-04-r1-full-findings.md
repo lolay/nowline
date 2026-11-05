@@ -22,7 +22,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `resolveAndGuard` (`server.ts:178`, `workspace-roots.ts:93-99`) is `path.resolve` plus a `startsWith` root check: no `realpath`, no extension check. `read`, `create`, `update`, `delete` (`server.ts:484-486, 517-523, 557-560, 587-589`) and render/export `output` (`:801`) all rely on it alone. `read` is annotated `readOnlyHint` (`:480`), which harnesses tend to auto-approve. Includes go through the kernel `HostEnv.readSource`, a bare `fs.readFile` (`:188-193`), and `stageMcpRoadmap` passes no `includePolicy` (`diagnostics.ts:202`), so core resolves includes unrooted. `specs/mcp.md:61,64` define these tools on "a local `.nowline` file", and `:100` calls the root sandbox "the real guard".
 - Verified: ran the built `@nowline/mcp --root root/`. `read {path:".env"}` returned the file's token; `read {path:"link.nowline"}`, a symlink to `../outside/creds.txt`, returned the outside file; `render` with `include "/abs/outside/other.nowline"` and with `include "../outside/other.nowline"` drew the outside file's lane into the SVG. Includes can only read `.nowline` files (core enforces the extension); arbitrary contents leak through `read` and symlinks.
 - Recommendation: require `.nowline` for `read`, `create`, `update`, `delete`, and a known export extension for `output`; `realpath` the target (and the parent for writes) before the root check; pass `includePolicy: { kind: 'rooted', root }` as the CLI's `--include-root` does. Tests for each.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#253 (e1b2ef6)
 
 ### r1.f2 - MCP Streamable HTTP (`--port`) accepts any Host and Origin, so a web page can drive it by DNS rebinding
 
