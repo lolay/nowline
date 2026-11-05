@@ -26,6 +26,10 @@
         "./http": {
             "types": "./dist/http.d.ts",
             "import": "./dist/http.js"
+        },
+        "./start": {
+            "types": "./dist/start.d.ts",
+            "import": "./dist/start.js"
         }
     },
     "files": [

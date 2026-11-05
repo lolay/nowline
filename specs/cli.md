@@ -265,6 +265,8 @@ The server exposes the eight shared-contract tools (`validate`, `render`, `read`
 
 **CLI-design note for review:** `--mcp` is a mode flag on `nowline` (like `--serve` and `--init`) rather than a verb on the separate `@nowline/mcp` package. The separate package (`npx @nowline/mcp`) is the canonical install path for harness configs because it decouples the MCP server's install lifecycle from the CLI binary — a harness using `npx @nowline/mcp` always gets the published npm version, whereas `nowline --mcp` uses whatever binary the user has installed. Either form is valid; `npx @nowline/mcp` is preferred in MCP config examples. See [`specs/mcp.md`](./mcp.md).
 
+`--mcp` takes `--root <dir>` with the same meaning as `npx @nowline/mcp --root`: the one allowed root, and the folder a binary `export` saves into by default. Both start through the same `startMcpServer`, so the two forms behave identically. A `--port` that isn't a whole number from 1 to 65535 exits 2.
+
 `--mcp` rejects `--serve`, `--init`, and `--dry-run`.
 
 ### `--mcp-install [<client>]` / `--mcp-uninstall [<client>]`

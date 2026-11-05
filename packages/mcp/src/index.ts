@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // @nowline/mcp — entry point for `npx @nowline/mcp`.
 //
-// Parses --root, --port, and --version flags, creates the MCP server, and
-// connects it to the appropriate transport:
+// Parses --root, --port, and --version flags and hands them to
+// startMcpServer (start.ts), which `nowline --mcp` calls too. Transports:
 //   stdio  (default)                  standard MCP stdio transport
 //   http   (--port <N>)               Streamable HTTP transport on localhost:<N>
 //
@@ -11,51 +11,25 @@
 //
 // Spec: specs/mcp.md.
 
-import { readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import { createMcpHttpHandler } from './http.js';
-import { expandRootPath } from './root-path.js';
-import { createMcpServer } from './server.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-function readPkgVersion(): string {
-    try {
-        const raw = readFileSync(resolve(__dirname, '../package.json'), 'utf-8');
-        const pkg = JSON.parse(raw) as { version?: string };
-        return pkg.version ?? '0.0.0';
-    } catch {
-        return '0.0.0';
-    }
-}
-
-const PKG_VERSION = readPkgVersion();
+import { MCP_VERSION } from './generated/version.js';
+import { InvalidPortError, startMcpServer } from './start.js';
 
 function parseArgs(argv: string[]): {
     root?: string;
-    port?: number;
+    port?: string;
     help: boolean;
     version: boolean;
 } {
     const args = argv.slice(2);
     let root: string | undefined;
-    let port: number | undefined;
+    let port: string | undefined;
     let help = false;
     let version = false;
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--root' && i + 1 < args.length) {
             root = args[++i];
         } else if (args[i] === '--port' && i + 1 < args.length) {
-            const n = parseInt(args[++i], 10);
-            if (!Number.isFinite(n) || n < 1 || n > 65535) {
-                process.stderr.write(`nowline-mcp: --port must be a number between 1 and 65535\n`);
-                process.exit(1);
-            }
-            port = n;
+            port = args[++i];
         } else if (args[i] === '-h' || args[i] === '--help') {
             help = true;
         } else if (args[i] === '--version' || args[i] === '-v') {
@@ -68,7 +42,7 @@ function parseArgs(argv: string[]): {
 const { root, port, help, version } = parseArgs(process.argv);
 
 if (version) {
-    process.stdout.write(`${PKG_VERSION}\n`);
+    process.stdout.write(`${MCP_VERSION}\n`);
     process.exit(0);
 }
 
@@ -92,34 +66,10 @@ if (help) {
     process.exit(0);
 }
 
-// Expand mcpb tokens (${HOME}/~/env vars) so a literal default from the
-// .mcpb directory picker resolves to a real path. An empty/blank value
-// (optional field left unset) collapses to undefined → cwd fallback, inline.
-const expandedRoot = expandRootPath(root);
-
-const serverOptions = {
-    allowedRoot: expandedRoot,
-    rootConfigured: expandedRoot !== undefined,
-    version: PKG_VERSION,
-};
-
-if (port !== undefined) {
-    // Streamable HTTP transport — stateless, one server per request.
-    const httpServer = createServer(createMcpHttpHandler(() => createMcpServer(serverOptions)));
-
-    httpServer.listen(port, '127.0.0.1', () => {
-        process.stderr.write(
-            `nowline-mcp: Streamable HTTP listening on http://127.0.0.1:${port}\n`,
-        );
-    });
-
-    await new Promise<void>((resolve) => {
-        httpServer.on('close', resolve);
-        process.on('SIGINT', () => httpServer.close());
-        process.on('SIGTERM', () => httpServer.close());
-    });
-} else {
-    // Default: stdio transport.
-    const transport = new StdioServerTransport();
-    await createMcpServer(serverOptions).connect(transport);
+try {
+    await startMcpServer({ root, port });
+} catch (err) {
+    if (!(err instanceof InvalidPortError)) throw err;
+    process.stderr.write(`nowline-mcp: ${err.message}\n`);
+    process.exit(1);
 }

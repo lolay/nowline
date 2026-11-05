@@ -1,10 +1,10 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { packageRoot } from '../helpers.js';
+import { packageRoot, repoRoot, runCliBuilt, withTempDir } from '../helpers.js';
 
 const distEntry = path.join(packageRoot, 'dist', 'index.js');
 const hasBuild = existsSync(distEntry);
@@ -60,6 +60,57 @@ function driveJsonRpc(args: string[], request: object, timeoutMs = 5000): Promis
 
         child.stdin.write(`${JSON.stringify(request)}\n`);
         // Leave stdin open so the server stays alive until we kill it.
+    });
+}
+
+/**
+ * Sends each request over stdio in order, waiting for the reply to one before
+ * sending the next, and resolves with the replies once the last arrives.
+ */
+function mcpSession(args: string[], requests: object[], timeoutMs = 20000): Promise<unknown[]> {
+    return new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [distEntry, ...args], {
+            cwd: packageRoot,
+            stdio: ['pipe', 'pipe', 'pipe'],
+        });
+        const replies: unknown[] = [];
+        let buf = '';
+        let stderr = '';
+        const timer = setTimeout(() => {
+            child.kill('SIGTERM');
+            reject(new Error(`MCP session timed out after ${replies.length} replies: ${stderr}`));
+        }, timeoutMs);
+        const sendNext = () => {
+            if (replies.length === requests.length) {
+                clearTimeout(timer);
+                child.stdin.end();
+                resolve(replies);
+                return;
+            }
+            child.stdin.write(`${JSON.stringify(requests[replies.length])}\n`);
+        };
+        child.stderr.on('data', (d: Buffer) => {
+            stderr += d.toString();
+        });
+        child.stdout.on('data', (d: Buffer) => {
+            buf += d.toString('utf-8');
+            let nl = buf.indexOf('\n');
+            while (nl !== -1) {
+                const line = buf.slice(0, nl).trim();
+                buf = buf.slice(nl + 1);
+                nl = buf.indexOf('\n');
+                if (!line) continue;
+                const msg = JSON.parse(line) as { id?: unknown };
+                if (msg.id === undefined) continue; // a notification
+                replies.push(msg);
+                sendNext();
+            }
+        });
+        child.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+        sendNext();
     });
 }
 
@@ -199,5 +250,58 @@ describeBuilt('CLI --mcp flag (requires `pnpm build`)', () => {
             result?: { serverInfo?: { name?: string } };
         };
         expect(msg.result?.serverInfo?.name).toBe('nowline');
+    });
+
+    // r1.f15: `nowline --mcp` once built its own server without rootConfigured
+    // or a version, so it reported 0.6.0 and returned a PDF inline instead of
+    // saving it under --root as `npx @nowline/mcp --root` does.
+    it('--mcp --root saves a PDF export under the root and reports the package version', async () => {
+        const mcpPkg = JSON.parse(
+            readFileSync(path.join(repoRoot, 'packages', 'mcp', 'package.json'), 'utf-8'),
+        ) as { version: string };
+        await withTempDir(async (dir) => {
+            const source = [
+                'nowline v1',
+                '',
+                'roadmap parity "Parity" start:2026-01-05 scale:1w',
+                '',
+                'swimlane eng "Engineering"',
+                '  item build "Build" duration:1w',
+            ].join('\n');
+            const [init, call] = (await mcpSession(
+                ['--mcp', '--root', dir],
+                [
+                    {
+                        jsonrpc: '2.0',
+                        id: 1,
+                        method: 'initialize',
+                        params: {
+                            protocolVersion: '2025-06-18',
+                            capabilities: {},
+                            clientInfo: { name: 'nowline-cli-test', version: '0.0.1' },
+                        },
+                    },
+                    {
+                        jsonrpc: '2.0',
+                        id: 2,
+                        method: 'tools/call',
+                        params: { name: 'export', arguments: { source, format: 'pdf' } },
+                    },
+                ],
+            )) as [
+                { result?: { serverInfo?: { version?: string } } },
+                { result?: { isError?: boolean; content?: Array<{ type: string }> } },
+            ];
+            expect(init.result?.serverInfo?.version).toBe(mcpPkg.version);
+            expect(call.result?.isError).not.toBe(true);
+            expect(existsSync(path.join(dir, 'parity.pdf'))).toBe(true);
+            expect(call.result?.content?.some((block) => block.type === 'resource')).toBe(false);
+        });
+    });
+
+    it('--mcp --port with a non-numeric value exits 2', async () => {
+        const result = await runCliBuilt(['--mcp', '--port', 'abc']);
+        expect(result.exitCode).toBe(2);
+        expect(result.stderr).toMatch(/--port must be a number between 1 and 65535 \(got abc\)/);
     });
 });

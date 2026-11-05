@@ -1,54 +1,33 @@
-import { createServer } from 'node:http';
-import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import { createMcpHttpHandler } from '@nowline/mcp/http';
-import { createMcpServer } from '@nowline/mcp/server';
+import { InvalidPortError, startMcpServer } from '@nowline/mcp/start';
 import type { ParsedArgs } from '../cli/args.js';
+import { CliError, ExitCode } from '../io/exit-codes.js';
 import { createLog } from '../io/log.js';
 
 /**
  * `nowline --mcp` handler.
  *
- * Starts a Model Context Protocol server sharing the same @nowline/mcp
- * server factory as `npx @nowline/mcp`.
+ * Starts the Model Context Protocol server through the same `startMcpServer`
+ * that `npx @nowline/mcp` calls, so `--root` (expansion and the binary-export
+ * delivery default), `--port` and the reported version behave identically.
  *
  * Transport selection:
  *   stdio (default)  — when --port is absent.
- *   Streamable HTTP  — when --port <N> is supplied; listens on localhost:<N>.
+ *   Streamable HTTP  — when --port <N> is supplied; listens on 127.0.0.1:<N>.
  *
  * Runs until the process receives SIGINT/SIGTERM or the client closes stdin.
  */
 export async function mcpHandler({ args }: { args: ParsedArgs }): Promise<void> {
-    // Without --root the server follows the client's MCP roots, else cwd.
-    const root = args.root;
-
-    const portStr = args.port;
-    if (portStr !== undefined) {
-        const port = parseInt(portStr, 10);
-        if (!Number.isFinite(port) || port < 1 || port > 65535) {
-            throw new Error(
-                `nowline: --port must be a number between 1 and 65535 (got ${portStr}).`,
-            );
+    try {
+        await startMcpServer({
+            root: args.root,
+            port: args.port,
+            onListening: (url) =>
+                createLog(args.logLevel).notice(`nowline: MCP Streamable HTTP listening on ${url}`),
+        });
+    } catch (err) {
+        if (err instanceof InvalidPortError) {
+            throw new CliError(ExitCode.InputError, `nowline: ${err.message}`);
         }
-
-        const httpServer = createServer(
-            createMcpHttpHandler(() => createMcpServer({ allowedRoot: root })),
-        );
-
-        await new Promise<void>((resolve) => {
-            httpServer.listen(port, '127.0.0.1', () => {
-                createLog(args.logLevel).notice(
-                    `nowline: MCP Streamable HTTP listening on http://127.0.0.1:${port}`,
-                );
-            });
-            httpServer.on('close', resolve);
-            process.on('SIGINT', () => httpServer.close());
-            process.on('SIGTERM', () => httpServer.close());
-        });
-    } else {
-        const transport = new StdioServerTransport();
-        await createMcpServer({ allowedRoot: root }).connect(transport);
-        await new Promise<void>((resolve) => {
-            transport.onclose = resolve;
-        });
+        throw err;
     }
 }

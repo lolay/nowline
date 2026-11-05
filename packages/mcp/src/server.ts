@@ -61,6 +61,7 @@ import {
     REFERENCE_MAN_PAGE,
 } from './generated/resources.js';
 import { PREVIEW_HTML } from './generated/ui-bundle.js';
+import { MCP_VERSION } from './generated/version.js';
 import { type McpResolvedOptions, resolveMcpOptions } from './options.js';
 import {
     type GuardedPath,
@@ -276,7 +277,7 @@ export interface McpServerOptions {
     rootConfigured?: boolean;
     /** Server name shown in the MCP client. Defaults to 'nowline'. */
     name?: string;
-    /** Server version. Defaults to package version. */
+    /** Server version. Defaults to the @nowline/mcp package version. */
     version?: string;
 }
 
@@ -285,7 +286,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
     const server = new McpServer(
         {
             name: opts.name ?? 'nowline',
-            version: opts.version ?? '0.6.0',
+            version: opts.version ?? MCP_VERSION,
             icons: [...NOWLINE_MCP_ICONS],
         },
         {

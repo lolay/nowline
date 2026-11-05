@@ -75,7 +75,7 @@ The OSS tools take local paths, and every path must land inside an allowed root.
 
 Client roots change where paths resolve, not how `export` delivers binary formats: a client root never counts as the configured root folder that switches the smart `pdf`/`xlsx`/`png` default to writing a file ([Structured output](#structured-output) § export delivery). The stateless Streamable HTTP transport (`--port`) builds a server per request that never sees the client's `initialize`, so it always uses `--root` or cwd.
 
-`nowline --mcp` follows the same order.
+`nowline --mcp` follows the same order. Both entry points start the server through one `startMcpServer` (`@nowline/mcp/start`), which expands `--root`, marks it as the configured root, picks the transport from `--port`, and reports the `@nowline/mcp` package version, so `nowline --mcp --root <dir>` and `npx @nowline/mcp --root <dir>` deliver exports the same way.
 
 **What the roots guard.** Every path is checked twice: as written (resolved against the primary root) and again with every symlink resolved, so a link inside a root cannot reach a file outside every root. A path that fails either check is `NL.MCP.OUT_OF_ROOT`. For a path that does not exist yet (`create`, an `output`), the deepest existing ancestor is resolved, and a dangling link resolves to where it points, so a write cannot land outside a root either. On top of that:
 
