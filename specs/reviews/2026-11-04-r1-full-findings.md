@@ -69,7 +69,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `dsl.md:319,1149` say `link` takes a URL, and the URL terminal is `https?://` (`nowline.langium:222`), but `PropertyAtom` also accepts `STRING` (`:208`), no validator checks `link`, `parseLinkIcon` passes any string through as `href` (`item-measure.ts:186-194`), and the renderer emits `<a href=…>` (`renderer/src/svg/item.ts:568-569`). That SVG is live DOM in the embed (`embed/src/auto-scan.ts:151`), the preview shell (`preview-shell/src/mount.ts:591`) and the HTML export. The logo sanitizer already rejects `javascript:` (`rendering.md:132`); item links don't.
 - Verified: `link:"javascript:alert(document.domain)"` renders with no diagnostic to `<a href="javascript:…" rel="noopener" target="_blank">`. In headless Chromium, clicking it opened an `about:blank` popup and ran nothing (`target=_blank` plus `noopener`); Firefox and Safari untested. Re-rated from high: no script execution shown.
 - Recommendation: a validator error for a `link` that isn't `http(s):` (optionally `mailto:`), and the renderer drops any other scheme as defence in depth.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#257 (26eeb5a); `mailto:` is allowed too, quoted
 
 ### r1.f6 - Release jobs run mutable-tag actions and unpinned publish tools next to registry secrets
 
