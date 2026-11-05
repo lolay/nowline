@@ -80,7 +80,7 @@ pipeline that artifact is built in a separate CI job and handed over — see
 | `format` | Auto-fix formatting, lint, and import order (`pnpm check:fix`) |
 | `typecheck` | Type-check the packages that opt in (`pnpm typecheck`). Needs a prior `build`: several packages resolve sibling `@nowline/*` types from `dist/` |
 | `test` | Run every package's Vitest suite (`pnpm -r test`) and the `node:test` specs under `scripts/gallery/test/` and `scripts/test/` (the latter guards the `engines` floors); depends on `build` |
-| `doctor` | Check the tools in `triage.yaml` (read-only): errors below a floor, warns below a pin. `MODE=default\|release\|ci` picks the profile; `STRICT=1` adds `triage --strict` so warnings fail, which is how CI's `triage` job runs it on the `.nvmrc` pin |
+| `doctor` | Check the tools in `triage.yaml` (read-only): errors below a floor, warns below a pin. `MODE=default\|release\|ci\|lint` picks the profile; `STRICT=1` adds `triage --strict` so warnings fail, which is how CI's `triage` job runs it on the `.nvmrc` pin |
 | `ci` | The full pre-push gate: `lint` + `build` + `typecheck` + `test`, in that order. The canonical CI cell (`ubuntu-latest`, Node 26) runs this target directly on a clean checkout |
 | `ci-platform` | Slim gate for the other build-test cells (`ubuntu-latest` Node 22, macOS, Windows): `build-fast`, then `pnpm -r test` and the script tests. No lint, typecheck, or render: those have never differed by OS or Node version, while every platform bug so far was a Windows path bug that Vitest caught. Calls `pnpm -r test` itself rather than depending on `test`, so it never re-runs the full `build` |
 | `pre-commit` | Local alias of `ci` — run before committing or pushing |

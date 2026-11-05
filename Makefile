@@ -73,7 +73,7 @@ confirm = @if [ -z "$($(1))" ]; then \
   exit 1; \
 fi
 
-# MODE selects triage.yaml profile (default | release).
+# MODE selects triage.yaml profile (default | release | ci | lint).
 MODE ?= default
 
 # STRICT=1 makes triage warnings fail (triage --strict). CI's triage job runs
@@ -145,7 +145,7 @@ gallery-publish: ## CI: add $(GALLERY_DIR)/raw to the history in $(GALLERY_DIR)/
 gallery-serve: ## Serve the local review gallery over http on every interface (phone/iPad on the same network)
 	node scripts/gallery/serve.mjs $(GALLERY_DIR)/site $(GALLERY_PORT)
 
-doctor: ## Check required tools for this repo (read-only). MODE=default|release STRICT=1
+doctor: ## Check required tools for this repo (read-only). MODE=default|release|ci|lint STRICT=1
 	@command -v triage >/dev/null 2>&1 || { printf 'triage not found - install: brew install lolay/tap/triage\n' >&2; exit 1; }
 	@triage --profile $(MODE)$(if $(filter 1,$(STRICT)), --strict)
 
