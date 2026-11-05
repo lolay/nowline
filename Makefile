@@ -31,15 +31,12 @@ SHELL := bash
         determinism determinism-browser determinism-update mcp-app-e2e mcp-inspector-smoke mcp-claude-e2e \
         compile smoke deb pack vsix pack-mcpb bump snapshot-version release-changelog release-commit release-notes \
         changelog-check changelog-preview \
-        publish-npm publish-vscode publish-cdn publish-mcp-registry
+        publish-npm publish-vscode publish-mcp-registry
 
 # Overridable inputs for the package / guarded targets. The release and
 # deploy workflows pass these in; the defaults serve a manual local run:
 #   VSIX                  the .vsix to publish (CI passes the downloaded artifact path)
-#   FIREBASE_PROJECT_PATH the firebase.json directory to deploy from (dev tier by default)
-#   PROJECT_ID            the Firebase project id (CI passes vars.PROJECT_ID)
 VSIX ?= packages/vscode-extension/dist/nowline-vscode.vsix
-FIREBASE_PROJECT_PATH ?= packages/embed/firebase/dev
 NPM_DIST_TAG ?= latest
 
 # Local review gallery (make gallery). GALLERY_DIR holds the raw build history
@@ -348,10 +345,6 @@ publish-vscode: ## [danger] Publish the VS Code extension to the VS Code Marketp
 	$(call confirm,CONFIRM_PUBLISH,Publishes nowline-vscode to the VS Code Marketplace and Open VSX)
 	npx --yes @vscode/vsce publish --packagePath $(VSIX)
 	npx --yes ovsx publish $(VSIX) -p "$$OVSX_PAT"
-
-publish-cdn: ## [danger] Deploy the @nowline/embed bundle to the Firebase Hosting CDN
-	$(call confirm,CONFIRM_DEPLOY,Deploys the embed bundle to the Firebase Hosting CDN)
-	cd $(FIREBASE_PROJECT_PATH) && firebase deploy --only hosting --project $(PROJECT_ID) --non-interactive
 
 publish-mcp-registry: ## [danger] Publish io.nowline/nowline to the public MCP registry (needs MCP_PRIVATE_KEY)
 	$(call confirm,CONFIRM_PUBLISH,Publishes io.nowline/nowline to the MCP registry)

@@ -441,7 +441,7 @@ Nowline ships [`AGENTS.md`](./AGENTS.md) and welcomes AI-assisted PRs. Read [`AI
 
 ### Changelog entries
 
-User-observable changes — DSL syntax, CLI flags, AST JSON shape, exporter output, extension UX, the `embed.nowline.io` surface — land with a changelog fragment, not an edit to [`CHANGELOG.md`](./CHANGELOG.md). Every PR that edits the same `## [Unreleased]` lines conflicts with every other open PR; a file of your own can't.
+User-observable changes — DSL syntax, CLI flags, AST JSON shape, exporter output, extension UX, the `@nowline/embed` surface — land with a changelog fragment, not an edit to [`CHANGELOG.md`](./CHANGELOG.md). Every PR that edits the same `## [Unreleased]` lines conflicts with every other open PR; a file of your own can't.
 
 Add `.changelog/<name>.txt` (your branch slug or the PR number), with one fenced block per entry:
 

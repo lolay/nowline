@@ -32,7 +32,6 @@ graph LR
     build -.-> vsix
     pack -.-> publish_npm["publish-npm"]
     vsix -.-> publish_vscode["publish-vscode"]
-    build -.-> publish_cdn["publish-cdn"]
     build -.-> gallery_collect["gallery-collect"]
     gallery_collect -.-> gallery
     gallery_collect -.-> gallery_publish["gallery-publish"]
@@ -130,7 +129,6 @@ running it by hand hits the friction. Excluded from `make ci`.
 |--------|-------|-------------|
 | `publish-npm` | `CONFIRM_PUBLISH` | Publish the `@nowline/*` tarballs in `dist-pack/` to npmjs.com |
 | `publish-vscode` | `CONFIRM_PUBLISH` | Publish the extension to the VS Code Marketplace + Open VSX (`VSIX=` path) |
-| `publish-cdn` | `CONFIRM_DEPLOY` | Deploy the `@nowline/embed` bundle to the Firebase Hosting CDN (`PROJECT_ID=`, `FIREBASE_PROJECT_PATH=`) |
 
 Example: `make publish-npm` prints
 
@@ -149,13 +147,12 @@ The standard convention chains heavier targets onto lighter gates so they can't
 be skipped (`ci: lint build typecheck test`, `test: build`). The guarded
 `publish-*` targets are the one deliberate exception in this repo: nowline's
 release pipeline builds artifacts **once** in [`build.yml`](./.github/workflows/build.yml)
-and hands them to a separate, pure-push publish/deploy job
-([`release.yml`](./.github/workflows/release.yml),
-[`embed-cdn.yml`](./.github/workflows/embed-cdn.yml)) that has no build
+and hands them to a separate, pure-push publish job
+([`release.yml`](./.github/workflows/release.yml)) that has no build
 toolchain installed. A hard `build` prerequisite would make those CI steps fail
 (and re-running the whole build on a publish runner defeats the artifact
 handoff). Instead each guarded target asserts its prebuilt input exists
-(`dist-pack/*.tgz`, the `.vsix`, the CDN `public/` tree) and fails loudly if
+(`dist-pack/*.tgz`, the `.vsix`) and fails loudly if
 not — preserving the "never ship an unbuilt artifact" guarantee for a manual
 run while keeping CI's job separation intact. For a clean local publish, run the
 producing target first (`make build pack` then `CONFIRM_PUBLISH=1 make publish-npm`).
@@ -170,10 +167,9 @@ keeps per-step logs and the matrix while sourcing the command from one place.
 | Workflow | Trigger | What it does | make targets |
 |----------|---------|--------------|--------------|
 | [`ci.yml`](./.github/workflows/ci.yml) | push to `main`, pull requests, merge queue | Strict env doctor on the `.nvmrc` pin; lint workflows; lint man pages; the full `make ci` gate (lint + build + typecheck + test) on a clean checkout on `ubuntu-latest` Node 26, and `make ci-platform` (build-fast + Vitest) on the Node 22, macOS, and Windows cells (macOS and Windows only in the merge queue and on `main`; a PR runs the Linux cells); embed bundle-size gate; export-determinism and MCP harness gates; release-build smoke (calls `build.yml`, in parallel with the test matrix; Linux cells only on a PR); a docs-only PR or queue entry (Markdown outside `packages/` and `.github/`, except `specs/dsl.md`) skips every build and test job, while push to `main` always runs everything; the aggregate `CI gate` job, the only check the `main` ruleset requires | `doctor` (as `MODE=ci STRICT=1`, through `lolay/triage-action`), `lint-workflows`, `lint-man`, `ci`, `ci-platform`, `bundle-size`, `build-fast`, `compile`, `determinism`, `determinism-browser`, `mcp-inspector-smoke`, `mcp-app-e2e` |
-| [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries and smoke each on a runner that can execute it (native `ubuntu-24.04-arm` / `windows-11-arm` for arm64, Rosetta for macOS x64), build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror + embed CDN bundle | `compile`, `smoke`, `deb`, `pack`, `vsix` |
-| [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror, deploy prod embed CDN | `bump`, `release-changelog`, `release-notes`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
+| [`build.yml`](./.github/workflows/build.yml) | reusable (called by `ci.yml` smoke + `release.yml`) | 10-cell build/package matrix: compile per-OS/arch binaries and smoke each on a runner that can execute it (native `ubuntu-24.04-arm` / `windows-11-arm` for arm64, Rosetta for macOS x64), build `.deb`s, pack npm tarballs, package the `.vsix`, stage the action mirror | `compile`, `smoke`, `deb`, `pack`, `vsix` |
+| [`release.yml`](./.github/workflows/release.yml) | `v*` tag push, manual dispatch | Cut release (bump + tag), call `build.yml` with upload, publish to npm + Marketplace + Open VSX, GitHub release + Homebrew tap + action mirror | `bump`, `release-changelog`, `release-notes`, `publish-npm`, `publish-vscode` (guarded with `CONFIRM_PUBLISH=1`) |
 | [`changelog.yml`](./.github/workflows/changelog.yml) | pull requests (including label changes), merge queue | Validate `.changelog/` fragments; on a PR, require one unless it's labelled `no-changelog`, and reject new entries written straight into a `CHANGELOG.md`. The `Changelog` check is required by the `main` ruleset | `changelog-check` |
-| [`embed-cdn.yml`](./.github/workflows/embed-cdn.yml) | push to `main`, pull requests, manual dispatch | Build the dev IIFE; continuous-deploy `embed.nowline.dev`; per-PR ephemeral preview channel | `publish-cdn` (guarded with `CONFIRM_DEPLOY=1`, embed-dev job) |
 
 Other workflows (`copilot-pr-*`, `agent-*`, `editor-release-monitor.yml`,
 `vscode-extension-engine-bump.yml`, the generated `agent-*.lock.yml`) run
