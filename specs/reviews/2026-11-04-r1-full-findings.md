@@ -44,7 +44,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `title` is `escapeText(...)` (`:38`, escapes `& < >` only) and is then interpolated into `aria-label="${title}"` (`:55`). `escapeAttr` exists in the same file (`:87`) and is used for `generator` but not here. DSL strings unescape `\"`. The same exporter serves the CLI, MCP `export` and the VS Code extension.
 - Verified: `roadmap r "Demo\" onmouseover=\"alert(1)\" x=\""` exported with `-f html` produced `<main ... aria-label="Demo" onmouseover="alert(1)" x="">`; a reviewer's variant with `autofocus onfocus=` runs without a click.
 - Recommendation: `escapeAttr` for the attribute, `escapeText` for `<title>`; a regression test with a quote in the title.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#254 (7de617c)
 
 ### r1.f4 - `agent-verdict-apply` lets any commenter move the agent state machine with the maintainer PAT
 
