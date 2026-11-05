@@ -4,6 +4,12 @@ All notable changes to Nowline are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Don't edit this file in a PR: add a fragment to [`.changelog/`](./.changelog/README.md), and the release cut folds every pending fragment into a new `## [X.Y.Z]` section (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)). The `## [Unreleased]` section below predates fragments; the next release folds it in and drops the heading.
 
+## [0.12.1] - 2026-11-04
+
+### Fixed
+
+- The GitHub Action installs `@nowline/cli` into a directory under `$RUNNER_TEMP` and adds it to PATH instead of running `npm install -g`, so it works on a stock `ubuntu-latest` runner without `actions/setup-node` (#243).
+
 ## [0.12.0] - 2026-11-04
 
 ### Added

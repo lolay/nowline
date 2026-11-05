@@ -514,7 +514,7 @@ Ceilings are **per target**, asserted in CI by [`packages/cli/scripts/compile.mj
 | Target          | Measured | Ceiling |
 | --------------- | -------- | ------- |
 | `darwin-arm64`  | ~70 MB   | 80 MB   |
-| `darwin-x64`    | ~75 MB   | 85 MB   |
+| `darwin-x64`    | ~87 MB   | 92 MB   |
 | `linux-x64`     | ~107 MB  | 115 MB  |
 | `linux-arm64`   | ~107 MB  | 115 MB  |
 | `windows-x64`   | ~122 MB  | 130 MB  |

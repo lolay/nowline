@@ -1,0 +1,3 @@
+```release-note:security
+The MCP Streamable HTTP server (`nowline --mcp --port` and `npx @nowline/mcp --port`) now refuses, with `403`, any request whose `Host` isn't `localhost`, `127.0.0.1` or `[::1]` on the listening port, or whose `Origin` is present and isn't `http://` on one of those names and port. Before, a web page could reach the server by DNS rebinding and call its tools, including `read` and `delete`.
+```

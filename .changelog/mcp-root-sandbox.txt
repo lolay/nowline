@@ -1,0 +1,3 @@
+```release-note:security
+`@nowline/mcp`: the file tools now stay inside the allowed roots. Paths are checked after symlinks are resolved; `read`, `create`, `update`, `delete` and every `path` input accept only `.nowline` files (`NL.MCP.INPUT` otherwise); `render` and `export` write only export extensions; and includes are confined to the root as with the CLI's `--include-root`, so an absolute include or one that leaves the root is `NL.E0208`.
+```

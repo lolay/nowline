@@ -1,14 +1,10 @@
 import * as path from 'node:path';
-import type { NonWorkingDisplay, ThemeName } from '@nowline/layout';
+import type { ThemeName } from '@nowline/layout';
 import * as vscode from 'vscode';
+import type { ExportSource } from '../export/export-source.js';
+import { readDocumentText } from '../io/document-text.js';
 import type { RcConfigCache } from '../io/rc-config.js';
-import {
-    parseToolbarNow,
-    resolveNonWorkingDisplay,
-    resolvePreviewOptions,
-    resolveTodayAnchor,
-    withOptionProblems,
-} from './option-resolver.js';
+import { parseToolbarNow, resolvePreviewOptions, withOptionProblems } from './option-resolver.js';
 import { type RenderOutcome, renderDocument } from './render-pipeline.js';
 import { getShellHtml } from './shell-html.js';
 
@@ -133,6 +129,8 @@ export class NowlinePreview {
     private debounceTimer: ReturnType<typeof setTimeout> | undefined;
     /** Monotonic counter so a slow render can't overwrite a newer one. */
     private renderSeq = 0;
+    /** The text and options of the latest render; what Save and Export… write. */
+    private shown: ExportSource | undefined;
     private disposed = false;
 
     constructor(opts: NowlinePreviewOptions) {
@@ -169,21 +167,11 @@ export class NowlinePreview {
         this.panel.reveal(viewColumn);
     }
 
-    /** Apply new settings; re-render if the theme effectively changed. */
-    updateSettings(settings: PreviewSettings, themeChanged: boolean): void {
-        const oldResolvedTheme = this.resolveThemeQuick(this.settings);
+    /** Apply new settings (or a new editor color theme) and re-render. */
+    updateSettings(settings: PreviewSettings): void {
         this.settings = settings;
-        const newResolvedTheme = this.resolveThemeQuick(settings);
-
         this.postConfigChange();
-
-        if (themeChanged || oldResolvedTheme !== newResolvedTheme) {
-            void this.refreshNow();
-        } else {
-            // Re-render unconditionally for any other settings change so
-            // locale / now / strict / etc. propagate immediately.
-            void this.refreshNow();
-        }
+        void this.refreshNow();
     }
 
     /**
@@ -207,7 +195,7 @@ export class NowlinePreview {
         this.cancelDebounce();
         const seq = ++this.renderSeq;
         try {
-            const text = await this.readSourceText();
+            const text = await readDocumentText(this.sourceUri);
             const sourceDir = path.dirname(this.sourceUri.fsPath);
             const rc = await this.rcCache.resolveFor(sourceDir);
             const resolved = resolvePreviewOptions({
@@ -218,6 +206,12 @@ export class NowlinePreview {
                 toolbarOverrides: this.toolbarOverrides,
                 rcPath: rc.rcPath,
             });
+            // Recorded before rendering, so an export taken while the render
+            // runs writes this text and not an older one. A newer refresh that
+            // started meanwhile owns the record instead.
+            if (seq === this.renderSeq) {
+                this.shown = { text, sourcePath: this.sourceUri.fsPath, options: resolved };
+            }
             const outcome = await renderDocument({
                 text,
                 fsPath: this.sourceUri.fsPath,
@@ -263,70 +257,13 @@ export class NowlinePreview {
     }
 
     /**
-     * The theme currently shown in this preview panel — toolbar overrides win
-     * over settings, and `'auto'` is resolved to `'light'`/`'dark'` using the
-     * active VS Code color theme. Use this when re-exporting the document so
-     * the saved file matches what the preview displayed (including greyscale
-     * toolbar overrides).
+     * The text and resolved options of the latest render, or `undefined`
+     * before the first one. Save, the copy-PNG fallback and Export… use these
+     * so the file they write is the diagram the preview drew: its theme,
+     * now-line, locale, links, non-working days, asset root and text.
      */
-    resolvedTheme(): ThemeName {
-        // Toolbar override takes precedence over the persistent setting,
-        // matching the chain in resolvePreviewOptions / resolveTheme.
-        const effective = this.toolbarOverrides.theme ?? this.settings.theme;
-        if (effective === 'light') return 'light';
-        if (effective === 'dark') return 'dark';
-        if (effective === 'grayscale') return 'grayscale';
-        // 'auto' (or unrecognised): follow the active VS Code color theme.
-        return isDarkColorTheme() ? 'dark' : 'light';
-    }
-
-    /**
-     * The now-line anchor currently shown in this preview panel — toolbar
-     * overrides win over settings. Returns an explicit UTC-midnight `Date`
-     * so the export kernel always has an unambiguous anchor, or `null` to
-     * suppress the now-line entirely (mirrors `--now -`). Shares
-     * {@link resolveTodayAnchor} with the live render so export == preview.
-     */
-    resolvedToday(): Date | null {
-        return resolveTodayAnchor(this.toolbarOverrides.now, this.settings.now);
-    }
-
-    /**
-     * The operator-chain locale currently shown in this preview panel:
-     * `nowline.preview.locale` setting → `vscode.env.language`. Returns
-     * `undefined` to let the export default to `en-US`. (The file's own
-     * `nowline v1 locale:` directive still wins inside the layout for both
-     * preview and export, so it isn't reflected here.) Mirrors the sync
-     * `resolvedTheme()` / `resolvedToday()` pattern: the `.nowlinerc` layer
-     * is resolved asynchronously during render and not consulted here.
-     */
-    resolvedLocale(): string | undefined {
-        const fromSettings = this.settings.locale;
-        if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
-        if (typeof this.vscodeLanguage === 'string' && this.vscodeLanguage.length > 0) {
-            return this.vscodeLanguage;
-        }
-        return undefined;
-    }
-
-    /**
-     * The non-working display currently shown in this preview panel: the
-     * toolbar override wins over the `nowline.preview.nonWorking` setting, and
-     * `'file'` (from either) is `undefined`, so the roadmap's own key applies.
-     * Use this when re-exporting so the saved file matches the preview. Shares
-     * {@link resolveNonWorkingDisplay} with the live render.
-     */
-    resolvedNonWorking(): NonWorkingDisplay | undefined {
-        return resolveNonWorkingDisplay(this.toolbarOverrides.nonWorking, this.settings.nonWorking);
-    }
-
-    /**
-     * Whether link icons are currently shown in this preview panel — toolbar
-     * override wins over the persistent setting. Use this when re-exporting so
-     * the saved file's link visibility matches what the preview displayed.
-     */
-    resolvedShowLinks(): boolean {
-        return this.toolbarOverrides.showLinks ?? this.settings.showLinks;
+    lastRender(): ExportSource | undefined {
+        return this.shown;
     }
 
     private cancelDebounce(): void {
@@ -358,20 +295,6 @@ export class NowlinePreview {
         if (payload.showLinks !== undefined) next.showLinks = payload.showLinks;
         this.toolbarOverrides = next;
         void this.refreshNow();
-    }
-
-    /**
-     * Pull document text from VS Code's in-memory model when the source is
-     * open (so unsaved edits show in the preview), falling back to the
-     * filesystem when the document isn't currently in the editor.
-     */
-    private async readSourceText(): Promise<string> {
-        const open = vscode.workspace.textDocuments.find(
-            (d) => d.uri.toString() === this.sourceUri.toString(),
-        );
-        if (open) return open.getText();
-        const bytes = await vscode.workspace.fs.readFile(this.sourceUri);
-        return new TextDecoder('utf-8').decode(bytes);
     }
 
     private postOutcome(outcome: RenderOutcome): void {
@@ -414,21 +337,10 @@ export class NowlinePreview {
             locale: this.vscodeLanguage,
         });
     }
-
-    /**
-     * Cheap theme resolution used to detect "did the resolved theme
-     * change" without touching the rc cache. The full chain runs inside
-     * `resolvePreviewOptions` for actual rendering.
-     */
-    private resolveThemeQuick(settings: PreviewSettings): ThemeName {
-        if (settings.theme === 'light') return 'light';
-        if (settings.theme === 'dark') return 'dark';
-        if (settings.theme === 'grayscale') return 'grayscale';
-        return isDarkColorTheme() ? 'dark' : 'light';
-    }
 }
 
-function isDarkColorTheme(): boolean {
+/** Whether the editor's color theme is dark, which a theme of `auto` follows. */
+export function isDarkColorTheme(): boolean {
     const kind = vscode.window.activeColorTheme?.kind;
     return kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast;
 }

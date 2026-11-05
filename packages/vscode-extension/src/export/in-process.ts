@@ -20,14 +20,12 @@ import {
     exportDocument,
     type HostEnv,
     type ExportFormat as KernelFormat,
-    type NonWorkingDisplay,
     type RenderInputs,
-    resolveToday,
 } from '@nowline/export';
 import { lengthToPoints, parseLength, resolveFonts } from '@nowline/export-core';
-import type { ThemeName } from '@nowline/layout';
 import { resolveExportWidth } from '../preview/option-resolver.js';
 import type { ExportSettings } from './cli-runner.js';
+import type { ExportSource } from './export-source.js';
 
 // ---- WASM path registration -------------------------------------------------
 
@@ -84,36 +82,6 @@ export interface InProcessExportResult {
     isBinary: boolean;
 }
 
-/**
- * Preview-derived render overrides so the export matches what the preview is
- * showing (WYSIWYG). When a preview panel is open, the caller passes the
- * panel's resolved values; otherwise it resolves them from settings. Every
- * field is optional and falls back to the kernel/CLI default when omitted.
- */
-export interface ExportOverrides {
-    /**
-     * Now-line anchor. `Date` pins it (UTC midnight); `null` suppresses it
-     * (mirrors `--now -`); `undefined` defaults to today (UTC midnight).
-     */
-    today?: Date | null;
-    /** Theme. Defaults to `'light'` when omitted. */
-    theme?: ThemeName;
-    /** BCP-47 operator-chain locale. Defaults to `'en-US'` when omitted. */
-    locale?: string;
-    /** Drop `<a>` link icons from the render. Defaults to `false` (links shown). */
-    noLinks?: boolean;
-    /**
-     * Non-working display. `undefined` leaves the choice to the roadmap's own
-     * `default roadmap non-working:` key (then `hide`).
-     */
-    nonWorking?: NonWorkingDisplay;
-    /**
-     * Directory logo and image assets load from, resolved by the preview's
-     * chain (`resolveExportAssetRoot`). The source file's directory when omitted.
-     */
-    assetRoot?: string;
-}
-
 const BINARY_FORMATS = new Set<KernelFormat>(['png', 'pdf', 'xlsx']);
 const TEXT_DECODER = new TextDecoder('utf-8');
 
@@ -121,33 +89,26 @@ const TEXT_DECODER = new TextDecoder('utf-8');
  * Produce export output in-process for the given format by delegating to the
  * @nowline/export kernel.
  *
- * @param sourcePath  Absolute filesystem path to the .nowline source file.
- * @param format      Target export format.
- * @param settings    Resolved nowline.export.* VS Code settings.
- * @param overrides   Preview-derived render overrides (now-line, theme, locale,
- *                    link visibility) so the export matches the preview. Pass
- *                    the open panel's `resolved*()` values when saving from a
- *                    preview; resolve from settings otherwise.
+ * @param source    The text to export and the options the preview's chain
+ *                  resolved for it. The text is used as given, never re-read
+ *                  from disk, so the export is what the preview drew.
+ * @param format    Target export format.
+ * @param settings  Resolved nowline.export.* VS Code settings.
  */
 export async function exportInProcess(
-    sourcePath: string,
+    source: ExportSource,
     format: KernelFormat,
     settings: ExportSettings,
-    overrides: ExportOverrides = {},
 ): Promise<InProcessExportResult> {
-    const source = await fs.readFile(sourcePath, 'utf-8');
-
-    const { today, theme, locale, noLinks, nonWorking, assetRoot } = overrides;
-    // `null`  → suppress the now-line (RenderInputs.today = undefined)
-    // `Date`  → pin to that UTC midnight
-    // missing → default to today (local civil date via resolveToday)
+    const { sourcePath, options } = source;
     const inputs: RenderInputs = {
         sourcePath,
-        today: today === null ? undefined : (today ?? resolveToday()),
-        locale: locale ?? 'en-US',
-        theme: theme ?? 'light',
-        noLinks: noLinks ?? false,
-        nonWorking,
+        // `null` suppresses the now-line (the kernel's "omitted").
+        today: options.today ?? undefined,
+        locale: options.locale ?? 'en-US',
+        theme: options.theme,
+        noLinks: !options.showLinks,
+        nonWorking: options.nonWorking,
         // Canvas width is a deliberate export setting (not preview-coupled):
         // a best-effort *maximum* cap under the shared width rule. `0`/unset
         // fits the content, keeping byte-for-byte parity with the CLI default.
@@ -170,8 +131,8 @@ export async function exportInProcess(
         inputs.fonts = { sans: result.sans, mono: result.mono };
     }
 
-    const host = createExtensionHostEnv(sourcePath, assetRoot);
-    const bytes = await exportDocument(source, format, inputs, host);
+    const host = createExtensionHostEnv(sourcePath, options.assetRoot);
+    const bytes = await exportDocument(source.text, format, inputs, host);
 
     const isBinary = BINARY_FORMATS.has(format);
     return {

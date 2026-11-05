@@ -17,7 +17,7 @@ import { indexFootnotes } from './footnote-node.js';
 import {
     placeRegionMarkers,
     regionMarkerLabelsRightX,
-    seedRegionAnchorEdges,
+    seedRegionDatedEdges,
 } from './region-markers.js';
 import { SwimlaneNode } from './swimlane-node.js';
 
@@ -74,14 +74,15 @@ export function buildIncludeRegions(
         footnotesBefore += region.content.footnotes.size;
         // Region ids stay invisible to the host, but the wave edges are
         // shared: seed them into the region's otherwise empty edge maps.
-        // Without waves, the region's own dated anchors resolve inside it
-        // instead, as engine C's `scheduleRegion` resolves them, so a lane
-        // `after:kickoff` naming the region's anchor starts on its date
-        // (specs/scheduler-unification.md §5 F5).
+        // Without waves, the region's own dated anchors and milestones
+        // resolve inside it instead, as engine C's `scheduleRegion` resolves
+        // them, so a lane `after:kickoff` naming the region's anchor starts
+        // on its date (specs/scheduler-unification.md §5 F5), and so does
+        // one naming a dated milestone (r1.f8).
         if (ctx.waves) {
             seedWaveEdges(ctx.waves, childCtx.entityLeftEdges, childCtx.entityRightEdges);
         } else {
-            seedRegionAnchorEdges(region.content.anchors, childCtx);
+            seedRegionDatedEdges(region.content, childCtx);
         }
         const nestedSwimlanes: PositionedSwimlane[] = [];
         let cursorY = innerStartY;

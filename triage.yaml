@@ -9,7 +9,7 @@ default:
     hint: https://nodejs.org
   - tool: pnpm
     version: ">=11"
-    hint: corepack enable && corepack prepare pnpm@latest --activate
+    hint: brew install pnpm (or see https://pnpm.io/installation)
   - tool: python3
     hint: https://www.python.org
 
@@ -21,3 +21,15 @@ release:
 
 ci:
   extends: [default]
+
+# lint-workflows and lint-man need tools the build does not. Kept out of `ci`:
+# the CI triage job runs on a bare runner, and the lint jobs install their own.
+lint:
+  extends: [default]
+  add:
+    - tool: actionlint
+      hint: brew install actionlint (or see https://github.com/rhysd/actionlint)
+    - tool: shellcheck
+      hint: brew install shellcheck (or apt-get install shellcheck)
+    - tool: mandoc
+      hint: apt-get install mandoc (ships with macOS)

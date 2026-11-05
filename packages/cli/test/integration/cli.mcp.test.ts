@@ -1,5 +1,7 @@
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { createServer, request } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { packageRoot } from '../helpers.js';
@@ -61,7 +63,80 @@ function driveJsonRpc(args: string[], request: object, timeoutMs = 5000): Promis
     });
 }
 
+function freePort(): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const probe = createServer();
+        probe.on('error', reject);
+        probe.listen(0, '127.0.0.1', () => {
+            const { port } = probe.address() as AddressInfo;
+            probe.close(() => resolve(port));
+        });
+    });
+}
+
+/** Starts `nowline --mcp --port <port>` and resolves once it is listening. */
+function startHttpMcp(port: number, timeoutMs = 10000): Promise<ChildProcess> {
+    return new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [distEntry, '--mcp', '--port', String(port)], {
+            cwd: packageRoot,
+            stdio: ['ignore', 'ignore', 'pipe'],
+        });
+        let stderr = '';
+        const timer = setTimeout(() => {
+            child.kill('SIGTERM');
+            reject(new Error(`--mcp --port did not start listening: ${stderr}`));
+        }, timeoutMs);
+        child.stderr?.on('data', (d: Buffer) => {
+            stderr += d.toString();
+            if (stderr.includes('listening')) {
+                clearTimeout(timer);
+                resolve(child);
+            }
+        });
+        child.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+    });
+}
+
+function postToolsList(port: number, host: string): Promise<number> {
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    return new Promise((resolve, reject) => {
+        const req = request(
+            {
+                host: '127.0.0.1',
+                port,
+                method: 'POST',
+                path: '/',
+                headers: {
+                    Host: host,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json, text/event-stream',
+                },
+            },
+            (res) => {
+                res.resume();
+                res.on('end', () => resolve(res.statusCode ?? 0));
+            },
+        );
+        req.on('error', reject);
+        req.end(body);
+    });
+}
+
 describeBuilt('CLI --mcp flag (requires `pnpm build`)', () => {
+    it('--mcp --port refuses a foreign Host and serves localhost', async () => {
+        const port = await freePort();
+        const child = await startHttpMcp(port);
+        try {
+            expect(await postToolsList(port, `rebind.example:${port}`)).toBe(403);
+            expect(await postToolsList(port, `127.0.0.1:${port}`)).toBe(200);
+        } finally {
+            child.kill('SIGTERM');
+        }
+    });
+
     it('--mcp appears in --help output', async () => {
         const child = spawn(process.execPath, [distEntry, '--help'], {
             cwd: packageRoot,

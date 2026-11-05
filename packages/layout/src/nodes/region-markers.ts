@@ -58,11 +58,11 @@ export function placeRegionMarkers(
     lanesBottomY: number,
     chartRightX: number,
 ): RegionMarkers {
-    // A milestone `after:` an anchor reads the anchor's edge. Without waves
-    // the edges are already seeded for the lanes; with waves they are
-    // seeded here, after the lanes, so the lanes still see only the wave
-    // edges.
-    seedRegionAnchorEdges(region.content.anchors, ctx);
+    // A milestone `after:` an anchor or a dated milestone reads its edge.
+    // Without waves the edges are already seeded for the lanes; with waves
+    // they are seeded here, after the lanes, so the lanes still see only
+    // the wave edges.
+    seedRegionDatedEdges(region.content, ctx);
     const placements = buildMilestones(region.content.milestones, ctx);
     const entries = regionMarkerEntries(region.content.anchors, placements, ctx);
     if (entries.length === 0) return { anchors: [], milestones: [], laneShift: 0 };
@@ -179,15 +179,17 @@ function positionedEntry(m: PositionedAnchor | PositionedMilestone, bold: boolea
 }
 
 /**
- * Seed a region's dated anchors into its context's edge maps at their x on
- * the host's scale, the way the host seeds its own (`phases/place.ts`).
- * An anchor outside the date window is skipped, as on the host.
+ * Seed a region's dated anchors and dated milestones into its context's
+ * edge maps at their x on the host's scale, the way the host seeds its own
+ * (`phases/place.ts`), so `after:` either resolves to its date as engine C's
+ * `scheduleRegion` resolves it. A marker outside the date window is skipped,
+ * as on the host.
  */
-export function seedRegionAnchorEdges(
-    anchors: ReadonlyMap<string, AnchorDeclaration>,
+export function seedRegionDatedEdges(
+    content: Pick<IsolatedRegion['content'], 'anchors' | 'milestones'>,
     ctx: LayoutContext,
 ): void {
-    for (const e of datePinnedMarkerEntries(anchors, new Map(), ctx.scale)) {
+    for (const e of datePinnedMarkerEntries(content.anchors, content.milestones, ctx.scale)) {
         ctx.entityLeftEdges.set(e.id, e.centerX);
         ctx.entityRightEdges.set(e.id, e.centerX);
     }

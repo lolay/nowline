@@ -2161,3 +2161,43 @@ swimlane web "Web"
         expect(svg).not.toContain('url(#nl-arrow');
     });
 });
+
+// r1.f5: the renderer is the last guard before a live <a href>. Layout already
+// drops a non-web link, so hand the renderer a model with one put back in.
+describe('item link href', () => {
+    const LINKED_DSL = `nowline v1
+
+roadmap r1 "Links" start:2026-01-05
+
+swimlane build "Build"
+  item design "Design" duration:2w link:https://github.com/acme/auth/pull/87
+`;
+
+    function setLinkHrefs(node: unknown, href: string): number {
+        if (!node || typeof node !== 'object') return 0;
+        let count = 0;
+        const record = node as Record<string, unknown>;
+        if (typeof record.linkHref === 'string') {
+            record.linkHref = href;
+            count++;
+        }
+        for (const value of Object.values(record)) count += setLinkHrefs(value, href);
+        return count;
+    }
+
+    it('wraps an https link tile in <a href>', async () => {
+        const svg = await renderSvg(await parseToModel(LINKED_DSL));
+        expect(svg).toContain('<a href="https://github.com/acme/auth/pull/87"');
+    });
+
+    it('renders a javascript: href as a plain tile, with no <a>', async () => {
+        const model = await parseToModel(LINKED_DSL);
+        expect(setLinkHrefs(model, 'javascript:alert(document.domain)')).toBeGreaterThan(0);
+        const svg = await renderSvg(model);
+        expect(svg).not.toContain('javascript:');
+        // The only anchor left is the attribution mark's.
+        expect(svg.match(/<a\b[^>]*>/g)).toEqual([
+            '<a aria-label="Powered by nowline" href="https://nowline.io" rel="noopener" target="_blank">',
+        ]);
+    });
+});

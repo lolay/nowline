@@ -38,7 +38,7 @@ import { scheduleRoadmap } from '../src/schedule.js';
 import { ITEM_SEAM_PX } from '../src/themes/shared.js';
 import { TimeScale } from '../src/time-scale.js';
 import type { PositionedItem, PositionedRoadmap, PositionedSwimlane } from '../src/types.js';
-import { parseAndResolve } from './helpers.js';
+import { parseAndResolve, parseAndResolveFiles } from './helpers.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../../..');
@@ -183,6 +183,11 @@ async function observe(rel: string): Promise<Map<string, Mismatch>> {
     const abs = path.join(REPO, rel);
     const source = await readFile(abs, 'utf8');
     const { file, resolved } = await parseAndResolve(source, abs, (p) => readFile(p, 'utf8'));
+    return observeResolved(file, resolved);
+}
+
+/** `observe` on a roadmap already parsed and resolved. */
+function observeResolved(file: NowlineFile, resolved: ResolveResult): Map<string, Mismatch> {
     const model = layoutRoadmap(file, resolved, { today: TODAY });
     const schedule = scheduleRoadmap(file, resolved, { today: TODAY });
     const xToDay = indexAtX(file, resolved, model);
@@ -267,5 +272,121 @@ describe('engine divergence register (specs/scheduler-unification.md §6)', () =
             { unregistered, vanished },
             'a new A/C mismatch needs a register entry; a fixed one needs its entry deleted',
         ).toEqual({ unregistered: [], vanished: [] });
+    });
+});
+
+// `after:<dated milestone>` (r1.f8). Engine A seeds dated milestones with the
+// anchors before it places anything; engine C used to seed only the anchors,
+// so an item, group or parallel `after:` a dated milestone resolved to day 0
+// in the exports. No sample has the shape, so the corpus above could not
+// catch it: these roadmaps hold the engines to the same span on it, with and
+// without waves. `gate` is Mon 2026-03-02, working day 40 from the start.
+const GATE_DAY = 40;
+
+const datedMilestoneRoadmap = (lane: string, waves = ''): string => `nowline v1
+
+roadmap r "R" start:2026-01-05
+${waves}
+swimlane a "A"
+${lane}
+milestone gate "Gate" date:2026-03-02
+`;
+
+const WAVES = `
+wave build "Build"
+wave launch "Launch"
+`;
+
+const AFTER_DATED_MILESTONE: Array<[string, string, string]> = [
+    [
+        'item',
+        `  item x "X" duration:1w
+  item y "Y" duration:1w after:gate
+`,
+        '',
+    ],
+    [
+        'group',
+        `  item x "X" duration:1w
+  group g "G" after:gate
+    item g1 "G1" duration:1w
+    item g2 "G2" duration:1w
+`,
+        '',
+    ],
+    [
+        'parallel',
+        `  item x "X" duration:1w
+  parallel p "P" after:gate
+    item p1 "P1" duration:1w
+    item p2 "P2" duration:2w
+`,
+        '',
+    ],
+    [
+        'item with waves',
+        `  item x "X" duration:1w wave:build after:gate
+  item y "Y" duration:1w wave:launch
+`,
+        WAVES,
+    ],
+    [
+        'group with waves',
+        `  item w0 "W0" duration:1w wave:build
+  group g "G" wave:build after:gate
+    item g1 "G1" duration:1w
+  item y "Y" duration:1w wave:launch
+`,
+        WAVES,
+    ],
+    [
+        'parallel with waves',
+        `  item w0 "W0" duration:1w wave:build
+  parallel p "P" wave:build after:gate
+    item p1 "P1" duration:1w
+    item p2 "P2" duration:2w
+  item y "Y" duration:1w wave:launch
+`,
+        WAVES,
+    ],
+];
+
+describe('engines A and C agree on after:<dated milestone> (r1.f8)', () => {
+    it.each(AFTER_DATED_MILESTONE)('%s', async (_shape, lane, waves) => {
+        const { file, resolved } = await parseAndResolve(datedMilestoneRoadmap(lane, waves));
+        const observed = observeResolved(file, resolved);
+        expect([...observed].map(([key, m]) => `${key}: A ${fmt(m.a)} C ${fmt(m.c)}`)).toEqual([]);
+        // And they agree on the milestone's day, not on a shared day 0.
+        const schedule = scheduleRoadmap(file, resolved, { today: TODAY });
+        const starts = [...schedule.items.values()].map((s) =>
+            schedule.calendar.working.workingIndexOf(schedule.startDate, s.start),
+        );
+        expect(Math.max(...starts)).toBeGreaterThanOrEqual(GATE_DAY);
+    });
+
+    it('in an isolated region, against the region’s own dated milestone', async () => {
+        const { file, resolved } = await parseAndResolveFiles({
+            'main.nowline': `nowline v1
+
+include "./team.nowline" roadmap:isolate
+
+roadmap r "R" start:2026-01-05
+
+swimlane main "Main"
+  item m1 "Main work" duration:1w
+`,
+            'team.nowline': datedMilestoneRoadmap(`  item x "X" duration:1w
+  item y "Y" duration:1w after:gate
+`),
+        });
+        const observed = observeResolved(file, resolved);
+        expect([...observed].map(([key, m]) => `${key}: A ${fmt(m.a)} C ${fmt(m.c)}`)).toEqual([]);
+        const schedule = scheduleRoadmap(file, resolved, { today: TODAY });
+        const lane = [...resolved.content.isolatedRegions[0].content.swimlanes.values()][0];
+        const y = lane.content.find((c) => isItemDeclaration(c) && c.name === 'y');
+        const s = schedule.byNode.get(y as ItemDeclaration);
+        expect(s && schedule.calendar.working.workingIndexOf(schedule.startDate, s.start)).toBe(
+            GATE_DAY,
+        );
     });
 });

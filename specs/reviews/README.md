@@ -7,3 +7,4 @@ standard. Remediation is tracked in each review's issue.
 | Review | Date | Kind | Range | Findings | Issue | Outcome | Record |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | r1 | 2026-11-04 | full | ..a528705 | 9 high, 22 medium, 2 low | #259 | open | [summary](2026-11-04-r1-full.md) |
+| r2 | 2026-11-04 | estate | ..a528705 | 2 high, 4 medium here | #245 | open | [nowline-workspace r1](https://github.com/lolay/nowline-workspace/blob/main/specs/reviews/2026-11-04-r1-estate.md) |

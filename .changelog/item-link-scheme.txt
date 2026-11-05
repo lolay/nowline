@@ -1,0 +1,3 @@
+```release-note:security
+A `link:` value that isn't an absolute `http://` or `https://` URL or a quoted `mailto:` URL (for example `link:"javascript:alert(1)"`) is now the validation error `NL.E0414`, on every entity. The renderer no longer writes such a link into the SVG's `<a href>`, so it can't reach the live DOM of the embed, the preview or the HTML export.
+```

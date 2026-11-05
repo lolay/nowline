@@ -16,11 +16,15 @@ import {
 } from '@modelcontextprotocol/ext-apps/server';
 import { McpServer } from '@modelcontextprotocol/server';
 import type { SurfaceOptions } from '@nowline/config';
-import { type NowlineFile, parseNowlineJson, printNowlineFile } from '@nowline/core';
+import {
+    type IncludePolicy,
+    type NowlineFile,
+    parseNowlineJson,
+    printNowlineFile,
+} from '@nowline/core';
 import {
     acceptStagedRoadmap,
     type ExportFormat,
-    exportDocument,
     exportStaged,
     type HostEnv,
     IncludeResolveError,
@@ -44,7 +48,6 @@ import {
     LAYOUT_INSIGHT_HINT,
     layoutInsightsFromStage,
     type McpInsight,
-    PathOutsideRootError,
     REVIEW_MAX_WIDTH,
     routedResolveDiagnosticsToMcp,
     stageMcpRoadmap,
@@ -59,6 +62,15 @@ import {
 } from './generated/resources.js';
 import { PREVIEW_HTML } from './generated/ui-bundle.js';
 import { type McpResolvedOptions, resolveMcpOptions } from './options.js';
+import {
+    type GuardedPath,
+    guardPath,
+    includePolicyFor,
+    isWithin,
+    NOWLINE_EXTENSIONS,
+    OUTPUT_EXTENSIONS,
+    realPathAllowingMissing,
+} from './path-guard.js';
 import { registerPrompts } from './prompts.js';
 import { REFERENCE_CHEATSHEET } from './reference-cheatsheet.js';
 import { SCHEMA_VOCABULARY } from './schema-vocab.js';
@@ -79,7 +91,7 @@ import {
     UpdateOutputSchema,
     ValidateOutputSchema,
 } from './schemas.js';
-import { createWorkspaceRoots, isInsideRoots, type WorkspaceRoots } from './workspace-roots.js';
+import { createWorkspaceRoots, type WorkspaceRoots } from './workspace-roots.js';
 
 // ---- MCP Apps UI (in-chat live preview) -------------------------------------
 //
@@ -173,30 +185,32 @@ function mutatingTool(title: string, opts: { destructiveHint: boolean; idempoten
     };
 }
 
-// ---- Server factory ---------------------------------------------------------
-
-function resolveAndGuard(filePath: string, roots: WorkspaceRoots): string {
-    const abs = path.resolve(roots.primary, filePath);
-    if (!isInsideRoots(abs, roots)) {
-        throw new PathOutsideRootError(filePath, roots.allowed.join(', '));
-    }
-    return abs;
-}
-
 // ---- Node HostEnv for export ------------------------------------------------
 
-function createNodeHostEnv(sourcePath: string): HostEnv {
-    const assetRoot = path.resolve(path.dirname(sourcePath));
+/**
+ * The kernel's file access for a roadmap read from `target`. The include
+ * policy already confines includes to `target.root`; `readSource` checks
+ * again so no staging path (a kernel call that takes no policy) reads past
+ * it. Assets resolve against the roadmap's directory and must stay in it,
+ * symlinks resolved.
+ */
+function createNodeHostEnv(target: GuardedPath): HostEnv {
+    const assetRoot = path.dirname(target.real);
     return {
         async readSource(p: string): Promise<string> {
-            return fs.readFile(p, 'utf-8');
+            const real = await fs.realpath(p);
+            if (!isWithin(target.root, real) || !real.endsWith('.nowline')) {
+                throw new Error(`Include ${p} is outside the allowed root ${target.root}`);
+            }
+            return fs.readFile(real, 'utf-8');
         },
         async readAsset(ref: string): Promise<Uint8Array> {
             const abs = path.resolve(assetRoot, ref);
-            if (!abs.startsWith(assetRoot + path.sep) && abs !== assetRoot) {
+            const real = isWithin(assetRoot, abs) ? await fs.realpath(abs) : abs;
+            if (!isWithin(assetRoot, real)) {
                 throw new Error(`Asset ${ref} escapes asset-root ${assetRoot}`);
             }
-            const bytes = await fs.readFile(abs);
+            const bytes = await fs.readFile(real);
             return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
         },
         async loadWasm(): Promise<ArrayBuffer> {
@@ -222,17 +236,30 @@ function findExample(name: string): ExampleFile | undefined {
     return EXAMPLES.find((e) => e.name === withExt || e.name === name);
 }
 
+/**
+ * The roadmap a tool works on: inline `source`, or the `.nowline` file at
+ * `path`. `filePath` is the path diagnostics report; `target` is where the
+ * kernel reads includes and assets from. Inline source sits in the primary
+ * root.
+ */
 async function sourceAndPath(
     args: { source?: string; path?: string },
     roots: WorkspaceRoots,
-): Promise<{ source: string; filePath: string }> {
+): Promise<{ source: string; filePath: string; target: GuardedPath }> {
     if (args.source !== undefined && args.path === undefined) {
-        return { source: args.source, filePath: path.join(roots.primary, 'unnamed.nowline') };
+        const root = await realPathAllowingMissing(roots.primary);
+        const target = {
+            abs: path.join(roots.primary, 'unnamed.nowline'),
+            real: path.join(root, 'unnamed.nowline'),
+            root,
+            displayRoot: roots.primary,
+        };
+        return { source: args.source, filePath: target.abs, target };
     }
     if (args.path !== undefined) {
-        const abs = resolveAndGuard(args.path, roots);
-        const source = args.source ?? (await fs.readFile(abs, 'utf-8'));
-        return { source, filePath: abs };
+        const target = await guardPath(args.path, roots, NOWLINE_EXTENSIONS);
+        const source = args.source ?? (await fs.readFile(target.real, 'utf-8'));
+        return { source, filePath: target.abs, target };
     }
     throw new InputRequiredError('At least one of `source` or `path` is required.');
 }
@@ -422,7 +449,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         async (args) => {
             try {
                 const { options } = resolveMcpOptions(args);
-                const { source, filePath } = await sourceAndPath(args, await workspaceRoots());
+                const { source, filePath, target } = await sourceAndPath(
+                    args,
+                    await workspaceRoots(),
+                );
                 const doc = await buildDocument(source);
                 const diagnostics = collectMcpDiagnostics(doc, filePath);
                 // One stage: the routed (wave-rule) include diagnostics join
@@ -435,12 +465,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                         doc,
                         source,
                         {
-                            sourcePath: filePath,
+                            sourcePath: target.abs,
                             today: options.today,
                             locale: 'en-US',
                             theme: 'light',
                         },
-                        createNodeHostEnv(filePath),
+                        createNodeHostEnv(target),
+                        includePolicyFor(target),
                     );
                     diagnostics.push(...stageRoutedDiagnostics(stage));
                     if (stage.kind === 'staged') insights = layoutInsightsFromStage(stage);
@@ -482,8 +513,12 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, await workspaceRoots());
-                const source = await fs.readFile(abs, 'utf-8');
+                const { abs, real } = await guardPath(
+                    args.path,
+                    await workspaceRoots(),
+                    NOWLINE_EXTENSIONS,
+                );
+                const source = await fs.readFile(real, 'utf-8');
                 const structured = { path: abs, source };
                 return {
                     content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
@@ -516,11 +551,15 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, await workspaceRoots());
+                const { abs, real } = await guardPath(
+                    args.path,
+                    await workspaceRoots(),
+                    NOWLINE_EXTENSIONS,
+                );
                 const blocked = await diagnosticsErrorBlock(args.source, abs);
                 if (!blocked.ok) return blocked.response;
-                await fs.mkdir(path.dirname(abs), { recursive: true });
-                await fs.writeFile(abs, args.source, 'utf-8');
+                await fs.mkdir(path.dirname(real), { recursive: true });
+                await fs.writeFile(real, args.source, 'utf-8');
                 const structured = { ok: true, path: abs };
                 return {
                     content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
@@ -554,10 +593,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, await workspaceRoots());
+                const { abs, real } = await guardPath(
+                    args.path,
+                    await workspaceRoots(),
+                    NOWLINE_EXTENSIONS,
+                );
                 const blocked = await diagnosticsErrorBlock(args.source, abs);
                 if (!blocked.ok) return blocked.response;
-                await fs.writeFile(abs, args.source, 'utf-8');
+                await fs.writeFile(real, args.source, 'utf-8');
                 const structured = { ok: true, path: abs };
                 return {
                     content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }],
@@ -585,7 +628,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         },
         async (args) => {
             try {
-                const abs = resolveAndGuard(args.path, await workspaceRoots());
+                // The link itself is removed when `path` is a symlink; the guard
+                // still requires its target to be a `.nowline` file in a root.
+                const { abs } = await guardPath(
+                    args.path,
+                    await workspaceRoots(),
+                    NOWLINE_EXTENSIONS,
+                );
                 await fs.unlink(abs);
                 const structured = { path: abs };
                 return {
@@ -622,7 +671,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         async (args) => {
             try {
                 const roots = await workspaceRoots();
-                const dir = args.directory ? resolveAndGuard(args.directory, roots) : roots.primary;
+                const dir = args.directory
+                    ? (await guardPath(args.directory, roots)).abs
+                    : roots.primary;
                 const recursive = args.recursive ?? false;
                 const paths = await listNowlineFiles(dir, recursive);
                 const structured = { paths };
@@ -717,8 +768,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const { theme, options } = resolved;
             let source: string;
             let filePath: string;
+            let target: GuardedPath;
             try {
-                ({ source, filePath } = await sourceAndPath(args, await workspaceRoots()));
+                ({ source, filePath, target } = await sourceAndPath(args, await workspaceRoots()));
             } catch (err) {
                 return handleToolError(err, args.path);
             }
@@ -729,7 +781,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             const format: ExportFormat = args.format ?? 'svg';
             const today = options.today;
             const inputs: RenderInputs = {
-                sourcePath: filePath,
+                sourcePath: target.abs,
                 today,
                 locale: 'en-US',
                 theme: options.theme,
@@ -737,7 +789,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 nonWorking: options.nonWorking,
                 pngScale: args.scale,
             };
-            const host = createNodeHostEnv(filePath);
+            const host = createNodeHostEnv(target);
             // Explicit true/false wins; undefined follows the host's capabilities.
             const appActive = args.preview ?? clientSupportsAppsUi(server);
             // Skip the full render when the bytes won't be used: apps host with
@@ -748,7 +800,13 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
             // One stage serves the render, the insights and the include check.
-            const stage = await stageMcpRoadmap(blocked.doc, source, inputs, host);
+            const stage = await stageMcpRoadmap(
+                blocked.doc,
+                source,
+                inputs,
+                host,
+                includePolicyFor(target),
+            );
             if (stage.kind === 'invalid') {
                 return diagnosticsErrorResponse(
                     filePath,
@@ -789,6 +847,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                           bytes,
                           inputs,
                           host,
+                          includePolicyFor(target),
                       )
                     : [];
 
@@ -798,9 +857,14 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             if (args.output) {
                 try {
-                    const outAbs = resolveAndGuard(args.output, await workspaceRoots());
-                    await fs.mkdir(path.dirname(outAbs), { recursive: true });
-                    await fs.writeFile(outAbs, bytes);
+                    const out = await guardPath(
+                        args.output,
+                        await workspaceRoots(),
+                        OUTPUT_EXTENSIONS,
+                    );
+                    const outAbs = out.abs;
+                    await fs.mkdir(path.dirname(out.real), { recursive: true });
+                    await fs.writeFile(out.real, bytes);
                     const structured = {
                         format,
                         path: outAbs,
@@ -951,8 +1015,9 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             }
             let source: string;
             let filePath: string;
+            let target: GuardedPath;
             try {
-                ({ source, filePath } = await sourceAndPath(args, await workspaceRoots()));
+                ({ source, filePath, target } = await sourceAndPath(args, await workspaceRoots()));
             } catch (err) {
                 return handleToolError(err, args.path);
             }
@@ -962,7 +1027,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
 
             const format: ExportFormat = args.format as NonRenderFormat;
             const inputs: RenderInputs = {
-                sourcePath: filePath,
+                sourcePath: target.abs,
                 today: options.today,
                 locale: 'en-US',
                 theme: options.theme,
@@ -977,11 +1042,17 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                 const result = await resolveFonts({ headless: true });
                 inputs.fonts = { sans: result.sans, mono: result.mono };
             }
-            const host = createNodeHostEnv(filePath);
+            const host = createNodeHostEnv(target);
             let bytes: Uint8Array;
             try {
                 const staged = acceptStagedRoadmap(
-                    await stageMcpRoadmap(blocked.doc, source, inputs, host),
+                    await stageMcpRoadmap(
+                        blocked.doc,
+                        source,
+                        inputs,
+                        host,
+                        includePolicyFor(target),
+                    ),
                     inputs,
                 );
                 bytes = await exportStaged(staged, format, inputs, host);
@@ -1051,10 +1122,10 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
             let writtenPath: string | undefined;
             if (doWrite) {
                 try {
-                    const outAbs = resolveAndGuard(outTarget, roots);
-                    await fs.mkdir(path.dirname(outAbs), { recursive: true });
-                    await fs.writeFile(outAbs, bytes);
-                    writtenPath = outAbs;
+                    const out = await guardPath(outTarget, roots, OUTPUT_EXTENSIONS);
+                    await fs.mkdir(path.dirname(out.real), { recursive: true });
+                    await fs.writeFile(out.real, bytes);
+                    writtenPath = out.abs;
                 } catch (err) {
                     return handleToolError(err, args.output ?? outTarget);
                 }
@@ -1179,22 +1250,29 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
         async (args) => {
             try {
                 if (args.to === 'json') {
-                    const { source, filePath } = await sourceAndPath(args, await workspaceRoots());
-                    const host = createNodeHostEnv(filePath);
+                    const { source, target } = await sourceAndPath(args, await workspaceRoots());
+                    const host = createNodeHostEnv(target);
                     // The JSON AST does not depend on today's date, so convert
                     // takes no `now`; the kernel still wants a concrete one.
                     const { options } = resolveMcpOptions({});
-                    const jsonBytes = await exportDocument(
-                        source,
-                        'json',
-                        {
-                            sourcePath: filePath,
-                            today: options.today,
-                            locale: 'en-US',
-                            theme: 'light',
-                        },
-                        host,
+                    const jsonInputs: RenderInputs = {
+                        sourcePath: target.abs,
+                        today: options.today,
+                        locale: 'en-US',
+                        theme: 'light',
+                    };
+                    const doc = await buildDocument(source);
+                    const staged = acceptStagedRoadmap(
+                        await stageMcpRoadmap(
+                            doc,
+                            source,
+                            jsonInputs,
+                            host,
+                            includePolicyFor(target),
+                        ),
+                        jsonInputs,
                     );
+                    const jsonBytes = await exportStaged(staged, 'json', jsonInputs, host);
                     const result = new TextDecoder('utf-8').decode(jsonBytes);
                     const structured = { to: 'json' as const, result };
                     return {
@@ -1208,7 +1286,7 @@ export function createMcpServer(opts: McpServerOptions = {}): McpServer {
                     args.source ??
                     (args.path
                         ? await fs.readFile(
-                              resolveAndGuard(args.path, await workspaceRoots()),
+                              (await guardPath(args.path, await workspaceRoots(), ['.json'])).real,
                               'utf-8',
                           )
                         : null);
@@ -1529,6 +1607,7 @@ async function buildReviewContentBlocks(
     artifactBytes: Uint8Array,
     inputs: RenderInputs,
     host: HostEnv,
+    includePolicy: IncludePolicy,
 ): Promise<ContentBlock[]> {
     const blocks: ContentBlock[] = [
         {
@@ -1557,7 +1636,7 @@ async function buildReviewContentBlocks(
         // A narrower review width is a different layout, so it stages again
         // (the parsed document is reused).
         const reviewStage = acceptStagedRoadmap(
-            await stageMcpRoadmap(doc, source, reviewInputs, host),
+            await stageMcpRoadmap(doc, source, reviewInputs, host, includePolicy),
             reviewInputs,
         );
         inspectionBytes = await exportStaged(reviewStage, 'png', reviewInputs, host);
