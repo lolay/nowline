@@ -82,6 +82,43 @@ describeBuilt('m2c — MS Project XML', () => {
             expect(xml).toContain('<Project xmlns="http://schemas.microsoft.com/project">');
         });
     });
+    it('--start sets the project start date', async () => {
+        const r = await runCliBuilt([
+            sampleInput,
+            '-f',
+            'msproj',
+            '-o',
+            '-',
+            '--start',
+            '2027-03-01',
+        ]);
+        expect(r.exitCode).toBe(0);
+        expect(r.stdout).toContain('<StartDate>2027-03-01');
+    });
+
+    // `--start` is checked with the other format-specific settings, so a bad
+    // value is the same usage error whatever the format (r1.f20): it used to
+    // exit 0 for svg and 3 for msproj.
+    for (const format of ['svg', 'msproj', 'nowline']) {
+        for (const start of ['notadate', '2026-02-30']) {
+            it(`rejects --start ${start} as an input error (-f ${format})`, async () => {
+                const r = await runCliBuilt([
+                    sampleInput,
+                    '-f',
+                    format,
+                    '-o',
+                    '-',
+                    '--start',
+                    start,
+                ]);
+                expect(r.exitCode).toBe(2);
+                expect(r.stderr).toContain(
+                    `nowline: invalid --start "${start}". Expected YYYY-MM-DD, a real calendar date.`,
+                );
+                expect(r.stdout).toBe('');
+            });
+        }
+    }
 });
 
 describeBuilt('m2c — PNG', () => {

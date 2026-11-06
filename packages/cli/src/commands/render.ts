@@ -123,18 +123,18 @@ export async function renderHandler(options: RenderHandlerOptions): Promise<void
         noLinks: args.noLinks,
         strict: args.strict,
         assetRoot: cliOptions.assetRoot,
-        // m2c format-specific options. The PDF settings parse in `produce`,
-        // after validation, for every format.
+        // m2c format-specific options. The PDF settings and `--start` are
+        // checked in `produce`, after validation, for every format.
         pageSize: cliOptions.surface.pageSize,
         orientation: cliOptions.orientation,
         marginPt: cliOptions.margin,
-        assertPdfSettingsValid: () => cliOptions.assertPdfSettingsValid(),
+        assertExportSettingsValid: () => cliOptions.assertExportSettingsValid(),
         fontSans: cliOptions.fontSans,
         fontMono: cliOptions.fontMono,
         headless: cliOptions.headless,
         useSystemFonts: cliOptions.useSystemFonts,
         scale: args.scale,
-        start: args.start,
+        start: cliOptions.start,
         locale,
         operatorLocale: opLocale,
         resolvedLocale: resolved,
@@ -219,8 +219,8 @@ interface ProduceArgs {
     orientation?: PdfOrientation;
     /** Page margin in points. */
     marginPt?: number;
-    /** Reports a bad PDF setting; run after validation so its error follows any diagnostics. */
-    assertPdfSettingsValid: () => void;
+    /** Reports a bad PDF setting or `--start`; run after validation so its error follows any diagnostics. */
+    assertExportSettingsValid: () => void;
     fontSans?: string;
     fontMono?: string;
     headless: boolean;
@@ -299,7 +299,7 @@ async function produce(args: ProduceArgs): Promise<ProduceResult> {
         fonts = await resolveNodeFonts(args);
     }
 
-    args.assertPdfSettingsValid();
+    args.assertExportSettingsValid();
 
     const kernelInputs: RenderInputs = {
         ...layoutInputs,
@@ -445,9 +445,13 @@ async function resolveNodeFonts(
 async function produceCanonicalNowline(args: ProduceArgs): Promise<string> {
     if (args.inputFormat === 'json') {
         const { ast } = parseNowlineJson(args.contents, args.displayPath);
+        args.assertExportSettingsValid();
         return printNowlineFile(ast);
     }
     const parsed = await parseAndValidate(args.contents, args);
+    // The format-specific settings don't apply here, but a bad one is the same
+    // usage error for every format.
+    args.assertExportSettingsValid();
     const doc = serializeToJson(parsed.document, args.contents);
     return printNowlineFile(doc.ast);
 }

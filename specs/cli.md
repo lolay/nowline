@@ -19,13 +19,13 @@ The CLI is **verbless** by design: `nowline <input>` renders by default. Operati
 | macOS | `brew trust lolay/tap && brew install lolay/tap/nowline` |
 | Linux / WSL | `brew trust lolay/tap && brew install lolay/tap/nowline` or download `.deb` from [GitHub Releases](https://github.com/lolay/nowline/releases/latest) |
 | Windows | Direct download from GitHub Releases (`.exe`) |
-| npm (any platform) | `npm install -g nowline` |
+| npm (any platform) | `npm install -g @nowline/cli` |
 
 Each of the Unix paths (Homebrew, `.deb`, npm) ships the [`packages/cli/man/nowline.1`](../packages/cli/man/nowline.1) and [`packages/cli/man/nowline.5`](../packages/cli/man/nowline.5) man pages, so `man nowline` (CLI flags + LANGUAGE cheatsheet) and `man 5 nowline` (full DSL reference) both work immediately after install. See [`specs/cli-distribution.md`](./cli-distribution.md) for the per-channel install layout.
 
 ### Standalone Binaries
 
-`bun compile` produces self-contained binaries (~55MB) with no runtime dependency. Published as GitHub Release assets for:
+`bun compile` produces self-contained binaries (~70 to ~110 MB by platform; see [Binary Size Budget](#binary-size-budget)) with no runtime dependency. Published as GitHub Release assets for:
 
 - macOS arm64 (Apple Silicon)
 - macOS x64 (Intel)
@@ -45,7 +45,8 @@ nowline <input> [options]
                          (required unless --init or --version or --help)
 
 I/O options
-  -f, --format <fmt>     Output format: svg, png, pdf, html, mermaid, xlsx, msproj
+  -f, --format <fmt>     Output format: svg, png, pdf, html, mermaid, xlsx, msproj,
+                         json, nowline
                          Default: inferred from -o extension, else .nowlinerc
                          `defaultFormat`, else svg
   -o, --output <path>    Output file path. Use `-` for stdout (Unix dash convention)
@@ -58,6 +59,8 @@ Mode flags (mutually exclusive)
                          Default port: 4318. --open to open browser.
   --init [<name>]        Scaffold a starter .nowline file; positional becomes name
                          Default: roadmap.nowline in cwd
+                         --template <name> picks the starter: minimal (default),
+                         teams, product, or showcase
   --dry-run, -n          Run full pipeline (parse + validate + layout + format)
                          but skip the write step. Subsumes the old `validate` verb.
                          Exit 0 on success, 1 on validation error.
@@ -142,7 +145,8 @@ Format-specific options
                          Byte-stable across machines.
   --start <date>         MS Project: project start date (YYYY-MM-DD).
                          Default: the roadmap's start:, else --now
-                         (today).
+                         (today). A value that isn't a real calendar date
+                         is a usage error (exit 2) for every output format.
 
 Logging (mutually exclusive)
   -v, --verbose          Print extra diagnostics to stderr (config path,
@@ -223,6 +227,7 @@ nowline --init                       # writes ./roadmap.nowline
 nowline --init my-project            # writes ./my-project.nowline (extension appended)
 nowline --init my-project.nowline    # writes ./my-project.nowline (literal)
 nowline --init -o ./roadmaps/q1.nowline   # -o overrides path
+nowline --init --template teams      # writes ./roadmap.nowline from the teams starter
 ```
 
 The positional argument is the project *name*, not an input path.
@@ -232,6 +237,7 @@ The positional argument is the project *name*, not an input path.
 - Other extension → exit 2 with `nowline: --init only scaffolds .nowline files; got "..."`.
 - Missing positional → name `roadmap`.
 - `-o` always overrides the default path.
+- `--template <name>` picks the starter: `minimal` (the default), `teams`, `product`, or `showcase`, the same files as `examples/<name>.nowline`. Any other name exits 2 with `nowline: unknown --template "..."`, listing the choices.
 
 Existing files at the destination are silently overwritten.
 
@@ -459,7 +465,7 @@ nowline roadmap.json -f nowline -o roadmap.nowline
 
 ## Configuration
 
-The CLI reads an optional `.nowlinerc` file (JSON or YAML) from the current directory or any parent directory:
+The CLI reads an optional `.nowlinerc` file (JSON or YAML) from the input file's directory or the nearest parent that has one (from the current directory when the input is stdin):
 
 ```json
 {
@@ -502,7 +508,7 @@ Bundles follow the CLDR locale tree (`root → fr → {fr-CA, fr-FR}`); the load
 
 ## Distribution Pipeline
 
-1. **npm publish:** `@nowline/cli` published to npm. Users can `npx nowline roadmap.nowline` without global install.
+1. **npm publish:** `@nowline/cli` published to npm. Users can `npx @nowline/cli roadmap.nowline` without global install.
 2. **GitHub Releases:** `bun compile` binaries attached to each GitHub Release tag. Windows `.exe` binaries (x64, arm64) are the primary Windows distribution — direct download, no package manager needed.
 3. **Homebrew:** Custom tap (`lolay/tap`) with a formula that downloads the macOS or Linux binary. Also works in WSL.
 4. **apt:** `.deb` packages published to a PPA or GitHub Releases.

@@ -114,6 +114,72 @@ export interface ParsedArgs {
 }
 
 /**
+ * Every flag `nowline` accepts. Exported so a test can check that `--help` and
+ * `nowline.1` document each one.
+ */
+export const ARGV_OPTIONS = {
+    help: { type: 'boolean', short: 'h' },
+    version: { type: 'boolean', short: 'V' },
+    verbose: { type: 'boolean', short: 'v' },
+    quiet: { type: 'boolean', short: 'q' },
+
+    output: { type: 'string', short: 'o' },
+    format: { type: 'string', short: 'f' },
+    'input-format': { type: 'string' },
+
+    serve: { type: 'boolean' },
+    init: { type: 'boolean' },
+    mcp: { type: 'boolean' },
+    'mcp-install': { type: 'boolean' },
+    'mcp-uninstall': { type: 'boolean' },
+    'dry-run': { type: 'boolean', short: 'n' },
+
+    theme: { type: 'string', short: 't' },
+    // `--now <date>` overrides the now-line position; without it, the
+    // CLI defaults to today's calendar date. Use `--now -` to
+    // suppress the now-line entirely (Unix-`-` sentinel; same idea
+    // as `-o -` for stdout).
+    now: { type: 'string' },
+    // `--timezone` controls which civil date is "today" when --now is
+    // omitted. Accepts IANA names, ISO offsets, "UTC", "Z", or "local".
+    timezone: { type: 'string' },
+    'no-links': { type: 'boolean' },
+    scale: { type: 'string', short: 's' },
+    strict: { type: 'boolean' },
+    width: { type: 'string', short: 'w' },
+    'non-working': { type: 'string' },
+    'asset-root': { type: 'string' },
+    'include-root': { type: 'string' },
+    'no-includes': { type: 'boolean' },
+
+    port: { type: 'string', short: 'p' },
+    host: { type: 'string' },
+    open: { type: 'boolean' },
+
+    'diagnostic-format': { type: 'string' },
+
+    template: { type: 'string' },
+
+    // MCP
+    root: { type: 'string' },
+    scope: { type: 'string' },
+    server: { type: 'string' },
+
+    // Format-specific (m2c)
+    'page-size': { type: 'string' },
+    orientation: { type: 'string' },
+    margin: { type: 'string' },
+    'font-sans': { type: 'string' },
+    'font-mono': { type: 'string' },
+    headless: { type: 'boolean' },
+    'use-system-fonts': { type: 'boolean' },
+    start: { type: 'string' },
+
+    // Localization (m-loc-b)
+    locale: { type: 'string' },
+} satisfies NonNullable<ParseArgsConfig['options']>;
+
+/**
  * Pure argument parser. Walks `argv` once, identifies mode flags, applies
  * mutual-exclusivity rules, and returns a fully-resolved `ParsedArgs`. Throws
  * `CliError(ExitCode.InputError)` for usage errors.
@@ -139,67 +205,7 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
         args: argv as string[],
         allowPositionals: true,
         strict: true,
-        options: {
-            help: { type: 'boolean', short: 'h' },
-            version: { type: 'boolean', short: 'V' },
-            verbose: { type: 'boolean', short: 'v' },
-            quiet: { type: 'boolean', short: 'q' },
-
-            output: { type: 'string', short: 'o' },
-            format: { type: 'string', short: 'f' },
-            'input-format': { type: 'string' },
-
-            serve: { type: 'boolean' },
-            init: { type: 'boolean' },
-            mcp: { type: 'boolean' },
-            'mcp-install': { type: 'boolean' },
-            'mcp-uninstall': { type: 'boolean' },
-            'dry-run': { type: 'boolean', short: 'n' },
-
-            theme: { type: 'string', short: 't' },
-            // `--now <date>` overrides the now-line position; without it, the
-            // CLI defaults to today's calendar date. Use `--now -` to
-            // suppress the now-line entirely (Unix-`-` sentinel; same idea
-            // as `-o -` for stdout).
-            now: { type: 'string' },
-            // `--timezone` controls which civil date is "today" when --now is
-            // omitted. Accepts IANA names, ISO offsets, "UTC", "Z", or "local".
-            timezone: { type: 'string' },
-            'no-links': { type: 'boolean' },
-            scale: { type: 'string', short: 's' },
-            strict: { type: 'boolean' },
-            width: { type: 'string', short: 'w' },
-            'non-working': { type: 'string' },
-            'asset-root': { type: 'string' },
-            'include-root': { type: 'string' },
-            'no-includes': { type: 'boolean' },
-
-            port: { type: 'string', short: 'p' },
-            host: { type: 'string' },
-            open: { type: 'boolean' },
-
-            'diagnostic-format': { type: 'string' },
-
-            template: { type: 'string' },
-
-            // MCP
-            root: { type: 'string' },
-            scope: { type: 'string' },
-            server: { type: 'string' },
-
-            // Format-specific (m2c)
-            'page-size': { type: 'string' },
-            orientation: { type: 'string' },
-            margin: { type: 'string' },
-            'font-sans': { type: 'string' },
-            'font-mono': { type: 'string' },
-            headless: { type: 'boolean' },
-            'use-system-fonts': { type: 'boolean' },
-            start: { type: 'string' },
-
-            // Localization (m-loc-b)
-            locale: { type: 'string' },
-        },
+        options: ARGV_OPTIONS,
     };
 
     let parsed: ReturnType<typeof parseArgs>;
