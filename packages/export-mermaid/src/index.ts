@@ -52,6 +52,9 @@
 //     (specs/waves.md §10)
 // This mirrors Nowline's default "each item starts after the preceding item in
 // its lane" semantics (specs/rendering.md § Item Bars).
+//
+// Task ids are unique per export (`assignTaskIds`): Mermaid keeps the last
+// task per id, so two title-only `Design` items must not both be `design`.
 
 import type {
     AnchorDeclaration,
@@ -144,7 +147,15 @@ interface EmitCtx {
     waves: WaveCtx | undefined;
     /** Each named group and parallel, which `after:` expands to its end tasks. */
     containers: ReadonlyMap<string, GroupBlock | ParallelBlock>;
+    /** Every task's Mermaid id, unique within the export. */
+    ids: TaskIds;
 }
+
+/** A declaration emitted as a Mermaid task (a wave end milestone aside). */
+type TaskEntity = AnchorDeclaration | ItemDeclaration | MilestoneDeclaration;
+
+/** Each task entity's Mermaid id; see `assignTaskIds`. */
+type TaskIds = ReadonlyMap<TaskEntity, string>;
 
 export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}): string {
     const ast = inputs.ast;
@@ -178,13 +189,23 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     const anchors = ast.roadmapEntries.filter(
         (e): e is AnchorDeclaration => e.$type === 'AnchorDeclaration',
     );
+    const swimlanes = ast.roadmapEntries.filter(
+        (e): e is SwimlaneDeclaration => e.$type === 'SwimlaneDeclaration',
+    );
+    const milestones = ast.roadmapEntries.filter(
+        (e): e is MilestoneDeclaration => e.$type === 'MilestoneDeclaration',
+    );
+    const ids = assignTaskIds(
+        [...anchors, ...laneItems(swimlanes), ...milestones],
+        schedule.plan?.waves.map((w) => w.name as string) ?? [],
+    );
     if (anchors.length > 0) {
         out.push('    section Anchors');
         for (const anchor of anchors) {
             // Anchors are date markers; fall back to the roadmap start when an
             // anchor omits `date:` so Mermaid always sees a valid start token.
             const date = getProp(anchor, 'date') ?? startDate;
-            const id = anchor.name ?? slugify(displayLabel(anchor));
+            const id = taskIdOf(anchor, ids);
             out.push(`    ${escapeTaskName(displayLabel(anchor))} :milestone, ${id}, ${date}, 0d`);
         }
     }
@@ -193,18 +214,18 @@ export function exportMermaid(inputs: ExportInputs, options: MermaidOptions = {}
     const waves = emitWaves(schedule, drops, out, startDate);
 
     // Swimlanes → sections; their items become tasks.
-    const swimlanes = ast.roadmapEntries.filter(
-        (e): e is SwimlaneDeclaration => e.$type === 'SwimlaneDeclaration',
-    );
-    const ctx: EmitCtx = { startDate, schedule, waves, containers: namedContainers(swimlanes) };
+    const ctx: EmitCtx = {
+        startDate,
+        schedule,
+        waves,
+        containers: namedContainers(swimlanes),
+        ids,
+    };
     for (const lane of swimlanes) {
         emitSwimlane(lane, [lane.name ?? slugify(displayLabel(lane))], drops, out, ctx);
     }
 
     // Top-level milestones.
-    const milestones = ast.roadmapEntries.filter(
-        (e): e is MilestoneDeclaration => e.$type === 'MilestoneDeclaration',
-    );
     if (milestones.length > 0) {
         out.push('    section Milestones');
         for (const m of milestones) {
@@ -357,7 +378,7 @@ function emitParallel(
     }
     // After the block, the lane continues after every track's end: Mermaid's
     // `after a b` starts at the latest of them, where engine C ends a parallel.
-    chain.prevIds = endTaskIds(parallel);
+    chain.prevIds = endTaskIds(parallel, ctx.ids);
 }
 
 /**
@@ -373,7 +394,7 @@ function joinContainerAfter(
     ctx: EmitCtx,
 ): void {
     const refs = getProps(container, 'after').filter((raw) => !parseIsoDate(raw));
-    chain.prevIds = union(chain.prevIds, expandAfter(refs, ctx.containers));
+    chain.prevIds = union(chain.prevIds, expandAfter(refs, ctx));
 }
 
 function emitItem(
@@ -384,9 +405,9 @@ function emitItem(
     ctx: EmitCtx,
 ): void {
     countDrops(item, drops);
-    const id = taskIdOf(item);
+    const id = taskIdOf(item, ctx.ids);
     const status = mapStatus(getProp(item, 'status'));
-    const after = expandAfter(getProps(item, 'after'), ctx.containers);
+    const after = expandAfter(getProps(item, 'after'), ctx);
     const duration = daysToMermaid(ctx.schedule.byNode.get(item)?.days) ?? '1d';
     const start = startTokenFor(after, chain, ctx.startDate, previousWaveOf(item, ctx.waves));
 
@@ -402,9 +423,9 @@ function emitMilestone(
     out: string[],
     ctx: EmitCtx,
 ): void {
-    const id = milestone.name ?? slugify(displayLabel(milestone));
+    const id = taskIdOf(milestone, ctx.ids);
     const date = getProp(milestone, 'date');
-    const after = expandAfter(getProps(milestone, 'after'), ctx.containers);
+    const after = expandAfter(getProps(milestone, 'after'), ctx);
     let start: string;
     if (date) {
         start = date;
@@ -444,9 +465,45 @@ function union(a: readonly string[], b: readonly string[]): string[] {
     return [...a, ...b.filter((id) => !a.includes(id))];
 }
 
-/** An item's Mermaid task id: its own id, else a slug of its title. */
-function taskIdOf(item: ItemDeclaration): string {
-    return item.name ?? slugify(displayLabel(item));
+/**
+ * A Mermaid id for every task entity, unique within the export: Mermaid keeps
+ * one task per id, so a repeated id sends `after` to whichever task came last.
+ * An explicit id is its own. A title-only entity takes its title's slug, or the
+ * first free `-2`, `-3`, ... suffix of it, in emission order, never taking an
+ * explicit id or a wave id wherever that is declared (as core keys title-only
+ * declarations, specs/dsl.md § Identifiers). Mermaid shares one id space
+ * across anchors, waves, items and milestones, so one map covers them all.
+ */
+function assignTaskIds(entities: readonly TaskEntity[], waveIds: readonly string[]): TaskIds {
+    const taken = new Set<string>(waveIds);
+    for (const entity of entities) if (entity.name) taken.add(entity.name);
+    const ids = new Map<TaskEntity, string>();
+    for (const entity of entities) {
+        if (entity.name) {
+            ids.set(entity, entity.name);
+            continue;
+        }
+        const base = slugify(displayLabel(entity));
+        let id = base;
+        for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+        taken.add(id);
+        ids.set(entity, id);
+    }
+    return ids;
+}
+
+/** Every item under `lanes`, in emission order. */
+function laneItems(lanes: readonly SwimlaneDeclaration[]): ItemDeclaration[] {
+    return [...trackNodes(lanes)].filter(
+        (node): node is ItemDeclaration => !isGroupBlock(node) && !isParallelBlock(node),
+    );
+}
+
+/** A task entity's Mermaid id, as `assignTaskIds` gave it. */
+function taskIdOf(entity: TaskEntity, ids: TaskIds): string {
+    const id = ids.get(entity);
+    if (id === undefined) throw new Error(`no Mermaid id for ${displayLabel(entity)}`);
+    return id;
 }
 
 /** Every named group and parallel under `lanes`, by id. */
@@ -468,14 +525,11 @@ function namedContainers(
  * Mermaid's `after a b` starts at the latest end of the tasks it names, so the
  * expansion lands on the same day.
  */
-function expandAfter(
-    after: readonly string[],
-    containers: ReadonlyMap<string, GroupBlock | ParallelBlock>,
-): string[] {
+function expandAfter(after: readonly string[], ctx: EmitCtx): string[] {
     const out: string[] = [];
     for (const ref of after) {
-        const container = containers.get(ref);
-        for (const id of container ? endTaskIds(container) : [ref]) {
+        const container = ctx.containers.get(ref);
+        for (const id of container ? endTaskIds(container, ctx.ids) : [ref]) {
             if (!out.includes(id)) out.push(id);
         }
     }
@@ -483,13 +537,13 @@ function expandAfter(
 }
 
 /** The task ids that end a track node: an item, a group's last child, or every parallel track. */
-function endTaskIds(node: TrackNode): string[] {
+function endTaskIds(node: TrackNode, ids: TaskIds): string[] {
     if (isGroupBlock(node)) {
         const last = trackChildren(node).at(-1);
-        return last ? endTaskIds(last) : [];
+        return last ? endTaskIds(last, ids) : [];
     }
-    if (isParallelBlock(node)) return trackChildren(node).flatMap(endTaskIds);
-    return [taskIdOf(node)];
+    if (isParallelBlock(node)) return trackChildren(node).flatMap((n) => endTaskIds(n, ids));
+    return [taskIdOf(node, ids)];
 }
 
 /** The previous wave's id for a member of wave k >= 2; undefined otherwise. */

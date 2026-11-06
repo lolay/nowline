@@ -69,7 +69,10 @@ exception can't be written, so its days are counted as `working-day` in the
 (sizes, `q` and `capacity:` included), written as `Nd` with up to two
 decimals (`10d`, `7.5d`), so a `full` `4w` is `28d`. The roadmap start and
 wave-end milestones fall on working days; anchor and milestone dates are
-written as declared. The trailing
+written as declared. Each task's id is its
+Nowline id, or for a title-only entity a slug of its title made unique
+within the export (`design`, `design-2`, never an explicit id), so a
+repeated title can't redirect an `after`. The trailing
 `%%` comment line lists Nowline features that don't have a Mermaid
 equivalent and have been dropped.
 
