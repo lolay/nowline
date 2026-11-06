@@ -1,0 +1,18 @@
+nowline v1
+
+// Multi-team waves: every file declares the same waves, floor included, so
+// each team file renders alone and the program file merges them behind one barrier.
+
+include "./waves-program/web.nowline"
+include "./waves-program/api.nowline"
+
+roadmap program "Program" start:2026-01-05 scale:1w calendar:full
+
+wave plan "Plan"
+wave execute "Execute" after:2026-02-02
+
+swimlane pmo "PMO"
+  item kickoff "Kickoff" duration:1w wave:plan
+  item comms "Launch comms" duration:2w after:execute
+
+milestone done "Execute complete" after:execute

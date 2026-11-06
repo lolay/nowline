@@ -1,0 +1,42 @@
+nowline v1
+
+// Holiday quarter (m2p phase 5b, specs/working-calendar.md §4, §10): a
+// Nov to Jan plan for a team on a business calendar that names the days it is
+// closed and the one Saturday it works.
+//
+//   - Thanksgiving, a two-day holiday inside a bar.
+//   - Winter break, Dec 24 to Jan 1: seven working days, so a bar that
+//     crosses it ends seven working days later than it would without it.
+//   - Company summit, Wed Jan 13 to Fri Jan 15.
+//   - Launch prep Saturday, a working exception. The chart labels it
+//     "Launch prep Saturday · +1d", with no cut line since it removes no time;
+//     MS Project writes it as a working exception and Mermaid counts it in its
+//     lossy summary.
+//
+// Hidden by default: each closure is a labelled seam in the marker row.
+// Export it with `nowline examples/working-calendar.nowline -f msproj` to see
+// the closures as base-calendar <Exceptions>, or `-f mermaid` for the dated
+// `excludes` line.
+
+config
+
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
+
+non-working winter-break "Winter break" start:2026-12-24 end:2027-01-01
+
+non-working summit "Company summit" start:2027-01-13 end:2027-01-15
+
+working launch-prep "Launch prep Saturday" date:2027-01-23
+
+roadmap working-calendar "Holiday quarter" start:2026-11-02 scale:1w calendar:business
+
+anchor kickoff "Kickoff" date:2026-11-02
+milestone launch "Launch" date:2027-01-29
+swimlane platform "Platform"
+  item api-v2 "API v2" duration:3w
+  item data-migration "Data migration" duration:2w
+  item hardening "Hardening" duration:2w
+swimlane web "Web"
+  item design-refresh "Design refresh" duration:2w
+  item build "Build" duration:4w
+  item beta "Beta" duration:1w

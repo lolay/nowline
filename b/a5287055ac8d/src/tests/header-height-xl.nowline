@@ -1,0 +1,28 @@
+nowline v1
+
+// Timeline header height fixture (specs/rendering.md § Timeline Scale).
+// `default roadmap header-height:xl` is the tallest bucket: the top and the
+// mirrored bottom tick panels grow to 40 px and keep their date labels
+// vertically centered, and the wave strip, marker row and chart move down
+// by the extra 16 px. `header-height:md` (the default) is the 24 px panel
+// every other fixture draws; compare against header-height-none.
+
+config
+
+default roadmap header-height:xl timeline-position:both
+
+roadmap header-height-xl "Header height: xl" start:2026-01-05 scale:2w
+
+wave alpha "Alpha"
+wave beta "Beta"
+
+anchor kickoff date:2026-01-06
+milestone launch "Launch" date:2026-03-16
+
+swimlane platform "Platform"
+  item api "API gateway" duration:4w wave:alpha status:done
+  item search "Search v2" duration:3w wave:beta status:in-progress remaining:40%
+
+swimlane web "Web"
+  item redesign "Web redesign" duration:3w after:kickoff wave:alpha
+  item billing "Billing portal" duration:2w wave:beta

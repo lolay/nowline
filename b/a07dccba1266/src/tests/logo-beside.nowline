@@ -1,0 +1,14 @@
+nowline v1
+
+// Company logo, beside header (specs/rendering.md § Roadmap Header). A 4:1
+// wordmark (viewBox only) at the default `logo-size:md` draws 144 x 36 px
+// left of the title: the card widens by the logo plus its 12 px gap, the
+// title and author shift right, and the chart starts right of the wider
+// card. Compare against examples/minimal.nowline, which has no logo.
+
+roadmap logo-beside "Logo beside" author:"Acme Engineering" logo:"./assets/logo-wordmark.svg" start:2026-01-05
+
+swimlane build "Build"
+  item design "Design" duration:1w status:done
+  item implement "Implement" duration:2w status:in-progress
+  item ship "Ship" duration:3d

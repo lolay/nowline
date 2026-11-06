@@ -1,0 +1,13 @@
+nowline v1
+
+roadmap marker-predecessor-partner "Partner" start:2026-01-05 scale:1w
+
+anchor p-start "Partner start" date:2026-01-19
+
+swimlane plugin "Plugin"
+  item p-build "Plugin build" duration:5w
+  item p-polish "Plugin polish" duration:2w after:p-build
+
+milestone p-alpha "Partner alpha" after:[p-start, p-build]
+milestone p-beta "Partner beta" after:[p-alpha, p-polish]
+milestone p-due "Partner due" date:2026-02-02 after:p-alpha

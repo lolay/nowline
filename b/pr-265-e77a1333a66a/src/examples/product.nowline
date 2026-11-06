@@ -1,0 +1,74 @@
+nowline v1
+
+config
+
+scale
+  name: weeks
+  label-every: 2
+  label: "W{n}"
+
+calendar
+  days-per-week: 5
+  days-per-month: 22
+  days-per-quarter: 65
+  days-per-year: 260
+
+style enterprise-style "Enterprise readiness"
+  bg: blue
+  fg: navy
+  text: white
+  border: solid
+
+style risky
+  border: dashed
+  fg: orange
+
+style subtle
+  bg: gray
+
+default item shadow:subtle
+default swimlane padding:sm spacing:none
+default roadmap padding:md header-height:md font:sans
+default parallel bracket:none
+
+roadmap platform-2026 "Platform 2026" author:"Acme Engineering" start:2026-01-05 calendar:custom
+
+person sam "Sam Chen"
+person jen "Jennifer Wu"
+
+size xs effort:1d
+size sm effort:3d
+size md effort:1w
+size lg effort:2w
+size xl effort:1m
+
+status awaiting-review
+status in-review
+
+label enterprise "Enterprise readiness" style:enterprise-style
+label security "Security hardening" style:enterprise-style
+label low-confidence style:risky
+
+anchor kickoff date:2026-01-06
+anchor code-freeze "Code Freeze" date:2026-05-01
+anchor ga-date "GA Date" date:2026-06-01
+
+swimlane platform
+  item auth-refactor "Auth refactor" size:lg after:kickoff status:done owner:sam labels:enterprise link:https://github.com/acme/platform/issues/123
+  parallel after:auth-refactor
+    group audit-track "Audit Track" labels:security
+      item audit-log "Audit log v2" size:xl before:code-freeze remaining:30% labels:[enterprise, security]
+        description "Comprehensive audit trail for all admin actions"
+      item audit-ui "Audit UI" size:md
+    item sso "SSO plugins" size:md labels:[enterprise, low-confidence]
+  item platform-qa "Platform QA" size:sm
+
+swimlane mobile
+  item offline "Offline mode" size:lg after:kickoff owner:jen status:at-risk remaining:60% link:https://github.com/acme/mobile/pull/87
+  item push-v2 "Push notifications v2" size:md
+
+milestone beta "Beta" after:auth-refactor
+milestone ga-launch "GA launch" date:2026-06-01 after:[auth-refactor, audit-log]
+
+footnote vendor-footnote "Vendor dependency" on:audit-log
+  description "Blocked until vendor contract is signed. Expected March resolution."

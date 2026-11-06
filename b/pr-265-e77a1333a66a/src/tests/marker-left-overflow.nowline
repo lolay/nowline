@@ -1,0 +1,22 @@
+nowline v1
+
+// Marker labels that fit on neither side of their marker. The chart is one
+// week wide and the header card sits beside it (the default
+// `header-position:beside`), so a long label pinned near the left edge
+// overflows the canvas on the right and runs into the card on the left.
+//
+// The stressed axis is that left fallback: the canvas grows on the right
+// until each label fits there, the way a titled non-working run's label
+// does, so no label lands on the header card.
+//   - Kickoff: an anchor on the first day.
+//   - Beta: a dated milestone a day later; its label packs onto its own row.
+//   - Ready: an after-only milestone at the end of Build.
+
+roadmap marker-left-overflow "Marker overflow" start:2026-01-05 scale:1w
+
+anchor kickoff "Kickoff and stakeholder alignment" date:2026-01-05
+milestone beta "Beta to design partners" date:2026-01-06
+milestone ready "Ready for the partner review" after:build
+
+swimlane a "A"
+  item build "Build" duration:1w
