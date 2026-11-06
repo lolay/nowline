@@ -245,7 +245,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `cli.md:22` (`npm install -g nowline`) and `:503` (`npx nowline`) name an unscoped package this repo never publishes (`Makefile:337-344`; `README.md:175` uses `@nowline/cli`). `--template` exists (`cli/args.ts:183`, `commands/init.ts:28, 62`) but isn't in `cli.md`, `nowline.1` or `--help`. `cli.md:460` says `.nowlinerc` is found from the current directory; the code walks up from the input's directory (`nowline.1:545` is right). A bad `--mcp --port` throws a plain `Error` (`commands/mcp.ts:28`). The `-f` list (`cli.md:48`) omits `json` and `nowline`.
 - Verified: each part reproduced: `--mcp --port abc` prints a stack trace and exits 1 (the exit table says 2); `--start notadate` exits 0 for svg and 3 for msproj.
 - Recommendation: fix the package name; document `--template` in all three places; fix the rc text; throw `CliError` with `InputError` for `--port`; validate `--start` in `resolveCliOptions` like the other flags; complete the `-f` list.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#267 (ce594a5)
 
 ### r1.f21 - VS Code Export ignores the export-only `.nowlinerc` keys `ide.md` says it reads
 
@@ -303,7 +304,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: the graph (`:65-93`) omits `@nowline/config`, `@nowline/share-link` and `@nowline/preview`, and draws the renderer under layout only (`:101` says it uses core). preview-shell is "standalone, no engine deps" (`:86`) but declares `@nowline/browser` and `@nowline/layout` as dependencies (type-only imports). mcp "optionally" depends on browser and preview-shell (`:88`); they're hard deps, beside preview, config, share-link, export-core and layout. The CLI "wraps every exporter" (`:92, :116`) but imports none directly and depends on mcp and config. embed "consumes core + layout + renderer" (`:119`) but imports browser and share-link. The Action "couples loosely" through the CLI (`:120`) but bundles `@nowline/layout` (`nowline-action/src/inputs.ts:2`). Stale: `pnpm@9` (`:133`, the repo pins 12.11.2), ~55 MB and ~70 MB binary in the same spec; `export-determinism.md:89, 113` still describe finished work as future.
 - Verified: every claim checked against package.json and imports. `:95` "enforced by package.json declarations" is half true: pnpm's strict linking rejects undeclared imports (none found), but the declarations don't match the drawn graph.
 - Recommendation: replace the graph with the one drawn from the code (the summary's Architecture section), fix the descriptions and version text, and add a declared-versus-imported check to `make lint` (see r1.f33).
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#267 (ce594a5)
 
 ## duplication
 
