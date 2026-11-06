@@ -1,4 +1,5 @@
 import {
+    buildTransientDocument,
     collectDocumentDiagnostics,
     createNowlineServices,
     type NowlineFile,
@@ -41,11 +42,7 @@ export async function parseSource(
     filePath: string,
     options: ParseOptions = {},
 ): Promise<ParseResult> {
-    const services = getServices();
-    const uri = uriFor(filePath);
-    const docFactory = services.shared.workspace.LangiumDocumentFactory;
-    const doc = docFactory.fromString<NowlineFile>(contents, uri);
-    await services.shared.workspace.DocumentBuilder.build([doc], {
+    const doc = await buildTransientDocument(getServices().shared, contents, uriFor(filePath), {
         validation: options.validate ?? true,
     });
 

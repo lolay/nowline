@@ -6,4 +6,5 @@ export * from './language/ast-walk.js';
 export * from './language/calendar-declarations.js';
 export * from './language/style-chain.js';
 export * from './language/value-tables.js';
+export * from './util/langium-retention.js';
 export * from './util/props.js';

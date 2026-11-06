@@ -1,12 +1,12 @@
 // MCP diagnostic helpers — maps Langium/core diagnostics to the MCP tool shape.
 
 import {
+    buildTransientDocument,
     collectDocumentDiagnostics,
     createNowlineServices,
     type IncludePolicy,
     inferCodeFromMessage,
     isRoutedResolveDiagnostic,
-    type NowlineFile,
     type ResolveDiagnostic,
     resolveDiagnosticCode,
     resolveDiagnosticSuggestion,
@@ -56,14 +56,8 @@ export function getMcpServices() {
 }
 
 export async function buildDocument(source: string) {
-    const services = getMcpServices();
     const uri = URI.parse(`memory:///mcp-${++docCounter}.nowline`);
-    const doc = services.shared.workspace.LangiumDocumentFactory.fromString<NowlineFile>(
-        source,
-        uri,
-    );
-    await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
-    return doc;
+    return buildTransientDocument(getMcpServices().shared, source, uri);
 }
 
 export function collectMcpDiagnostics(

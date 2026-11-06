@@ -18,6 +18,7 @@
 // bundle stays free of any Node literal even before tree-shaking.
 
 import {
+    buildTransientDocument,
     collectDocumentDiagnostics,
     createNowlineServices,
     isRoutedResolveDiagnostic,
@@ -202,11 +203,7 @@ export async function parseSource(
     options: ParseOptions = {},
 ): Promise<ParseResult> {
     const filePath = options.filePath ?? DEFAULT_SYNTHETIC_PATH;
-    const services = getServices();
-    const docFactory = services.shared.workspace.LangiumDocumentFactory;
-    const doc = docFactory.fromString<NowlineFile>(source, freshUri());
-    await services.shared.workspace.DocumentBuilder.build([doc], { validation: true });
-
+    const doc = await buildTransientDocument(getServices().shared, source, freshUri());
     return { ast: doc.parseResult.value, diagnostics: documentRows(doc, filePath) };
 }
 
@@ -357,6 +354,11 @@ export async function renderSource(
  * URI counter between cases so a `parseSource` failure in one test
  * doesn't poison the next one's document builder.
  */
+/** The pipeline's cached Langium services, for leak tests. */
+export function __browserPipelineServicesForTests(): CachedServices {
+    return getServices();
+}
+
 export function __resetBrowserPipelineForTests(): void {
     cachedServices = undefined;
     docCounter = 0;
