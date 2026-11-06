@@ -68,3 +68,20 @@ writeFileSync(outPath, `${lines.join('\n')}\n`);
 console.log(
     `bundled ${examples.length} examples + man page + conversions guide → src/generated/resources.ts`,
 );
+
+// ---- Package version -------------------------------------------------------
+// Baked in rather than read from package.json at runtime: `bun build --compile`
+// embeds the CLI (and this package with it) without its package.json.
+
+const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf-8'));
+writeFileSync(
+    path.join(outDir, 'version.ts'),
+    [
+        '// GENERATED — do not edit. Re-run `pnpm --filter @nowline/mcp build` to regenerate.',
+        '// Source: packages/mcp/package.json "version".',
+        '',
+        '/** The @nowline/mcp package version, reported as the MCP `serverInfo.version`. */',
+        `export const MCP_VERSION: string = ${JSON.stringify(pkg.version)};`,
+        '',
+    ].join('\n'),
+);
