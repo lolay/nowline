@@ -86,10 +86,10 @@ function exportDocument(
 ): Promise<Uint8Array>;
 ```
 
-Today this pipeline exists twice — the CLI's `produce()` and the VS Code
-extension's `packages/vscode-extension/src/export/in-process.ts`. Extracting
-`@nowline/export` collapses them into one implementation so they can no longer
-drift; each surface's host glue shrinks to a thin `HostEnv`.
+This pipeline used to exist twice, in the CLI's `produce()` and in the VS Code
+extension's `packages/vscode-extension/src/export/in-process.ts`. Both now call
+`@nowline/export`, so there is one implementation that can't drift, and each
+surface's host glue is a thin `HostEnv`.
 
 ## Determinism contract
 
@@ -110,9 +110,9 @@ Deviating on any row forfeits the byte-identity guarantee for that export.
 
 | Surface | Runtime | How it achieves byte-identity |
 |---------|---------|-------------------------------|
-| `@nowline/cli` | Node / Bun binary | Imports `@nowline/export` directly; Node `HostEnv`. Switches `@nowline/export-png` from native `@resvg/resvg-js` to `@resvg/resvg-wasm`. |
+| `@nowline/cli` | Node / Bun binary | Imports `@nowline/export` directly; Node `HostEnv`. PNG goes through `@nowline/export-png` on `@resvg/resvg-wasm`, not native `@resvg/resvg-js`. |
 | `@nowline/mcp` (OSS) | Node (`npx`) | Imports `@nowline/export` directly, fully in-process — **no CLI shell-out** (see [`mcp.md`](./mcp.md)). Same runtime, same `HostEnv` as the CLI. |
-| `vscode-extension` | Node (extension host) | Imports `@nowline/export`; the existing `in-process.ts` becomes its thin `HostEnv`. The preview "Save PNG" path delegates to the kernel so it matches "Export…". |
+| `vscode-extension` | Node (extension host) | Imports `@nowline/export`; `in-process.ts` is its thin `HostEnv`. The preview "Save PNG" path delegates to the kernel so it matches "Export…". |
 | Free / Pro web apps | Browser | Import `@nowline/export`; browser `HostEnv` fetches `resvg.wasm` + bundled fonts. Canonical export uses `@resvg/resvg-wasm`, not `<canvas>`. Owned by [`lolay/nowline-app/specs/export-determinism.md`](https://github.com/lolay/nowline-app/blob/main/specs/export-determinism.md). |
 | Nowline Pro MCP / REST API | Go (`nowline-api`) | Cannot import the JS kernel (Go-only, single sanctioned subprocess). Achieves byte-identity structurally by shelling out to the **same pinned `nowline` CLI binary** that uses the kernel. Owned by [`lolay/nowline-api/specs/mcp.md`](https://github.com/lolay/nowline-api/blob/main/specs/mcp.md). |
 
