@@ -1,0 +1,7 @@
+```release-note:fixed
+A `--start` that isn't a real `YYYY-MM-DD` calendar date (`--start notadate`, `--start 2026-02-30`) now exits 2 with `nowline: invalid --start "..."` for every output format. Before, it was ignored with exit 0 for every format but `msproj`, which failed with exit 3. `-f nowline` also rejects a bad `--page-size`, `--orientation` or `--margin` now, as every other format already did.
+```
+
+```release-note:fixed
+`--template <name>`, which picks the `--init` starter (`minimal`, `teams`, `product` or `showcase`), is now documented in `--help`, `man nowline` and the CLI spec. `--help` also lists `--page-size`, `--orientation`, `--margin` and `--start`, and `man nowline` documents `--diagnostic-format`.
+```

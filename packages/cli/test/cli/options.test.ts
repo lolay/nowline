@@ -120,14 +120,26 @@ describe('resolveCliOptions errors', () => {
         );
     });
 
-    it('holds the PDF settings back until assertPdfSettingsValid', () => {
+    it('holds a bad --start back until assertExportSettingsValid', () => {
+        const options = resolve(['--start', 'notadate']);
+        expect(() => options.assertValid()).not.toThrow();
+        expect(failure(() => options.assertExportSettingsValid())).toBe(
+            'nowline: invalid --start "notadate". Expected YYYY-MM-DD, a real calendar date.',
+        );
+        expect(() => resolve(['--start', '2026-02-30']).assertExportSettingsValid()).toThrow(
+            expect.objectContaining({ exitCode: ExitCode.InputError }),
+        );
+        expect(resolve(['--start', '2027-03-01']).start).toBe('2027-03-01');
+    });
+
+    it('holds the PDF settings back until assertExportSettingsValid', () => {
         const options = resolve(['--orientation', 'sideways'], { pdfMargin: 'wide' });
         expect(() => options.assertValid()).not.toThrow();
-        expect(failure(() => options.assertPdfSettingsValid())).toBe(
+        expect(failure(() => options.assertExportSettingsValid())).toBe(
             'nowline: invalid --orientation "sideways". Expected portrait, landscape, or auto.',
         );
         const margin = resolve([], { pdfMargin: 'wide' });
-        expect(failure(() => margin.assertPdfSettingsValid())).toMatch(
+        expect(failure(() => margin.assertExportSettingsValid())).toMatch(
             /^nowline: invalid \.nowlinerc pdfMargin "wide": /,
         );
     });

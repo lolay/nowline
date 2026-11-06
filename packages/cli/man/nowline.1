@@ -20,6 +20,7 @@
 .Ar input
 .Nm
 .Fl -init
+.Op Fl -template Ar name
 .Op Ar name
 .Nm
 .Fl -mcp
@@ -154,6 +155,17 @@ is auto-appended if missing.
 Default name is
 .Sy roadmap .
 Existing files are silently overwritten.
+.It Fl -template Ar name
+With
+.Fl -init ,
+the starter to scaffold:
+.Sy minimal
+(the default),
+.Sy teams ,
+.Sy product ,
+or
+.Sy showcase .
+Any other name exits with status 2.
 .It Fl -mcp
 Start a Model Context Protocol (MCP) server on standard input and
 output, exposing validate, render, export, and file tools to an agent.
@@ -193,6 +205,20 @@ Exits 0 on success, 1 on validation error.
 Works with any output format \(em
 .Nm Ar roadmap.nowline Fl f Ar pdf Fl -dry-run
 exercises the entire PDF pipeline without producing a file.
+.It Fl -diagnostic-format Ar fmt
+How diagnostics are written to standard error:
+.Sy text
+or
+.Sy json .
+.Sy json
+prints one document per run, warnings included.
+Default:
+.Sy json
+with
+.Fl -dry-run Fl -format Ns = Ns Sy json ,
+else
+.Sy text .
+Any other value exits with status 2.
 .El
 .Sh I/O OPTIONS
 .Bl -tag -width Fl
@@ -438,6 +464,8 @@ Default: the roadmap's
 else
 .Fl -now
 (today).
+A value that is not a real calendar date exits with status 2, whatever
+the output format.
 .El
 .Sh SERVE OPTIONS
 .Bl -tag -width Fl

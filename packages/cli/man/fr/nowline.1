@@ -5,7 +5,7 @@
 .\" Empreinte de la page anglaise relue pour cette traduction. Après avoir
 .\" reporté une modification de la page anglaise, remplacez-la par la ligne
 .\" qu'affiche packages/cli/test/man/translation-parity.test.ts.
-.\" translated-from: nowline.1 sha256:4f113445e5c8d41932dcdeb46732a884ed1f960b28bdb2becd0060ad4cde539c
+.\" translated-from: nowline.1 sha256:bc246855c46b144ad137c48a1f89755f9e91a57970529767c43b7771583aeb39
 .Dd $Mdocdate$
 .Dt NOWLINE 1
 .Os
@@ -28,6 +28,7 @@
 .Ar entrée
 .Nm
 .Fl -init
+.Op Fl -template Ar nom
 .Op Ar nom
 .Nm
 .Fl -mcp
@@ -169,6 +170,17 @@ est ajouté automatiquement s'il manque.
 Le nom par défaut est
 .Sy roadmap .
 Les fichiers existants sont écrasés sans confirmation.
+.It Fl -template Ar nom
+Avec
+.Fl -init ,
+le modèle de démarrage à créer\ :
+.Sy minimal
+(par défaut),
+.Sy teams ,
+.Sy product
+ou
+.Sy showcase .
+Tout autre nom se termine avec le code 2.
 .It Fl -mcp
 Lance un serveur Model Context Protocol (MCP) sur l'entrée et la sortie
 standard, qui expose à un agent les outils de validation, de rendu,
@@ -209,6 +221,21 @@ Termine avec 0 en cas de succès, 1 en cas d'erreur de validation.
 Compatible avec tous les formats de sortie\ —
 .Nm Ar feuille.nowline Fl f Ar pdf Fl -dry-run
 exerce tout le pipeline PDF sans produire de fichier.
+.It Fl -diagnostic-format Ar fmt
+Forme des diagnostics écrits sur la sortie d'erreur standard\ :
+.Sy text
+ou
+.Sy json .
+Avec
+.Sy json ,
+un seul document par exécution, avertissements compris.
+Par défaut\ :
+.Sy json
+avec
+.Fl -dry-run Fl -format Ns = Ns Sy json ,
+sinon
+.Sy text .
+Toute autre valeur se termine avec le code 2.
 .El
 .Sh OPTIONS D'E/S
 .Bl -tag -width Fl
@@ -460,6 +487,8 @@ Par défaut\ : le
 de la feuille de route, sinon
 .Fl -now
 (aujourd'hui).
+Une valeur qui n'est pas une date réelle du calendrier se termine avec
+le code 2, quel que soit le format de sortie.
 .El
 .Sh OPTIONS DE SERVEUR
 .Bl -tag -width Fl

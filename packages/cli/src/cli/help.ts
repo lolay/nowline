@@ -8,7 +8,7 @@ const HELP_TEXT = `nowline ${fullVersionString()} — render, validate, and serv
 USAGE
   nowline <input> [options]
   nowline --serve <input> [options]
-  nowline --init [<name>]
+  nowline --init [--template <name>] [<name>]
   nowline --mcp-install [<client>] [options]
   nowline --version
   nowline --help
@@ -32,6 +32,8 @@ MODE FLAGS (mutually exclusive)
                           rendered output to disk on each rebuild.
       --init [<name>]     Scaffold a starter .nowline file in cwd. Positional
                           becomes project name; .nowline appended if missing.
+      --template <name>   Starter for --init: minimal (default), teams,
+                          product, or showcase.
       --mcp               Start a Model Context Protocol (MCP) stdio server
                           exposing validate, render, export, and file tools.
                           Shares the same @nowline/mcp server code as
@@ -103,6 +105,17 @@ RENDER OPTIONS
                           wins for content. Falls back to LC_ALL /
                           LC_MESSAGES / LANG, then en-US.
 
+FORMAT OPTIONS (checked for every format; exit 2 if invalid)
+      --page-size <size>  PDF page size: letter (default), legal, tabloid,
+                          ledger, a1-a5, b3-b5, content, or WxHunit
+                          (e.g. 8.5x11in, 210x297mm).
+      --orientation <o>   PDF orientation: portrait | landscape | auto
+                          (default).
+      --margin <length>   PDF page margin: points, or in / mm / cm.
+                          Default: 36pt.
+      --start <date>      MS Project start date (YYYY-MM-DD). Default: the
+                          roadmap's start:, else --now.
+
 FONT OPTIONS (png, pdf)
                           Raster/PDF export is bundled-first: by default it
                           renders with the bundled DejaVu pair on every OS, so
@@ -152,6 +165,7 @@ EXAMPLES
   nowline roadmap.nowline --dry-run         # validate-only
   nowline roadmap.nowline --serve -p 8080   # live preview
   nowline --init my-project                 # scaffold ./my-project.nowline
+  nowline --init --template teams           # scaffold the teams starter
   nowline --mcp                             # start MCP stdio server
   nowline --mcp --root ./roadmaps           # MCP server with custom root
   nowline --mcp-install                     # register with every agent found

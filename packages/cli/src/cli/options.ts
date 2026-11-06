@@ -19,6 +19,7 @@ import {
     SURFACE_OPTION_SPECS,
     type SurfaceOptions,
 } from '@nowline/config';
+import { isRealIsoDate } from '@nowline/core/internal';
 import { lengthToPoints, parseLength } from '@nowline/export-core';
 import { type NormalizedZone, normalizeZone, TimezoneError } from '@nowline/layout';
 import { CliError, ExitCode } from '../io/exit-codes.js';
@@ -63,6 +64,15 @@ function parseMargin(raw: unknown): OptionParse<number> {
     }
 }
 
+// `--start` is the MS Project start date: a real calendar day, flag only. It is
+// checked here, for every format, so a bad value is a usage error rather than an
+// msproj exporter failure that other formats never see.
+function parseStart(raw: unknown): OptionParse<string> {
+    if (raw === undefined || raw === '') return { ok: true, value: undefined };
+    if (typeof raw === 'string' && isRealIsoDate(raw)) return { ok: true, value: raw };
+    return { ok: false, detail: 'must be YYYY-MM-DD, a real calendar date' };
+}
+
 /** Every option the CLI resolves over its flag and rc layers: the shared five, then its own. */
 export const CLI_OPTION_SPECS = Object.freeze({
     ...SURFACE_OPTION_SPECS,
@@ -75,6 +85,7 @@ export const CLI_OPTION_SPECS = Object.freeze({
     useSystemFonts: { rcKey: 'useSystemFonts', parse: lenientSwitch } as OptionSpec<boolean>,
     locale: { rcKey: 'locale', parse: lenientString } as OptionSpec<string>,
     assetRoot: ASSET_ROOT_SPEC as OptionSpec<string>,
+    start: { parse: parseStart } as OptionSpec<string>,
 });
 
 type CliSpecs = typeof CLI_OPTION_SPECS;
@@ -94,6 +105,7 @@ const FLAG_NAMES: Readonly<Partial<Record<CliOptionKey, string>>> = {
     headless: '--headless',
     useSystemFonts: '--use-system-fonts',
     assetRoot: '--asset-root',
+    start: '--start',
 };
 
 // ---- Resolution -------------------------------------------------------------
@@ -117,16 +129,19 @@ export interface CliOptions {
     assetRoot?: string;
     /** The rc `locale`; the flag and `NOWLINE_LOCALE` rank above it (`resolveLocaleOverride`). */
     rcLocale?: string;
+    /** `--start`, the MS Project start date (`YYYY-MM-DD`). */
+    start?: string;
     /**
      * Throw the first invalid option as a usage error, in the order the CLI
      * has always reported them: theme, timezone, now, width, non-working.
      */
     assertValid(): void;
     /**
-     * Throw the first invalid PDF setting (page size, orientation, margin).
-     * Run after validation, so these errors follow any diagnostics.
+     * Throw the first invalid format-specific setting (page size, orientation,
+     * margin, start date), whatever the output format. Run after validation, so
+     * these errors follow any diagnostics.
      */
-    assertPdfSettingsValid(): void;
+    assertExportSettingsValid(): void;
 }
 
 /**
@@ -171,6 +186,7 @@ export function resolveCliOptions(
         useSystemFonts: values.useSystemFonts ?? false,
         assetRoot: absoluteAssetRoot(values.assetRoot, args.assetRoot !== undefined, rcPath, cwd),
         rcLocale: values.locale,
+        start: values.start,
         assertValid: () =>
             throwFirst([
                 failure('theme'),
@@ -180,8 +196,13 @@ export function resolveCliOptions(
                 failure('nonWorking'),
                 failure('assetRoot'),
             ]),
-        assertPdfSettingsValid: () =>
-            throwFirst([failure('pageSize'), failure('orientation'), failure('margin')]),
+        assertExportSettingsValid: () =>
+            throwFirst([
+                failure('pageSize'),
+                failure('orientation'),
+                failure('margin'),
+                failure('start'),
+            ]),
     };
 }
 
@@ -206,6 +227,7 @@ function flagLayer(args: ParsedArgs): OptionLayer<CliOptionKey> {
             fontSans: args.fontSans,
             fontMono: args.fontMono,
             assetRoot: args.assetRoot,
+            start: args.start,
             // A switch flag is absent or on; absent leaves the rc to decide.
             headless: args.headless || undefined,
             useSystemFonts: args.useSystemFonts || undefined,
@@ -258,6 +280,7 @@ export function formatOptionError(error: OptionError<string>): string {
     switch (error.key) {
         // Detail reads "must be YYYY-MM-DD, ...": the CLI says "Expected".
         case 'now':
+        case 'start':
             return `${lead}. Expected ${error.detail.replace(/^must be /, '')}.`;
         // These two carry the parser's own message after a colon.
         case 'pageSize':
