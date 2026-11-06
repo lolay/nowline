@@ -95,7 +95,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: each call builds a document on a fresh URI (`memory:///mcp-N` in `mcp/src/diagnostics.ts:58-66`, `stage-N` in `renderer/src/stage.ts:117-126`, `nowline-browser-N` in `browser/src/pipeline.ts:203-208`) with `DocumentBuilder.build([doc])` and never removes it; `IndexManager` keeps `symbolIndex[uri]` and `DocumentBuilder` keeps `buildState[uri]`, and the exported descriptions hold the AST, CST and text. No `IndexManager.remove` or `DocumentBuilder.update([], [uri])` exists in `src`. The browser path backs the VS Code preview on every debounced keystroke, the embed and the MCP App; the stdio MCP server leaks on every validate, render, export, create, update and share.
 - Verified: with the built dists and `--expose-gc`, 220 MCP builds left `symbolIndex` and `buildState` at 220 entries; retained heap was 41 KB per call for `minimal.nowline` and 666 KB per call for `long.nowline`; `@nowline/browser` `renderSource` on `long.nowline` retained 657 KB per call.
 - Recommendation: one core helper that builds a transient document and removes it from the index and build state afterwards, used by all three builders; a test that the index size stays constant across N renders.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#263 (1edbaa1)
 
 ### r1.f8 - The export scheduler ignores `after:<dated milestone>`, so XLSX and Mermaid wave-end dates disagree with the chart
 
@@ -106,7 +107,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `scheduleRoadmap` pre-seeds only anchors before walking the lanes (`:191-201`); `milestoneEnd` is filled by the milestone loop after the lanes (`:431-442`), so `resolveAfterDay` returns day 0 for a dated milestone (`:236-239`). The chart's placement seeds dated milestones and anchors alike first (`phases/place.ts:122-129`). No sample has the shape, so `engine-divergences.json` stays empty; the date window misses the bar and `finalize.ts:170` extends the axis with a cause its own comment calls a bug.
 - Verified: `roadmap r start:2026-01-05` with `item y duration:1w after:gate` and `milestone gate date:2026-03-02`: the chart draws `y` at Mar 2; the schedule gives 2026-01-12 and the XLSX Items sheet writes that. With waves, Mermaid emits `Build (wave end) :milestone, build, 2026-01-12` while the chart's wave ends Mar 9. Without waves, Mermaid's own `after gate` is right; XLSX is wrong in both.
 - Recommendation: seed `milestoneEnd` with every dated milestone before the lane walks, in the main scope and `scheduleRegion`; an A=C regression for item, group and parallel `after:<dated milestone>`, with and without waves.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#261 (537765c)
 
 ### r1.f9 - Mermaid export reuses one task id for repeated titles, so `after` chains resolve to the wrong task
 
@@ -117,7 +119,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: `taskIdOf` returns `item.name ?? slugify(displayLabel(item))` (`:448-450`, `slugify` `:587-594`; anchors `:187`, milestones `:405`) with no de-duplication, where core de-duplicates title slugs (`design`, `design-2`; `dsl.md:1136`). Mermaid's `ganttDb` keeps the last task per id. Every title with no ASCII letters slugs to `item`. Title-only items appear 13 times in `examples/` and `tests/`.
 - Verified: `swimlane web` with `item "Design" 1w`, `item "Build" 1w` and `swimlane ios` with `item "Design" 4w` exports `Design :design` twice and `Build :build, after design` (from the lane cursor) twice; per upstream `ganttDb`, web's Build lands after iOS's 4-week Design (Feb 2), where the chart has Jan 12.
 - Recommendation: a unique Mermaid id per entity per export (core's resolved key, or `-2`, `-3` suffixes reserved against explicit ids) used by tasks, end ids, anchors and milestones; a repeated-title test.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#262 (9a39991)
 
 ### r1.f10 - MCP `render` with `review:true` returns the review prompt without the raster for PNG at 1024 px or less
 
@@ -185,7 +188,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: the CLI calls `createMcpServer({ allowedRoot: root })` (`:34, :49`) with its own copy of the transport, port and signal glue (`:20-54` beside `mcp/src/index.ts:42-125`). The npx entry passes `rootConfigured` and `version` (`index.ts:100-104`). `rootConfigured` defaults to false (`server.ts:257`) and decides the delivery default (`:1036-1041`), so binary exports come back inline instead of being saved to the root, against the tool's own description (`:880-882`) and `mcp.md:72, 78, 122` (Claude Desktop drops inline binaries). `serverInfo.version` falls back to the literal `'0.6.0'` (`:261`). `--mcp-install` registers this variant by default (`mcp-install.ts:65`, `server-command.ts:60`).
 - Verified: same root, `export {format:"pdf"}`: `nowline --mcp --root` reported version 0.6.0 and returned inline bytes with no file; `@nowline/mcp --root` reported 0.12.0 and wrote `r.pdf`.
 - Recommendation: one `startMcpServer({ root, port, version })` exported by `@nowline/mcp` and called by both entries; version read from package.json; a parity test that `--mcp --root` PDF export writes a file.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#264 (2041c05)
 
 ### r1.f16 - VS Code Save, Copy PNG fallback and Export… don't render what the preview shows
 
@@ -196,7 +200,8 @@ Locations are at a5287055 (`a528705` below). Mermaid findings r1.f9 and r1.f11 w
 - Evidence: the preview resolves options once (`option-resolver.ts:127-170`: theme toolbar/setting, then `.nowlinerc`, then editor; locale setting, then rc, then VS Code; now with the timezone setting). The export paths use hand-written copies instead: `resolvedTheme()` (`preview-panel.ts:272-281`), `resolveThemeForExport` (`extension.ts:301-313`) and `resolveThemeQuick` (`:423-428`) never read the rc; `resolvedLocale()` (`:303-309`) skips it; `resolvedToday()` (`:290-291`) drops `settings.timezone`. `handleCopyPngFallback` (`extension.ts:528-538`) passes no `assetRoot`, which 5da7d2a added to Save and Export only. `exportInProcess` reads the file from disk (`in-process.ts:138`) while the preview renders the live buffer (`preview-panel.ts:368-372`). `extension.ts:466-467` and `surface-options.md:135` promise the preview's options.
 - Verified: all four parts read in code. With rc `theme: dark`, setting `auto` and a light editor, the preview is dark and saved files are light; a `+14:00` timezone moves the preview's today but not the saved file's; unsaved edits save stale content and an untitled document fails. No test covers export theme or locale.
 - Recommendation: keep the text and `ResolvedRenderOptions` from the last `refreshNow()` and use them for Save, the copy fallback and Export… with a preview open, passing the text to the kernel; without a preview, call `resolvePreviewOptions` with the rc layer; delete the if-chains; extend `surface-parity.test.ts`.
-- Status: open
+- Status: fixed
+- Resolution: lolay/nowline#260 (49a2d2a)
 
 ### r1.f17 - PNG default scale is documented as 1 but renders at 2, and VS Code's two export paths disagree
 
