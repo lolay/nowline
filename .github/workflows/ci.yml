@@ -340,8 +340,8 @@ jobs:
       platforms: ${{ github.event_name == 'pull_request' && 'linux' || 'all' }}
 
   ci-gate:
-    # Aggregate required check. The `main` ruleset requires only this
-    # context (scripts/apply-branch-policies.sh), so matrix and job-name
+    # Aggregate required check. The `main` ruleset (Terraform, in a private
+    # lolay org repo) requires only this context, so matrix and job-name
     # changes above never need a lockstep ruleset edit. `if: always()` makes
     # it report even when a dependency fails; it fails when any job below
     # failed or was cancelled. `skipped` passes, because release-build-smoke
