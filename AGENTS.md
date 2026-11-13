@@ -140,6 +140,8 @@ Issues in this repo may enter a four-phase AI agent flow driven by labels. Label
 **Labels you may emit** (as safe-outputs from a phase workflow, never directly):
 `agent-plan`, `maintainer-only` (triage phase); `agent-deep`, `agent-exec`, `agent-done`, `originator-input`, `maintainer-decide` (plan phase); `agent-done`, `originator-input`, `maintainer-decide` (implement fallback); `maintainer-pr-safe`, `maintainer-pr-review` (review phase).
 
+Only the phase workflows apply `agent-*`, `originator-*` and `maintainer-*` labels, and `agent-review` runs only on Copilot PRs (the `copilot-pr` label). On any other PR (Claude, Cursor, human) apply none of them; a label added by hand makes `human-action-comment.yml` post a comment claiming an agent review ran. The one label you may apply is `no-changelog`, where the changelog rule above says so.
+
 Never emit a label outside the safe-outputs list for your phase. A maintainer performs every merge — never call `gh pr merge` directly.
 
 ## For more detail
