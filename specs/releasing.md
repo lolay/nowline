@@ -65,7 +65,7 @@ The tag push then re-triggers `release.yml` under `event_name == 'push'`, which 
 
 ### 2. Manual fallback
 
-If the dispatch flow is unusable (e.g. PAT expired), you can do the same thing locally:
+If the dispatch flow is unusable (for example the release App's token can't be minted or its push is refused; see [`ops/release-app.md`](../ops/release-app.md)), an org admin can do the same thing locally, since the admin bypass on `main`'s ruleset lets the push through:
 
 ```bash
 node .github/scripts/bump-version.mjs patch     # or minor / major; prints new version, syncs MCP metadata
