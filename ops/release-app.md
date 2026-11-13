@@ -22,13 +22,9 @@ The App id is not a secret, so workflows write it as a literal rather than readi
 gh secret set RELEASE_APP_PRIVATE_KEY -R lolay/nowline < lolay-nowline-release.<date>.private-key.pem
 ```
 
-## First release on the App
+### If a push fails
 
-`release.yml` pushed with a personal PAT until it moved to the App. Its `RELEASE_TAG_PAT` secret is deleted, so there's nothing to fall back to: a failure gets fixed on the App path.
-
-On the first release cut with the App token, check that the `release vX.Y.Z` commit lands on `main`, the tag push starts the build and publish jobs, and the pusher in the repo's activity is `lolay-nowline-release[bot]`. The committer doesn't change, since `release.yml` sets `GIT_COMMITTER_NAME: nowline-release-bot` workflow-wide.
-
-If `cut-release` fails at checkout or push, check that the App is still installed on `lolay/nowline` with Contents write, that `RELEASE_APP_PRIVATE_KEY` matches a live key (see Setup), and that the App is still a bypass actor on `main`'s ruleset (its `release_pushers`, in the org's Terraform). Delete this section once that release has gone out.
+If `cut-release` or `editor-release-monitor.yml` fails at checkout or push, check that the App is still installed on `lolay/nowline` with Contents write, that `RELEASE_APP_PRIVATE_KEY` matches a live key, and that the App is still a bypass actor on `main`'s ruleset (its `release_pushers`, in the org's Terraform). To ship a release meanwhile, use the manual fallback in [`specs/releasing.md`](../specs/releasing.md).
 
 ## Choosing a token
 
