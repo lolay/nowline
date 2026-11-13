@@ -10,7 +10,7 @@ Automation that pushes to `main` on `lolay/nowline` does it as the `lolay-nowlin
 | Workflow | Pushes | Identity today |
 |---|---|---|
 | [`editor-release-monitor.yml`](../.github/workflows/editor-release-monitor.yml) | A daily `[skip ci]` history-update commit to `main` | The App, through `actions/create-github-app-token` |
-| [`release.yml`](../.github/workflows/release.yml) | The version-bump commit to `main`, then the tag | `RELEASE_TAG_PAT`, a personal PAT (migration below is queued) |
+| [`release.yml`](../.github/workflows/release.yml) | The version-bump commit to `main`, then the tag | The App, through `actions/create-github-app-token` |
 
 `github-actions[bot]` (the `GITHUB_TOKEN` identity) is not a bypass actor on any ruleset, on purpose.
 
@@ -22,25 +22,15 @@ The App id is not a secret, so workflows write it as a literal rather than readi
 gh secret set RELEASE_APP_PRIVATE_KEY -R lolay/nowline < lolay-nowline-release.<date>.private-key.pem
 ```
 
-## Queued: move `release.yml` off the PAT
+## Retiring `RELEASE_TAG_PAT`
 
-`release.yml` uses a PAT because tags pushed with `GITHUB_TOKEN` don't trigger downstream `push` or `workflow_run` events (GitHub's anti-recursion safeguard). An App installation token push does trigger them, so moving to the App drops the yearly PAT renewal and a personal identity from automation.
+`release.yml` used a personal PAT until it moved to the App. Keep the `RELEASE_TAG_PAT` secret until one release has gone out on the App token, so falling back is a one-line revert (the checkout's `token:` back to `${{ secrets.RELEASE_TAG_PAT }}`, and the mint step dropped). After that release, delete the secret, then revoke the PAT itself in your GitHub settings:
 
-The change is one step at the top of the `cut-release` job:
-
-```yaml
-- name: Mint release-bot installation token
-  id: app-token
-  uses: actions/create-github-app-token@v3
-  with:
-      app-id: "3789687"
-      private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-      permission-contents: write
+```bash
+gh secret delete RELEASE_TAG_PAT -R lolay/nowline
 ```
 
-Then replace `token: ${{ secrets.RELEASE_TAG_PAT }}` on every `actions/checkout` and `git push` step with `token: ${{ steps.app-token.outputs.token }}` (or `GH_TOKEN: ${{ steps.app-token.outputs.token }}` for steps that call `gh`). Keep `RELEASE_TAG_PAT` for one full release cycle as a fallback, and delete it after one verified release.
-
-To verify: the bump commit lands on `main`, the tag push starts the publish phase, and the pusher in the events is `lolay-nowline-release[bot]`. The committer doesn't change, since `cut-release` sets `GIT_COMMITTER_NAME: nowline-release-bot` workflow-wide.
+To verify that release: the `release vX.Y.Z` commit lands on `main`, the tag push starts the build and publish jobs, and the pusher in the repo's activity is `lolay-nowline-release[bot]`. The committer doesn't change, since `release.yml` sets `GIT_COMMITTER_NAME: nowline-release-bot` workflow-wide.
 
 ## Choosing a token
 

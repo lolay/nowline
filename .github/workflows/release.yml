@@ -49,14 +49,26 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
-      # Use a PAT (RELEASE_TAG_PAT) instead of GITHUB_TOKEN so the tag
-      # push below actually triggers downstream jobs in this same
-      # workflow. GITHUB_TOKEN-pushed tags do not trigger workflow_run /
-      # push events to avoid recursion; a user-scoped PAT does.
+      # Push as the lolay-nowline-release App (ops/release-app.md), not
+      # GITHUB_TOKEN: a GITHUB_TOKEN-pushed tag starts no workflow, so the
+      # build and publish jobs below would never run. An App token push
+      # does start them, and the App is a bypass actor on main's ruleset,
+      # so the bump commit lands without a PR. checkout persists the token
+      # in the git config, which the `git push` lines below use.
+      - name: Mint release-bot installation token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          # lolay-nowline-release: not a secret, so a literal rather
+          # than a variable that could be left unset.
+          app-id: "3789687"
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TAG_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: ./.github/actions/setup-node-pnpm
 
