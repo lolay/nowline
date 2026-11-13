@@ -84,7 +84,7 @@ If Steps 1–2 pass, first post one comment (no verdict marker) that pins the pl
 3. `Assisted-by: GitHub Copilot` as a trailer on **every commit** on the branch (standard Git footer, last line of the commit body).
 4. The full plan from the `## Plan` issue comment, reproduced verbatim under a `## Plan from issue` heading in the PR body.
 
-Plus the standard PR template `## Summary`, `## Motivation`, and `## How I tested this` sections, filled in, all above `## AI assistance`.
+Plus the standard PR template sections, filled in, all above `## AI assistance`: `## Summary`, `## Motivation`, `## Review guide` (the `Review tier:` line with its reason, blast radius, review time, and a tagged reading order, as the template's opening comment defines them), `## Validation` (each check with its result, or `not run` and why), and `## Rollback`.
 
 The Copilot session is structurally separate from this workflow. Your only job here is to verify, sanity-check, and delegate.
 

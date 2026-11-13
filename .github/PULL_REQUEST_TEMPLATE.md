@@ -6,6 +6,21 @@ Thanks for opening a PR. A few quick reminders:
 - For changes that touch the language or the published AST JSON schema, please open an issue first to discuss the shape.
 
 See CONTRIBUTING.md for the full workflow.
+
+The description is a review guide: a reviewer should get the change from the
+part above the first <details> in about 2 minutes, on a phone. Tag each area
+of the diff with what the reviewer should do with it; the PR's tier is the
+highest tag, and when an area could take two tags it takes the deeper one.
+
+- [study] read every line: DSL syntax, AST JSON, CLI flags, exporter output,
+  persisted data, auth or input validation, anything hard to undo.
+- [check] read the named hunks: control flow, error handling, rewritten or
+  loosened tests, behavior-changing config or workflows.
+- [skim] glance: refactors covered by tests, docs, renames.
+- [skip] trust the tool: generated code, lockfiles, formatter passes (name it).
+
+Drop any section or tier with nothing to say. A [skim] or [skip] PR keeps the
+Review tier and Review time lines and can drop the rest of the guide.
 -->
 
 ## Summary
@@ -18,19 +33,56 @@ See CONTRIBUTING.md for the full workflow.
 
 Closes #
 
-## How I tested this
+## Review guide
+
+Review tier: [check], because <reason>.
+Blast radius: <who or what breaks if it's wrong; how reversible>.
+Review time: ~N min
+
+<!-- Reading order: contracts and the tests that define new behavior first. Link each path to its diff. -->
+
+1. [check] `path`: <what to look at>
+2. [skim] `path`
+
+## Validation
 
 <!--
-Describe what you ran and what you saw. For example:
+Each check you ran with its result, and each one that applies but didn't run, with why. For example:
 
-- `pnpm -r test` passes locally.
-- Added a regression test in `packages/core/test/...` that fails without this patch.
-- Re-rendered `examples/minimal.nowline` and confirmed the SVG is unchanged.
+- `make pre-commit`: pass
+- `packages/core/test/...`: new regression test, fails without this patch
+- Re-rendered `examples/minimal.nowline`: SVG unchanged
+- `make lint-man`: not run, no mandoc locally (CI covers it)
 -->
+
+## Rollback
+
+<!-- How to undo it: revert the squash commit, plus anything a revert doesn't undo (a published package, a migrated file). -->
 
 ## Screenshots / terminal output
 
-<!-- If the change is user-visible (renderer, CLI output, error messages), include before/after. Delete this section if not applicable. -->
+<!--
+If the change is user-visible (renderer, CLI output, error messages), include before/after. Delete this section if not applicable.
+A renderer change follows AGENTS.md "Visual changes": before/after renders with the `.nowline` lines that draw them. Same-repo PRs also get a review.nowline.dev build to link.
+-->
+
+<!--
+One collapsible block per tier present, deepest first; [study] starts open. Keep the blank line after <summary> or the Markdown inside won't render.
+
+<details>
+<summary>[check] Control flow and error handling</summary>
+
+<before/after: contracts table, Mermaid diagram, data, error handling>
+
+</details>
+
+<details>
+<summary>Decisions</summary>
+
+<alternatives ruled out, and why>
+
+</details>
+-->
 
 ## Checklist
 

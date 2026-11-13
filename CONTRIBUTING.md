@@ -466,7 +466,9 @@ The release cut folds every fragment into a new `## [X.Y.Z] - YYYY-MM-DD` sectio
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
     - The motivation (linked issue, bug repro, or design doc).
-    - A short "how I tested this" note.
+    - A short review guide: the review tier and why, and the order to read the diff in. The [PR template](./.github/PULL_REQUEST_TEMPLATE.md) explains the tiers.
+    - Validation: what you ran and what you saw.
+    - How to roll it back, if a revert isn't the whole story.
     - Screenshots or terminal output if the change is user-visible.
 6. **Respond to review feedback** with follow-up commits; we squash-merge, so intermediate history doesn't need to be pristine.
 
