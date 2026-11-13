@@ -54,7 +54,7 @@ There are two ways to trigger a release; the dispatch UI is the default.
 
 This kicks off the `cut-release` job, which:
 
-1. Checks out `main` using `RELEASE_TAG_PAT` (a user-scoped PAT — `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point).
+1. Mints a one-hour token for the `lolay-nowline-release` GitHub App and checks out `main` with it ([`ops/release-app.md`](../ops/release-app.md)). `GITHUB_TOKEN`-pushed tags do not trigger downstream workflows, which would defeat the whole point; an App token push does, and the App is a bypass actor on `main`'s ruleset.
 2. Runs `node .github/scripts/bump-version.mjs <level>` to rewrite every `packages/*/package.json` to the next SemVer, and to sync that version into the tracked MCP metadata (`packages/mcp/manifest.json` for the `.mcpb`, `packages/mcp/server.json` for the MCP registry, `gemini-extension.json`, and the two plugin manifests under `plugins/nowline/`) via `scripts/sync-mcp-metadata.mjs`.
 3. Runs `make release-changelog VERSION=<version>` (`python3 scripts/changelog.py release <version>`) to fold every fragment in `.changelog/` and `packages/vscode-extension/.changelog/` into a new `## [X.Y.Z] - YYYY-MM-DD` section of the `CHANGELOG.md` beside it, and delete the fragments.
 4. Runs `make release-commit VERSION=<version>` ([`.github/scripts/release-commit.sh`](../.github/scripts/release-commit.sh)), which commits the bump, the changelog sections and the fragment deletions as `release vX.Y.Z`, then fails if any tracked file is still dirty, so a file the bump rewrote but the commit missed stops the cut before a tag exists. [`scripts/test/release-cut.test.mjs`](../scripts/test/release-cut.test.mjs) dry-runs steps 2 to 4 in a throwaway worktree on every `make test`, so the same drift fails the PR that introduces it (v0.10.0 was first tagged without the plugin manifests this way).
@@ -207,7 +207,8 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 
 | Secret | Used by | Purpose |
 |---|---|---|
-| `RELEASE_TAG_PAT` | `cut-release` | User-scoped PAT (fine-grained, `contents: write` on `lolay/nowline`) used to push the release commit + tag. `GITHUB_TOKEN`-pushed tags do not trigger downstream workflow runs, which would prevent the build/publish jobs from firing. |
+| `RELEASE_APP_PRIVATE_KEY` | `cut-release`, `editor-release-monitor.yml` | Private key of the `lolay-nowline-release` GitHub App (id `3789687`, a literal in the workflows). Mints a one-hour token that pushes the release commit + tag, and the daily editor-history commit. `GITHUB_TOKEN`-pushed tags do not trigger downstream workflow runs, which would prevent the build/publish jobs from firing. Rotation: [`ops/release-app.md`](../ops/release-app.md). |
+| `RELEASE_TAG_PAT` | nothing | Retired: the personal PAT `cut-release` used before the App. Delete it after the first release cut with the App token ([`ops/release-app.md`](../ops/release-app.md)). |
 | `NPM_TOKEN` | `publish` (npm cell) | npm publish for `@nowline/*` packages. Use an automation token. |
 | `VSCE_PAT` | `publish` (vscode cell) | Azure DevOps personal access token with **Marketplace → Manage** scope, scoped to the `nowline` publisher. |
 | `OVSX_PAT` | `publish` (vscode cell) | Open VSX personal access token. |
