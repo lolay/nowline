@@ -9,11 +9,11 @@ name: Editor release monitor
 # change history stays readable.
 #
 # Branch-protection note: this workflow pushes directly to main as the
-# lolay-nowline-release App (see ops/branch-policies.md §6). The App is a
+# lolay-nowline-release App (see ops/release-app.md). The App is a
 # bypass actor on the main ruleset; GITHUB_TOKEN / github-actions[bot] is not.
 #
 # Requires secret RELEASE_APP_PRIVATE_KEY (the App id is a literal below).
-# See ops/branch-policies.md §6 for setup.
+# See ops/release-app.md for setup.
 
 on:
     schedule:

@@ -1,6 +1,6 @@
 # Continuous integration
 
-This document explains what CI runs, on which platforms and events, and why. The workflows are [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the reusable [`.github/workflows/build.yml`](../.github/workflows/build.yml), the changelog fragment check in [`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml), and the review gallery publish in [`.github/workflows/gallery.yml`](../.github/workflows/gallery.yml). Every command they run is a `make` target ([`Makefile.md`](../Makefile.md)). The branch ruleset and the merge queue are covered in [`ops/branch-policies.md`](../ops/branch-policies.md) and applied by [`scripts/apply-branch-policies.sh`](../scripts/apply-branch-policies.sh).
+This document explains what CI runs, on which platforms and events, and why. The workflows are [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), the reusable [`.github/workflows/build.yml`](../.github/workflows/build.yml), the changelog fragment check in [`.github/workflows/changelog.yml`](../.github/workflows/changelog.yml), and the review gallery publish in [`.github/workflows/gallery.yml`](../.github/workflows/gallery.yml). Every command they run is a `make` target ([`Makefile.md`](../Makefile.md)). The branch ruleset and the merge queue are Terraform in a private lolay org repo.
 
 ## Principles
 
@@ -58,7 +58,7 @@ So the Vitest suites stay on every cell, Windows included, and lint, typecheck a
 
 The queue replaces the ruleset's old "branch must be up to date" requirement (`strict: true`). The queue always tests against the latest `main`, so open PRs no longer need updating and re-running after every merge.
 
-No approving review is required: GitHub never lets a PR's author approve it, so the human gate is the maintainer clicking **Merge when ready** ([`ops/branch-policies.md`](../ops/branch-policies.md) § 1).
+No approving review is required: GitHub never lets a PR's author approve it, so the human gate is the maintainer clicking **Merge when ready**.
 
 Bypass actors skip the queue and every check. `release.yml`'s direct version-bump push to `main` relies on that; routine merges shouldn't, because a bypassed merge reaches `main` without the macOS and Windows run.
 
