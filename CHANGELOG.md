@@ -4,6 +4,24 @@ All notable changes to Nowline are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Packages in this monorepo share a single version and ship together. Don't edit this file in a PR: add a fragment to [`.changelog/`](./.changelog/README.md), and the release cut folds every pending fragment into a new `## [X.Y.Z]` section (see [`specs/releasing.md`](./specs/releasing.md#changelog-workflow)). The `## [Unreleased]` section below predates fragments; the next release folds it in and drops the heading.
 
+## [0.13.0] - 2026-11-13
+
+### Fixed
+
+- An item, group or parallel with `after:` a dated milestone now starts on the milestone's date in the XLSX export's Items sheet, as the chart draws it, instead of where its lane would otherwise start it. With waves, the Mermaid export's wave-end milestones and the XLSX wave spans follow. Inside an isolated region, the chart now resolves `after:` the region's own dated milestone too.
+- `nowline --mcp --root <dir>` now behaves like `npx @nowline/mcp --root <dir>`: a `pdf`, `xlsx` or `png` `export` with no `delivery` is saved into the root instead of returned inline, the server reports the real package version instead of `0.6.0`, and `--root` expands `~` and `${HOME}`-style tokens. A bad `--port` now exits 2 with a one-line message instead of 1 with a stack trace. `nowline --mcp-install` registers this form by default, so installs that used it were affected.
+- Long-running hosts no longer keep every parsed roadmap in memory. The MCP server (each `validate`, `render`, `export`, `create`, `update` and `share`), `@nowline/browser` (`renderSource` and `parseSource`, behind the VS Code preview, the embed and the MCP App), `stageRoadmap` and `nowline --serve` each held the full syntax tree and source text of every call, about 650 KB per render of a large roadmap. Outputs are unchanged.
+- `-f mermaid` gives every task a unique id within the export. Title-only items, anchors and milestones with the same title (or titles with no ASCII letters, which all slugged to `item`) no longer share an id, so an `after` chain no longer starts after a same-titled task in another lane: ids now run `design`, `design-2`, and never take an explicit or wave id.
+- A `--start` that isn't a real `YYYY-MM-DD` calendar date (`--start notadate`, `--start 2026-02-30`) now exits 2 with `nowline: invalid --start "..."` for every output format. Before, it was ignored with exit 0 for every format but `msproj`, which failed with exit 3. `-f nowline` also rejects a bad `--page-size`, `--orientation` or `--margin` now, as every other format already did.
+- `--template <name>`, which picks the `--init` starter (`minimal`, `teams`, `product` or `showcase`), is now documented in `--help`, `man nowline` and the CLI spec. `--help` also lists `--page-size`, `--orientation`, `--margin` and `--start`, and `man nowline` documents `--diagnostic-format`.
+
+### Security
+
+- `-f html` (and the MCP `export` tool and VS Code extension HTML export) escapes double quotes in the roadmap title written to the page's `aria-label`, so a title containing `\"` can no longer inject attributes such as event handlers.
+- The MCP Streamable HTTP server (`nowline --mcp --port` and `npx @nowline/mcp --port`) now refuses, with `403`, any request whose `Host` isn't `localhost`, `127.0.0.1` or `[::1]` on the listening port, or whose `Origin` is present and isn't `http://` on one of those names and port. Before, a web page could reach the server by DNS rebinding and call its tools, including `read` and `delete`.
+- `@nowline/mcp`: the file tools now stay inside the allowed roots. Paths are checked after symlinks are resolved; `read`, `create`, `update`, `delete` and every `path` input accept only `.nowline` files (`NL.MCP.INPUT` otherwise); `render` and `export` write only export extensions; and includes are confined to the root as with the CLI's `--include-root`, so an absolute include or one that leaves the root is `NL.E0208`.
+- A `link:` value that isn't an absolute `http://` or `https://` URL or a quoted `mailto:` URL (for example `link:"javascript:alert(1)"`) is now the validation error `NL.E0414`, on every entity. The renderer no longer writes such a link into the SVG's `<a href>`, so it can't reach the live DOM of the embed, the preview or the HTML export.
+
 ## [0.12.1] - 2026-11-04
 
 ### Fixed

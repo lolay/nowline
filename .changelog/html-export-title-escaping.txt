@@ -1,3 +1,0 @@
-```release-note:security
-`-f html` (and the MCP `export` tool and VS Code extension HTML export) escapes double quotes in the roadmap title written to the page's `aria-label`, so a title containing `\"` can no longer inject attributes such as event handlers.
-```

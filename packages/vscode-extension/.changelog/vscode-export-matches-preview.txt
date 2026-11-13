@@ -1,3 +1,0 @@
-```release-note:fixed
-Save, the copy-PNG fallback and Export… write what the preview shows: the `.nowlinerc` theme and locale, the `nowline.preview.timezone` today, the `.nowlinerc` asset root on the copy fallback, and the editor's unsaved text. An untitled document can be saved and exported.
-```

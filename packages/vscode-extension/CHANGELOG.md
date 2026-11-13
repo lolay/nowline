@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0] - 2026-11-13
+
+### Fixed
+
+- Save, the copy-PNG fallback and Export… write what the preview shows: the `.nowlinerc` theme and locale, the `nowline.preview.timezone` today, the `.nowlinerc` asset root on the copy fallback, and the editor's unsaved text. An untitled document can be saved and exported.
+- The preview no longer grows in memory as you type: each re-render used to keep the full syntax tree and source text of every keystroke's parse for as long as the preview stayed open.
+
 ## [0.12.1] - 2026-11-04
 
 ## [0.12.0] - 2026-11-04

@@ -1,3 +1,0 @@
-```release-note:fixed
-`-f mermaid` gives every task a unique id within the export. Title-only items, anchors and milestones with the same title (or titles with no ASCII letters, which all slugged to `item`) no longer share an id, so an `after` chain no longer starts after a same-titled task in another lane: ids now run `design`, `design-2`, and never take an explicit or wave id.
-```
