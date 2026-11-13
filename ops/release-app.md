@@ -22,15 +22,13 @@ The App id is not a secret, so workflows write it as a literal rather than readi
 gh secret set RELEASE_APP_PRIVATE_KEY -R lolay/nowline < lolay-nowline-release.<date>.private-key.pem
 ```
 
-## Retiring `RELEASE_TAG_PAT`
+## First release on the App
 
-`release.yml` used a personal PAT until it moved to the App. Keep the `RELEASE_TAG_PAT` secret until one release has gone out on the App token, so falling back is a one-line revert (the checkout's `token:` back to `${{ secrets.RELEASE_TAG_PAT }}`, and the mint step dropped). After that release, delete the secret, then revoke the PAT itself in your GitHub settings:
+`release.yml` pushed with a personal PAT until it moved to the App. Its `RELEASE_TAG_PAT` secret is deleted, so there's nothing to fall back to: a failure gets fixed on the App path.
 
-```bash
-gh secret delete RELEASE_TAG_PAT -R lolay/nowline
-```
+On the first release cut with the App token, check that the `release vX.Y.Z` commit lands on `main`, the tag push starts the build and publish jobs, and the pusher in the repo's activity is `lolay-nowline-release[bot]`. The committer doesn't change, since `release.yml` sets `GIT_COMMITTER_NAME: nowline-release-bot` workflow-wide.
 
-To verify that release: the `release vX.Y.Z` commit lands on `main`, the tag push starts the build and publish jobs, and the pusher in the repo's activity is `lolay-nowline-release[bot]`. The committer doesn't change, since `release.yml` sets `GIT_COMMITTER_NAME: nowline-release-bot` workflow-wide.
+If `cut-release` fails at checkout or push, check that the App is still installed on `lolay/nowline` with Contents write, that `RELEASE_APP_PRIVATE_KEY` matches a live key (see Setup), and that the App is still a bypass actor on `main`'s ruleset (its `release_pushers`, in the org's Terraform). Delete this section once that release has gone out.
 
 ## Choosing a token
 

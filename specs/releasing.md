@@ -208,7 +208,6 @@ All secrets live under **Settings → Secrets and variables → Actions** on `lo
 | Secret | Used by | Purpose |
 |---|---|---|
 | `RELEASE_APP_PRIVATE_KEY` | `cut-release`, `editor-release-monitor.yml` | Private key of the `lolay-nowline-release` GitHub App (id `3789687`, a literal in the workflows). Mints a one-hour token that pushes the release commit + tag, and the daily editor-history commit. `GITHUB_TOKEN`-pushed tags do not trigger downstream workflow runs, which would prevent the build/publish jobs from firing. Rotation: [`ops/release-app.md`](../ops/release-app.md). |
-| `RELEASE_TAG_PAT` | nothing | Retired: the personal PAT `cut-release` used before the App. Delete it after the first release cut with the App token ([`ops/release-app.md`](../ops/release-app.md)). |
 | `NPM_TOKEN` | `publish` (npm cell) | npm publish for `@nowline/*` packages. Use an automation token. |
 | `VSCE_PAT` | `publish` (vscode cell) | Azure DevOps personal access token with **Marketplace → Manage** scope, scoped to the `nowline` publisher. |
 | `OVSX_PAT` | `publish` (vscode cell) | Open VSX personal access token. |
