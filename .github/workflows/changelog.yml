@@ -17,12 +17,14 @@ on:
   merge_group:
     types: [checks_requested]
 
+# Labels are read live (see "Check fragments"), not from the event payload, so
+# there is no concurrency group: a PR opened and labelled in the same second
+# starts two runs, and cancelling one left a cancelled run as the latest
+# result for the required check, which blocked the merge. Every run now
+# reaches the same verdict, and the job takes seconds.
 permissions:
   contents: read
-
-concurrency:
-  group: changelog-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  pull-requests: read
 
 jobs:
   changelog:
@@ -37,9 +39,16 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          if [ "$EVENT" = pull_request ] && [ "$SKIP" != true ]; then
+          skip=false
+          if [ "$EVENT" = pull_request ] \
+            && gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name' | grep -qx no-changelog; then
+            skip=true
+          fi
+          if [ "$EVENT" = pull_request ] && [ "$skip" != true ]; then
             make changelog-check BASE="$BASE" REQUIRE=1
           else
             make changelog-check BASE="$BASE"

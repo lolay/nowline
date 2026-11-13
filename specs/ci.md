@@ -27,6 +27,8 @@ This document explains what CI runs, on which platforms and events, and why. The
 
 On `pull_request` and `merge_group`, a docs-only change skips every job in that table except `changes`, the two lint jobs, triage and `CI gate`.
 
+`changelog.yml` reads the PR's labels from the API, not the event payload, and has no concurrency group. A PR opened and labelled within a second starts two runs; cancelling one left a cancelled run as the latest `Changelog` result, and the required check then blocked the merge.
+
 `make ci` is lint, build, typecheck and test, and equals `make pre-commit`, so a local gate run matches the canonical cell exactly. `make ci-platform` is `build-fast` plus the Vitest suites, with no lint, typecheck or render.
 
 `release.yml` calls `build.yml` with the default `platforms: all`, so a release always builds every cell.
