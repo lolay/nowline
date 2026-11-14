@@ -47,13 +47,13 @@
         "remark-parse": "^11.0.0",
         "remark-stringify": "^11.0.0",
         "unified": "^11.0.5",
-        "unist-util-visit": "^5.1.0"
+        "unist-util-visit": "^5.2.0"
     },
     "devDependencies": {
         "@nowline/cli": "workspace:*",
         "@nowline/layout": "workspace:*",
         "@types/mdast": "^4.0.4",
-        "@types/node": "^26.6.5",
+        "@types/node": "^26.6.6",
         "esbuild": "^0.28.2",
         "typescript": "^7.0.2",
         "vitest": "^5.0.5"
