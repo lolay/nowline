@@ -44,9 +44,9 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@modelcontextprotocol/ext-apps": "^2.0.3",
-        "@modelcontextprotocol/node": "^2.1.1",
-        "@modelcontextprotocol/server": "^2.3.1",
+        "@modelcontextprotocol/ext-apps": "^2.0.4",
+        "@modelcontextprotocol/node": "^2.1.2",
+        "@modelcontextprotocol/server": "^2.4.0",
         "@nowline/browser": "workspace:*",
         "@nowline/config": "workspace:*",
         "@nowline/core": "workspace:*",
@@ -61,9 +61,9 @@
         "zod": "^4.6.7"
     },
     "devDependencies": {
-        "@modelcontextprotocol/client": "^2.3.1",
-        "@modelcontextprotocol/inspector": "2.12.0",
-        "@types/node": "^26.6.5",
+        "@modelcontextprotocol/client": "^2.4.0",
+        "@modelcontextprotocol/inspector": "2.13.0",
+        "@types/node": "^26.6.6",
         "esbuild": "^0.28.2",
         "vitest": "^5.0.5"
     }
