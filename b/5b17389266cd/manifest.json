@@ -1,0 +1,782 @@
+{
+  "schema": 2,
+  "id": "5b17389266cd",
+  "sha": "5b17389266cd15022c0ccb349dbb84f17bb4e9dc",
+  "subject": "Close out the v0.8.6 review docs and drop a finished handoff (#197)",
+  "author": "Gary Rudolph",
+  "date": "2026-10-19T20:05:09Z",
+  "ref": "main",
+  "runUrl": "https://github.com/lolay/nowline/actions/runs/39316513575",
+  "repoUrl": "https://github.com/lolay/nowline",
+  "dirty": false,
+  "line": "main",
+  "pr": null,
+  "groups": [
+    {
+      "id": "examples",
+      "title": "Examples",
+      "entries": [
+        {
+          "slug": "minimal",
+          "title": "Starter",
+          "description": "Smallest complete file.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/minimal.nowline",
+          "files": [
+            "examples/minimal.nowline"
+          ],
+          "svgHash": "3ca96501392d0f0c5add4f5b85d76b2826823a0e7cfbec28b93ec2e4b544ec2a",
+          "sourceHash": "aaee79d5841434dc0a15a57bbd3d370529307fb6b177e110895fb2fc7784f862"
+        },
+        {
+          "slug": "capacity",
+          "title": "Engineering Q1",
+          "description": "Lean example: one engineering swimlane with lane capacity, item capacity, and utilization along the band. \"On-call support\" is 1 of 4 = 25% of the team. For warn/over/segment demos see tests/utilization-states.nowline.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/capacity.nowline",
+          "files": [
+            "examples/capacity.nowline"
+          ],
+          "svgHash": "e31cc908bade550721f62eb0ce20e6cf5106e4ac54b0e75a51590d5b013465f0",
+          "sourceHash": "ea59cee242939d395e2ee204b12ee8e6b062300d6b536c74f7ab3cbc5b00e0c6"
+        },
+        {
+          "slug": "sizing",
+          "title": "Web Platform Q1",
+          "description": "Lean example: T-shirt sizes plus one \"crash a job\" — an XL burns one month of effort but lands as a 2w bar with capacity:2. Full matrix of size + capacity combinations lives in tests/size-and-capacity.nowline.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/sizing.nowline",
+          "files": [
+            "examples/sizing.nowline"
+          ],
+          "svgHash": "960b5bd56ef0be9f98db64d87659152948190327ed6d7b8c21fd02df8027ce31",
+          "sourceHash": "2b4107ccc7a10ea341fa11c9e35467d7535e452645fc3b038687813c4ad2819d"
+        },
+        {
+          "slug": "teams",
+          "title": "Teams Roadmap 2026",
+          "description": "Persons, teams, anchors, milestones, footnotes.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/teams.nowline",
+          "files": [
+            "examples/teams.nowline"
+          ],
+          "svgHash": "65db57cc0c3ce88807daaa799937cbf12f79f6f5bb1f13c6d38c369b2831e0a3",
+          "sourceHash": "c0d5f53bb65b2c6fdcdc4f1626d30e358985a1d4441c4ccae99978f514620cc7"
+        },
+        {
+          "slug": "product",
+          "title": "Platform 2026",
+          "description": "Full config, styles, labels, parallels, groups, descriptions.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/product.nowline",
+          "files": [
+            "examples/product.nowline"
+          ],
+          "svgHash": "0f84cfb0e756b93e1c9eb99dc92d52cfbdd3998dbd8fc8e38f0c8416952247ec",
+          "sourceHash": "88333271d82440abb60d082d3623cace01c867948e6c777d82669fb9709b6ffb"
+        },
+        {
+          "slug": "long",
+          "title": "Long Example 2026",
+          "description": "Stress test: eight swimlanes, ~160 items, parallels, groups, anchors, milestones, footnotes, cross-cutting labels.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/long.nowline",
+          "files": [
+            "examples/long.nowline"
+          ],
+          "svgHash": "b16b7c32512f597377d8d6a1b311a26db5a3072706bef7104321b50a68728994",
+          "sourceHash": "94e4b085d89e83facc2e1b455651565a488aaa004c23f693be57f916d45ad3fd"
+        },
+        {
+          "slug": "nested",
+          "title": "Nested Example 2026",
+          "description": "Parent Security swimlane plus five isolated per-team roadmap includes (iOS, Android, Web, Platform, Data). Demonstrates `roadmap:isolate`.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/nested.nowline",
+          "files": [
+            "examples/nested.nowline",
+            "examples/nested/platform.nowline",
+            "examples/nested/ios.nowline",
+            "examples/nested/android.nowline",
+            "examples/nested/web.nowline",
+            "examples/nested/data.nowline"
+          ],
+          "svgHash": "6fc61a95bdb495402c4c86e0680e7c498440660a07b6e66cb1410cc5336803a9",
+          "sourceHash": "249b6a1d569ebc5d9430bfb595369fbf2d5ac3eb00358b77c1b3105337010500"
+        },
+        {
+          "slug": "waves",
+          "title": "Checkout relaunch",
+          "description": "Lean example: three waves (Foundations, Build, Launch) as barriers across three lanes, plus unwaved background ops work. Details live in specs/waves.md.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/waves.nowline",
+          "files": [
+            "examples/waves.nowline"
+          ],
+          "svgHash": "0e44488938150a1e30d22381a90d2b99c29a2064f1a5a86d400d1079f77a414d",
+          "sourceHash": "9ee12e60cd59b48a268883ffa9dc535fd94ed7bb89a23f0cf294fc250622bd7d"
+        },
+        {
+          "slug": "waves-dark",
+          "title": "Checkout relaunch",
+          "description": "Lean example: three waves (Foundations, Build, Launch) as barriers across three lanes, plus unwaved background ops work. Details live in specs/waves.md.",
+          "theme": "dark",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/waves.nowline",
+          "files": [
+            "examples/waves.nowline"
+          ],
+          "svgHash": "10b4a8c8688a5d8d80a0ec99d9546152602eed961e1970518324d7f04855241e",
+          "sourceHash": "9ee12e60cd59b48a268883ffa9dc535fd94ed7bb89a23f0cf294fc250622bd7d"
+        },
+        {
+          "slug": "waves-grayscale",
+          "title": "Checkout relaunch",
+          "description": "Lean example: three waves (Foundations, Build, Launch) as barriers across three lanes, plus unwaved background ops work. Details live in specs/waves.md.",
+          "theme": "grayscale",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/waves.nowline",
+          "files": [
+            "examples/waves.nowline"
+          ],
+          "svgHash": "654881a41f47859d49256bffcbbf8bc1cf345f11f3ad52c83f098d1616ee432a",
+          "sourceHash": "9ee12e60cd59b48a268883ffa9dc535fd94ed7bb89a23f0cf294fc250622bd7d"
+        },
+        {
+          "slug": "waves-program",
+          "title": "Program",
+          "description": "Multi-team waves: every file declares the same waves, floor included, so each team file renders alone and the program file merges them behind one barrier.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/waves-program.nowline",
+          "files": [
+            "examples/waves-program.nowline",
+            "examples/waves-program/web.nowline",
+            "examples/waves-program/api.nowline"
+          ],
+          "svgHash": "5546eddb7f14cc0358b052512e7eae1c6cc5ab17a31af5d33e9e5943f31a8e12",
+          "sourceHash": "63b0639e8326f8c7b69845ad25d911b90f1fd87aeaa61c5814fba2645e215dc2"
+        },
+        {
+          "slug": "platform-2026",
+          "title": "Platform 2026",
+          "description": "Platform roadmap; sample-fidelity reference for specs/samples/.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/platform-2026.nowline",
+          "files": [
+            "examples/platform-2026.nowline"
+          ],
+          "svgHash": "c41f4d1655d4d6af62bf324b2fc3c394d03e72910010ec524e01500726b09a15",
+          "sourceHash": "c60ebe629531aa5dbe811f46fa87414aaf69cba7c9a3ebe949efb486faeec6b9"
+        },
+        {
+          "slug": "platform-2026-dark",
+          "title": "Platform 2026",
+          "description": "",
+          "theme": "dark",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/platform-2026.nowline",
+          "files": [
+            "examples/platform-2026.nowline"
+          ],
+          "svgHash": "6487b205f24ec414382139e25f962ebf567d42c3b0fe4cb9fb9dd4916c4b2185",
+          "sourceHash": "c60ebe629531aa5dbe811f46fa87414aaf69cba7c9a3ebe949efb486faeec6b9"
+        },
+        {
+          "slug": "platform-2026-grayscale",
+          "title": "Platform 2026",
+          "description": "",
+          "theme": "grayscale",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/platform-2026.nowline",
+          "files": [
+            "examples/platform-2026.nowline"
+          ],
+          "svgHash": "49d85e3d94cc78b387380ee4a9b72faff97ba81e8b8f56336e2138b300237a22",
+          "sourceHash": "c60ebe629531aa5dbe811f46fa87414aaf69cba7c9a3ebe949efb486faeec6b9"
+        },
+        {
+          "slug": "dependencies",
+          "title": "Dependency Demo",
+          "description": "Dependency arrows between items; sample-fidelity reference.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/dependencies.nowline",
+          "files": [
+            "examples/dependencies.nowline"
+          ],
+          "svgHash": "645c58e94f41d15f6a9775500180527d6a028b6c41c3e2d531f747aca3c40540",
+          "sourceHash": "e26a8a75c5b881db17e93d512581adfe9a0416d2e975b2054b6f54731051e221"
+        },
+        {
+          "slug": "isolate-include",
+          "title": "Primary Release",
+          "description": "A partner roadmap included with `roadmap:isolate`.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/isolate-include.nowline",
+          "files": [
+            "examples/isolate-include.nowline",
+            "examples/partner.nowline"
+          ],
+          "svgHash": "371d16219cf0a4c8144cfd6589083084e8bdb9f71c66c13eb2bd77378900b211",
+          "sourceHash": "433ab73e80551d0752f5df67c64c4e6ebb8f54a0a2faef97dcb8f454364c1a10"
+        },
+        {
+          "slug": "partner",
+          "title": "Partner - Vendor plugin roadmap",
+          "description": "The partner roadmap on its own (the child of isolate-include).",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/partner.nowline",
+          "files": [
+            "examples/partner.nowline"
+          ],
+          "svgHash": "72df4e66631bce6f587d56c92009dbc5be8322252342c6d2106c0342f120d6b0",
+          "sourceHash": "736f1f811add60c59a095e9d70067474d7eb3a183e1bbd0e212bf57b471f7b93"
+        },
+        {
+          "slug": "inline-date-pins",
+          "title": "Inline date pins",
+          "description": "Inline date pins on `after:` / `before:` — pin an item, group, or parallel to a specific calendar date without declaring a named `anchor`. The renderer paints a small `calendar` glyph on the entity's left (`after`) or right (`before`): in an item bar's top corner, or in a group's or parallel's title row. See `specs/dsl.md` \"Inline date pins\" and `specs/rendering.md` \"Inline-date glyph\".",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/inline-date-pins.nowline",
+          "files": [
+            "examples/inline-date-pins.nowline"
+          ],
+          "svgHash": "558ea7613b6993bebbebdd57a8c0f232d1dfa4626c251a440fada892e76f3e11",
+          "sourceHash": "a48816e8725e82444fd48859ceee346b7150a8746f2c7dd54a14858d7f5282aa"
+        },
+        {
+          "slug": "showcase",
+          "title": "Nowline Showcase",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/showcase.nowline",
+          "files": [
+            "examples/showcase.nowline"
+          ],
+          "svgHash": "793c29b041e5fa9f201af8b9035e9f522a8921ed68d8fbe6354bb7cefc4ee55c",
+          "sourceHash": "3aea518192d604d2a6d71e752703a5d676c1cc8e9cecff99195fd1105322c7b3"
+        },
+        {
+          "slug": "working-calendar",
+          "title": "Holiday quarter",
+          "description": "Holiday quarter (m2p phase 5b, specs/working-calendar.md §4, §10): a Nov to Jan plan for a team on a business calendar that names the days it is closed and the one Saturday it works. - Thanksgiving, a two-day holiday inside a bar. - Winter break, Dec 24 to Jan 1: seven working days, so a bar that crosses it ends seven working days later than it would without it. - Company summit, Wed Jan 13 to Fri Jan 15. - Launch prep Saturday, a working exception. The chart labels it \"Launch prep Saturday · +1d\", with no cut line since it removes no time; MS Project writes it as a working exception and Mermaid counts it in its lossy summary. Hidden by default: each closure is a labelled seam in the marker row. Export it with `nowline examples/working-calendar.nowline -f msproj` to see the closures as base-calendar <Exceptions>, or `-f mermaid` for the dated `excludes` line.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "examples/working-calendar.nowline",
+          "files": [
+            "examples/working-calendar.nowline"
+          ],
+          "svgHash": "a0a2e6c05b4646afc41a9aace0bb0eeb9c9e45164e9fb9ca8daec1d25f52637f",
+          "sourceHash": "d117054a872a490427e19670cdbb2e203496008c14f98f233d59fe5ae16cd914"
+        }
+      ]
+    },
+    {
+      "id": "tests",
+      "title": "Tests",
+      "entries": [
+        {
+          "slug": "large-roadmap-title",
+          "title": "Large Roadmap Title That Exercises Header Card Sizing",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/large-roadmap-title.nowline",
+          "files": [
+            "tests/large-roadmap-title.nowline"
+          ],
+          "svgHash": "c7953f68bfa6da266fbe184bb606ef65a6cd31efce6bf16f5df0aaf40fbea777",
+          "sourceHash": "c3462ba16523d51188590b887961cd2d7344c2b50383c9ee7ac30e13a7520438"
+        },
+        {
+          "slug": "large-swimlane-title",
+          "title": "Starter",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/large-swimlane-title.nowline",
+          "files": [
+            "tests/large-swimlane-title.nowline"
+          ],
+          "svgHash": "a9d3edf8b46673fbe90011e581d9638e5b660328aaa43dd5c6258e49b8148e5e",
+          "sourceHash": "6e395e36a923a74ffd5ce16cc1f1e611ed386e3d259bdc2815c41eda1d92e166"
+        },
+        {
+          "slug": "text-fits-inside-bars",
+          "title": "Starter",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/text-fits-inside-bars.nowline",
+          "files": [
+            "tests/text-fits-inside-bars.nowline"
+          ],
+          "svgHash": "ee9738d6698403ad3cbd802bd3a8bbeeabb1338c03a24ad7a253db60d271d69b",
+          "sourceHash": "310d5682592abce2557a132f586d966b40cf33c75fbf50713f1871576ce9044b"
+        },
+        {
+          "slug": "text-spills-right",
+          "title": "Starter",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/text-spills-right.nowline",
+          "files": [
+            "tests/text-spills-right.nowline"
+          ],
+          "svgHash": "b6ab566664af437109bc29a6c5dd27fa88984f4ac759dbad60af18ae07c36c09",
+          "sourceHash": "ae5994d7415e9ad999d8f4add4965330fe5a839a25981edb9d031dadaf953ae6"
+        },
+        {
+          "slug": "text-wraps-inside-bars",
+          "title": "Generative AI",
+          "description": "Fixture for item-title wrapping (lolay/nowline#59). A title that is too wide for its bar on one line but fits on at most two whitespace-wrapped lines stays INSIDE the bar instead of spilling to the right. The old spill pushed the next chained item down a whole row. What to look for when rendering this: - Platform lane: \"Technology Selection\" (2w at scale:2w, a 148px bar) wraps to \"Technology\" / \"Selection\" inside its bar. The bar grows 16px to hold the second title line plus the meta line, and \"API\" stays on the same row instead of dropping to a fresh one. - Every other title in the issue's roadmap already fits on one line (short title, or a bar of 3w or more), so it renders as before. - Link icon lane: \"Auth token refactor\" wraps too, and its caption starts past the 14px link-icon tile (24px inset, not 12px), so the title never sits under the tile. - Dot clearance lane: the first title line also stops short of the status dot (and any footnote digits or `before:` glyph) in the bar's upper-right. \"Authentication refactor\" in a 2w bar with a link icon would put \"Authentication\" (about 106px) in a 103px first-line budget, running under the dot, so it spills to the right instead. This is the regression case for that overlap. A wrapped item WITHOUT a meta line (the 2-line, no-growth case: line 2 lands at baseline 36, so the bar stays 56px) cannot be written in the DSL. Every item needs a `duration:` or `size:`, and either one is rendered as the meta line, so every bar wide enough to wrap carries meta. That case is pinned by the layout unit tests instead. Titles that cannot wrap into two lines still spill to the right; see text-spills-right.nowline and item-bumps-up.nowline (single words).",
+          "theme": "light",
+          "now": "2026-05-11",
+          "volatile": false,
+          "source": "tests/text-wraps-inside-bars.nowline",
+          "files": [
+            "tests/text-wraps-inside-bars.nowline"
+          ],
+          "svgHash": "0c5035429871001ea36a8438b0b1b5258c617fcd804b76d362fff381b1695fa4",
+          "sourceHash": "3b58a14e71d8519ad125a5a525e244e402eb741e935be5daa07b19513f7deef3"
+        },
+        {
+          "slug": "title-line-breaks",
+          "title": "Explicit title line breaks",
+          "description": "Fixture for explicit title line breaks (lolay/nowline#60). A `\\n` inside an item title is a hard line break: the author's lines are authoritative, so no auto-wrap runs on them and the two-line cap does not apply. Each line paints as its own <text>, 16px apart, with the meta line below the last one. `\\\\n` is just the literal text `\\n` (single line). What to look for when rendering this: - Breaks lane: \"Technology\" / \"Selection\" is the issue's title, broken by hand (auto-wrap would give the same split in this 2w bar; \"Plan\" / \"rollout\" is the case that proves the break wins, since \"Plan rollout\" fits one line in a 4w bar and still breaks). - Three lines lane: a 3-line title stays INSIDE the bar. Auto-wrap would have spilled it (a 2-line cap); an explicit break has no cap. The bar grows 32px with its meta line (88px), and \"Next up\" stays on the row. - Literal lane: `\\\\n` shows the two characters `\\n` on ONE line; it is a backslash and an n, not a break. - Too wide lane: line 1 (\"Internationalization of\") is wider than a 2w bar's text area, so the whole block spills to the RIGHT with its breaks preserved (two stacked lines, meta below). The spill reserves its widest line, so \"Follow up\" drops to the next row. - Link + footnote lane: line 1 shares the bar's upper-right with the status dot and the footnote digit, and the link tile pushes the caption right, so line 1 has to stop short of that cluster. \"Auth service\" just fits (about 90px of a 92px budget); line 2 is below the dot and uses the full width. A bare break at either end of a title (\"Plan\\n\") is trimmed and the title is then an ordinary one-line title; interior blank lines stay blank.",
+          "theme": "light",
+          "now": "2026-05-11",
+          "volatile": false,
+          "source": "tests/title-line-breaks.nowline",
+          "files": [
+            "tests/title-line-breaks.nowline"
+          ],
+          "svgHash": "8c724c40eeff457b54c810c5e62a6e9c7ecb056e55b4420cd3a8837e521d8e15",
+          "sourceHash": "ff36f4cc0ead3f7185a218e993c4998f7f0ffef698d442fd5136b54da8306ddf"
+        },
+        {
+          "slug": "item-bumps-up",
+          "title": "Starter",
+          "description": "\"Design\" spills its caption, so \"Build\" cannot share its row. The packer used to be first-fit from the top and move \"Build\" up beside \"Research\"; rows now never move up (specs/true-width-layout.md §3.2), so \"Build\" drops below \"Design\". The file keeps its name for the gallery history.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/item-bumps-up.nowline",
+          "files": [
+            "tests/item-bumps-up.nowline"
+          ],
+          "svgHash": "88301381098376915f7ba4b30682a342ad00092f122d1ebcd48bf20db802a973",
+          "sourceHash": "ce09adb5c74346d0518b72ad875629b8d5c59354f2ea2c3bb885c214531bd710"
+        },
+        {
+          "slug": "isolate-include-multi",
+          "title": "Primary Release",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/isolate-include-multi.nowline",
+          "files": [
+            "tests/isolate-include-multi.nowline",
+            "tests/partner-multi.nowline"
+          ],
+          "svgHash": "e5a930b2bae29f3dbd4547bce99c19f731f2243d8355df7fdcb76790e5c10215",
+          "sourceHash": "a835c1ee20c0ac64d29fe9dd2a9440487e30e9aef5b0001f3330d3933e4b69a6"
+        },
+        {
+          "slug": "defaults-no-start-no-now",
+          "title": "Defaults — no start, no now",
+          "description": "Defaults exerciser — intentionally omits `start:` from the roadmap declaration so the layout falls back to today's date (matching the spec: \"renderers choose their own reference date (e.g. the day of rendering)\"), and is rendered without `--now` so the renderer also falls back to today's date for the now-line. The output therefore drifts every day — that's by design. This fixture is NOT a byte-stable snapshot (see `scripts/render-tests.mjs` MANIFEST), it's purely a visual reference that the default-handling code paths still produce a sensible diagram.",
+          "theme": "light",
+          "now": null,
+          "volatile": true,
+          "source": "tests/defaults-no-start-no-now.nowline",
+          "files": [
+            "tests/defaults-no-start-no-now.nowline"
+          ],
+          "svgHash": "913c4fae1e3deef1a7d687cf26ede092acdc066ef0688b3d8d6bd2965d592444",
+          "sourceHash": "7319ab72996a51b1e9a0590efc3d3778d7868fa7ffae6dd9d3925299e1cd09ca"
+        },
+        {
+          "slug": "capacity-items",
+          "title": "Capacity item suffixes",
+          "description": "Fixture exercising item-level `capacity:` suffixes for each shape of `capacity-icon:` value: default multiplier, built-in SVG icons, inline Unicode literal, and a declared custom glyph. Each scenario lives in its own swimlane so items don't chain off-screen and the rendered suffix is easy to compare visually. Lane-level capacity (m7) and the overload underline (m8) come later. Style names avoid the grammar keywords `team`, `person`, and `description` to prevent the lexer from picking them up as declaration keywords (would parse as TeamDeclaration / PersonDecl otherwise). Comments use `//` per the .langium hidden terminal.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/capacity-items.nowline",
+          "files": [
+            "tests/capacity-items.nowline"
+          ],
+          "svgHash": "0a1b91cf14f44c930e6283f4a0e3b1eee3f5609b791126b3880bbbf1af5c0e94",
+          "sourceHash": "e6f51006e5fb9c128333792f4ef663e30db421fa791dac8bb49ba61390aa386e"
+        },
+        {
+          "slug": "capacity-lanes",
+          "title": "Lane capacity badges",
+          "description": "Fixture exercising lane-level `capacity:N` badges in the frame tab. Each lane uses a different `capacity-icon:` so the renderer's full suffix-rendering matrix (text, built-in SVG, inline literal, custom glyph, none) is visible inside the chiclet alongside lanes that also have items declaring item-level capacity. Style names avoid grammar keywords (`team`, `person`, `description`). Lane ids likewise avoid `team`, etc. Comments use `//`.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/capacity-lanes.nowline",
+          "files": [
+            "tests/capacity-lanes.nowline"
+          ],
+          "svgHash": "f7ce9c2e2366cbb9eae25b8d5bbe32541431a7d042d750f36ff236da49795611",
+          "sourceHash": "a2c33041e90fe1f2e8e42724bb70c4438c4bb412be25ee08916e2f201ccc89a8"
+        },
+        {
+          "slug": "size-and-capacity",
+          "title": "Size + capacity demo",
+          "description": "Fixture exercising the size + capacity interaction on items. Each lane shows a single combination so the driver token (size chip or duration literal) and capacity suffix are easy to read on the rendered SVG. Pairs nicely with tests/capacity-items.nowline (capacity glyph variants) and examples/long.nowline (size catalog without capacity). Meta line: one **driver** token only — the `duration:` literal when present, else the size chip. Bar width encodes derived calendar span for sized items without repeating it in text. Then optional owner / remaining, then the capacity suffix — see specs/rendering.md § Item size chip.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/size-and-capacity.nowline",
+          "files": [
+            "tests/size-and-capacity.nowline"
+          ],
+          "svgHash": "4752dd7f914f2ba5d78667634f57aa9ca9930e5d36aaefb3d12bd35032a7a0d9",
+          "sourceHash": "26b8cfa17c3512b9ed9d739bfd480f0e3419f8b26a4640a1acd667904a61f375"
+        },
+        {
+          "slug": "utilization-states",
+          "title": "Lane utilization states",
+          "description": "Fixture exercising the tri-state lane utilization underline (m13). Each lane has `capacity:` declared so the underline paints; the segments along the band's bottom edge map to the lane's per-timestep load against capacity: green — load < `utilization-warn-at` (default 80%) yellow — load in `[warn-at, over-at)` (default warn 80%, over 100%) red — load >= `utilization-over-at` (default 100%) Items use `duration:` literals (not `size:`) so each bar — and therefore each underline segment — is the full lane width and the color band is easy to read at a glance. For a small real-world story (on-call support as a capacity sink) see examples/capacity.nowline. See specs/rendering.md § Lane utilization underline for the full model.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/utilization-states.nowline",
+          "files": [
+            "tests/utilization-states.nowline"
+          ],
+          "svgHash": "da2dc21fc78159a3314db7b4b5d8f671cdbba51cdcfa229d5fcc7a6b145ef173",
+          "sourceHash": "7d745c9a30e44737a814b199af4d35a09fb670b00205c6f92ffe6e73448b95f0"
+        },
+        {
+          "slug": "nested-both-headers",
+          "title": "Bottom Timeline + Minor Grid",
+          "description": "Tall-roadmap readability fixture — exercises the opt-in `timeline-position:both` mirrored bottom date strip and the `minor-grid:true` per-tick faint grid. Several swimlanes keep the canvas tall so scrolling the rendered SVG hides the top strip; the mirrored bottom strip keeps date context visible.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/nested-both-headers.nowline",
+          "files": [
+            "tests/nested-both-headers.nowline"
+          ],
+          "svgHash": "fcafb0ee3f5d1d1097e75f2917badb724c2cdcad0721d961928a51c5d9b0535d",
+          "sourceHash": "2e5a84e233275e02634ceaa37915e7305aee16c9653d80245f9b146c5e10e159"
+        },
+        {
+          "slug": "header-height-xl",
+          "title": "Header height: xl",
+          "description": "Timeline header height fixture (specs/rendering.md § Timeline Scale). `default roadmap header-height:xl` is the tallest bucket: the top and the mirrored bottom tick panels grow to 40 px and keep their date labels vertically centered, and the wave strip, marker row and chart move down by the extra 16 px. `header-height:md` (the default) is the 24 px panel every other fixture draws; compare against header-height-none.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/header-height-xl.nowline",
+          "files": [
+            "tests/header-height-xl.nowline"
+          ],
+          "svgHash": "69a3a74133a34638979e49e6166afb9c5bd9745ee81ec3ff482a27e85543a48a",
+          "sourceHash": "e7a208f879f60940fdbc12351d02e2a7c3cf9850c764ae9da55fb3875099db2c"
+        },
+        {
+          "slug": "header-height-none",
+          "title": "Header height: none",
+          "description": "Timeline header height fixture (specs/rendering.md § Timeline Scale). `default roadmap header-height:none` drops every tick panel, so neither date strip draws even though `timeline-position:both` asks for both. The now-pill, wave strip and marker row stack directly, and the now-line stops at the last swimlane. The validator flags the combination with the warning NL.W0704. Compare against header-height-xl.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/header-height-none.nowline",
+          "files": [
+            "tests/header-height-none.nowline"
+          ],
+          "svgHash": "6bfc35fad6ab9ed6f50dcc3060978666209f1c7094646658b18d315b91127545",
+          "sourceHash": "2a7633864571d11ef1facae3f976f4cb30d2527a37054d0cb46b3398e17f644a"
+        },
+        {
+          "slug": "inline-date-corners",
+          "title": "Inline-date pin corners",
+          "description": "Fixture exercising the inline-date pin glyph (`after:DATE` / `before:DATE`) on every entity type that supports it: items in every decoration-row state, styled groups (chiclet row), and unstyled groups, bracketed parallels, and bare parallels (header band above the box). Each scenario lives in its own swimlane so the glyphs are easy to compare visually. A container's first child bar starts flush with the container's top corners, so no container glyph may sit there: it would be painted over. See specs/dsl.md \"Inline date pins\" and specs/rendering.md \"Inline-date glyph\" for the full contract.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/inline-date-corners.nowline",
+          "files": [
+            "tests/inline-date-corners.nowline"
+          ],
+          "svgHash": "ff68bff6e4c0fa8d2f0b93d48552a48580bf7e2674909acb6835b7fe8313a8ff",
+          "sourceHash": "53955b7b6fa728f2480046e1a0055acf2329e41d32e79b92c55bc47c06d0d2de"
+        },
+        {
+          "slug": "late-row-shifts",
+          "title": "Late row shifts",
+          "description": "Fixture for geometry that must follow a bar when layout moves it down AFTER placing it: when the anchors and milestones need more marker rows than the band was sized for, the band grows and the whole chart moves down. (Retroactive row growth, an item landing back on an earlier row and growing it, went away when rows stopped moving up, specs/true-width-layout.md §3.2; the first lane keeps that shape.) What to look for when rendering this: - First lane: \"Auth refactor\" spills, so \"Next\" and \"Plain thing\" drop to row 1, and every later child stays at or below the one before it. The a -> b arrow must land on \"Next\"'s top edge, the dotted c -> d arrow must leave \"Plain thing\"'s bottom edge and pass behind no bar on its way to \"Next one\" (it used to cross \"Delta\"), and the calendar glyphs on \"Plain thing\", the group's header row and the parallel's header band must sit on their own (moved) boxes. - The \"Ship\" milestone's slack arrow leaves \"Gamma\" (row 2) at its progress strip, not 16px above it. - Marker band: the anchor and the \"Beta\" milestone collide, so the band grows to two rows and everything below it moves down. The `after:` glyph on \"Alpha\" must sit inside Alpha's bar, not above it. - \"Omega\" waits on the code-freeze anchor (it starts two weeks after it), so a dotted stub runs from the anchor's cut line to Omega's start on Omega's (moved) midline.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/late-row-shifts.nowline",
+          "files": [
+            "tests/late-row-shifts.nowline"
+          ],
+          "svgHash": "e24fb5b85652e7ad90d301d35ae5722713fa641c3ec800ae3e45170e1e9eae26",
+          "sourceHash": "8db42e6df8ca0df2190b5bce9c822c528f482b2bddab4d423193990785b7bc90"
+        },
+        {
+          "slug": "marker-predecessor-arrows",
+          "title": "Marker predecessor arrows",
+          "description": "",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/marker-predecessor-arrows.nowline",
+          "files": [
+            "tests/marker-predecessor-arrows.nowline",
+            "tests/marker-predecessor-partner.nowline"
+          ],
+          "svgHash": "d97869dd5a1fc48d26922c5683aec03f0f9649f8fe64bc51ef2c97880be8f5c0",
+          "sourceHash": "31000ee408ca5bc4b51908a07b684f75e552724f7a614e5399bc58d251eb953f"
+        },
+        {
+          "slug": "milestone-overrun",
+          "title": "Milestone overrun",
+          "description": "A dated milestone overrun by an item: Polish ends four weeks past Ship's date, so Ship's line, diamond and label render red, with a red dotted arrow from Polish's end back to the line. UI finishes before Ship and adds no arrow. Review's predecessor ends on time, so Review stays in ink.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/milestone-overrun.nowline",
+          "files": [
+            "tests/milestone-overrun.nowline"
+          ],
+          "svgHash": "aeb55ab55fe86fcaa396a12ab1d7c53c86001bdafb284c3d4c1b53a7d5bb7b51",
+          "sourceHash": "5820cb764a8bf862c783e4e53a343c707827a62af60ab0903b2c1e875828a65c"
+        },
+        {
+          "slug": "waves-empty",
+          "title": "Empty wave",
+          "description": "Wave fixture: an empty wave (no items) between two populated ones. It spans no time, draws as a hollow marker on the shared boundary, shows \"(no items)\" in the legend, and reports NL.I1006.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/waves-empty.nowline",
+          "files": [
+            "tests/waves-empty.nowline"
+          ],
+          "svgHash": "148b98079c7d8d1be24321e740a2ca195ca172706f28419d69b3a7a4f8967c05",
+          "sourceHash": "042cd85419e534b0b8c12c0fae3486173bd97a7392e5fb4fa6f1c081703e274e"
+        },
+        {
+          "slug": "waves-parallel-group",
+          "title": "Parallel and group waves",
+          "description": "Wave fixture: parallel tracks in different waves; an id-only `group api-track wave:w1` and an anonymous `group wave:w2` that assign their children and draw nothing themselves (no bracket, no label); and a titled group that spans a boundary and keeps its bracket.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/waves-parallel-group.nowline",
+          "files": [
+            "tests/waves-parallel-group.nowline"
+          ],
+          "svgHash": "43c44276a6dad8017091911aa720bd80c3dcc6da72c5af259df21959f2096934",
+          "sourceHash": "140dc03f07645dc2ba224bb110e453fb2eb8126324ff97f67719b56402e16d4c"
+        },
+        {
+          "slug": "waves-gap-deadline",
+          "title": "Gaps and deadline",
+          "description": "Wave fixture: start floors that create gaps (an anchor floor and an inline-date floor) and a dated deadline milestone `after:<wave>` that the wave overruns. The inline-date gap shows its gap label (the one-week anchor gap is too narrow for one), plus the red overrun cut line and NL.I1007.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/waves-gap-deadline.nowline",
+          "files": [
+            "tests/waves-gap-deadline.nowline"
+          ],
+          "svgHash": "a642e52b62534e47d648847e7af04ef323b843c6b4d24869ea3fbac7e985a1ab",
+          "sourceHash": "1c351e04ad86cdf204b26d9fe030cdc418440b5e92774bf2a840e2ad3c6e1db7"
+        },
+        {
+          "slug": "waves-isolate",
+          "title": "Isolated region and waves",
+          "description": "Wave fixture: a roadmap:isolate include that takes part in the barrier. Region ids stay private, but the waves are global: pf-scale waits for the region's ios-offline. Child: waves-isolate-team.nowline (same waves).",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/waves-isolate.nowline",
+          "files": [
+            "tests/waves-isolate.nowline",
+            "tests/waves-isolate-team.nowline"
+          ],
+          "svgHash": "20788270ae322bb1bacc374ff77644ea610144aede908cbc197b1294ff494ed7",
+          "sourceHash": "8009233f26f5f141e0b120a5a77dc6e4a926be4547edeed872046609f8c5aac4"
+        },
+        {
+          "slug": "waves-coarse",
+          "title": "Coarse waves",
+          "description": "Wave fixture at coarse scale (scale:1m): seven waves including an empty one, a gap from a start floor, and a styled wave; two stacked marker rows; background work crossing boundaries; and a `group wave:x` on a boundary.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/waves-coarse.nowline",
+          "files": [
+            "tests/waves-coarse.nowline"
+          ],
+          "svgHash": "7fc4e08cd538f6283a686c2b06ad1b2433da3ba334f61a08acbd31cf283039cc",
+          "sourceHash": "63ea21d96e8efef60139ebfd4eb58ea35abed17e0b4826c543c173aa709c627b"
+        },
+        {
+          "slug": "weekends-show",
+          "title": "Weekends shown",
+          "description": "Non-working display fixture (m2p phase 4, specs/working-calendar.md §4.2, §7.3, §10 Example A). `default roadmap non-working:show` draws each weekend of a business calendar as a full-width shaded band, so a week is 7 days wide (56 px at this scale) instead of 5. A bar paints across the band but ends at the end of its last working day, which is what leaves the gap visible. The lanes stress one thing each: - Chained weeks: Example A, four 1w bars with a band between each pair. - Wednesday start: a bar that starts mid-week (`after:` a Wednesday) and crosses a weekend. - Group after Friday: a group that begins after a bar ends on a Friday starts on the next Monday, not inside the weekend. The milestones sit on their own dates: Friday Jan 30 and Saturday Jan 31 (the Saturday one lands inside the last band).",
+          "theme": "light",
+          "now": "2026-01-14",
+          "volatile": false,
+          "source": "tests/weekends-show.nowline",
+          "files": [
+            "tests/weekends-show.nowline"
+          ],
+          "svgHash": "1310f91764b87cf7c8b1b0917dc03cfd2c10292696f2eadf5c54fb646bc7c36f",
+          "sourceHash": "9e3fb378fd782927a511e35a8759500abf51d6f3c7f45788d17c83d2b5a11f24"
+        },
+        {
+          "slug": "non-working-hide",
+          "title": "Named days hidden",
+          "description": "Named non-working days, hidden (m2p phase 5b, specs/working-calendar.md §4, §7.2, §10 Example B). With the default `non-working:hide`, a titled closure is cut out of the time axis and drawn as a labelled seam: a dotted line down from a label in the marker row that names it and counts the working days it removes (\"Thanksgiving · 2d\", \"Company summit · 3d\"). The stressed axis is the labels and their packing: - Thanksgiving: Thu Nov 26 to Fri Nov 27, inside the Checkout bar, which is pushed out by the two days it loses. - Company summit: Wed Dec 9 to Fri Dec 11, inside the Rollout bar. - Launch: a Saturday milestone that hides onto the same x as the Thanksgiving seam, so the label packs onto its own marker row. Only dated, titled, non-working declarations are labelled.",
+          "theme": "light",
+          "now": "2026-11-25",
+          "volatile": false,
+          "source": "tests/non-working-hide.nowline",
+          "files": [
+            "tests/non-working-hide.nowline"
+          ],
+          "svgHash": "231c629693c198e1bf1a310e8fbaab7cc23090faca4cfb7bdcd143cd09273d24",
+          "sourceHash": "b313331934b5552326421866365a6ec640114b00e2b31797c8c1420353919eb2"
+        },
+        {
+          "slug": "non-working-show",
+          "title": "Named days shown",
+          "description": "Named non-working days, shown (m2p phase 5b, specs/working-calendar.md §4, §7.2, §10 Example B). The same body as non-working-hide.nowline, with `default roadmap non-working:show`: each closure is a shaded band at its true width, and its label (\"Thanksgiving · 2d\", \"Company summit · 3d\") sits in the marker row above the band's left edge. The one stressed axis is the view. Compare it with non-working-hide.nowline: there the closures are labelled seams, here they are labelled bands, and Launch (a Saturday milestone) lands on its own date instead of the seam.",
+          "theme": "light",
+          "now": "2026-11-25",
+          "volatile": false,
+          "source": "tests/non-working-show.nowline",
+          "files": [
+            "tests/non-working-show.nowline"
+          ],
+          "svgHash": "a3f22f9aae1e48821e538998980b12674eb87285ddc210987fa3f18e139d1623",
+          "sourceHash": "311c57c4927ce73b6fe7eefbd09fb007c619552b99cc458a20452923a494322c"
+        },
+        {
+          "slug": "working-exceptions",
+          "title": "Working exceptions",
+          "description": "Titled working exceptions (specs/working-calendar.md §4, §7.4, §10 Example D). A titled, dated `working` declaration puts days back into the schedule and is labelled in the marker row with the days it adds (\"Release crunch · +1d\"). The label has no cut line under `hide` and no band under `show`: a working day removes no time. The stressed axis is the working-exception labels: - Release crunch: a working Saturday, Dec 5, one day after the Launch milestone, so the two pack against each other in the marker row. - Crunch weekend: a range over Sat Dec 19 and Sun Dec 20, so `+2d`. - Make-up day: Wed Dec 30 works inside Winter break, which splits the closure into two labelled seams; the make-up label says why. - An untitled working Saturday, Dec 12: the day works, nothing is drawn.",
+          "theme": "light",
+          "now": "2026-12-02",
+          "volatile": false,
+          "source": "tests/working-exceptions.nowline",
+          "files": [
+            "tests/working-exceptions.nowline"
+          ],
+          "svgHash": "1240c01f0e92f572f0f98a6c6a86cda62f9a947b1ee0fd60eb29fef194129719",
+          "sourceHash": "a022917e4943f0f0154f68937fad6ad911d23cfae4c254652d6d0dd80db4f9d6"
+        },
+        {
+          "slug": "marker-left-overflow",
+          "title": "Marker overflow",
+          "description": "Marker labels that fit on neither side of their marker. The chart is one week wide and the header card sits beside it (the default `header-position:beside`), so a long label pinned near the left edge overflows the canvas on the right and runs into the card on the left. The stressed axis is that left fallback: the canvas grows on the right until each label fits there, the way a titled non-working run's label does, so no label lands on the header card. - Kickoff: an anchor on the first day. - Beta: a dated milestone a day later; its label packs onto its own row. - Ready: an after-only milestone at the end of Build.",
+          "theme": "light",
+          "now": "2026-01-07",
+          "volatile": false,
+          "source": "tests/marker-left-overflow.nowline",
+          "files": [
+            "tests/marker-left-overflow.nowline"
+          ],
+          "svgHash": "74a925421a570afb97cd7c50cc480fd82ec93268f18092d168a3479c48ae19ad",
+          "sourceHash": "e9c88df19ea5e699cd10a557a5ae3e10a35453bee44960d57c713a5648c5daeb"
+        },
+        {
+          "slug": "non-working-recurrence",
+          "title": "Summer Fridays",
+          "description": "Narrow-column labels under a bounded recurrence (specs/working-calendar.md §7.2). Summer Fridays take every Friday out from Jul 1 to Aug 31, so each week from Jun 29 to Aug 24 has four working days and its column is 32 px under the default `non-working:hide`, too narrow for a 35 px \"Jun 29\". The stressed axis is the week tick labels: - Inside the recurrence the nine narrowed weeks form one run, so their labels alternate (Jul 06, Jul 20, Aug 03, Aug 17), each one borrowing half of the unlabelled column on either side. Before the fix every label in the run was dropped and the axis was blank for nine weeks. - Juneteenth (Fri Jun 19) narrows one week between two full ones. A lone narrowed week keeps the plain rule: its label is dropped. The recurrence has a title but is not labelled on the chart (only dated declarations are), so the axis is the only place the stretch shows.",
+          "theme": "light",
+          "now": "2026-07-15",
+          "volatile": false,
+          "source": "tests/non-working-recurrence.nowline",
+          "files": [
+            "tests/non-working-recurrence.nowline"
+          ],
+          "svgHash": "b1bde4a4fd4264bec88065650ff185c60f64b3e64600e328a0b92ef512834f75",
+          "sourceHash": "31a00af55244d6f3779e8270be6fef21742e1e4310668dda9aeaaa4481e665e9"
+        },
+        {
+          "slug": "logo-beside",
+          "title": "Logo beside",
+          "description": "Company logo, beside header (specs/rendering.md § Roadmap Header). A 4:1 wordmark (viewBox only) at the default `logo-size:md` draws 144 x 36 px left of the title: the card widens by the logo plus its 12 px gap, the title and author shift right, and the chart starts right of the wider card. Compare against examples/minimal.nowline, which has no logo.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/logo-beside.nowline",
+          "files": [
+            "tests/logo-beside.nowline"
+          ],
+          "svgHash": "08ac4c40f400952cfc2e1218ba8b1c973e5c6ab6947e2645c54ba56fff983fdb",
+          "sourceHash": "4f82610d6b614cd9f467e34c17960742b6e5a5eb1a64ad6a8421bc4d362ec8c6"
+        },
+        {
+          "slug": "logo-above-xl",
+          "title": "Logo above, xl",
+          "description": "Company logo, above header at the largest preset (specs/rendering.md § Company Logo Size Presets). A 512 px square mark scales down to the 72 px `logo-size:xl` slot, which is taller than the 72 px band allows with its 10 px clearance, so the band grows to 92 px, the title and author center vertically beside the logo, and the chart moves down 20 px.",
+          "theme": "light",
+          "now": "2026-02-09",
+          "volatile": false,
+          "source": "tests/logo-above-xl.nowline",
+          "files": [
+            "tests/logo-above-xl.nowline"
+          ],
+          "svgHash": "0213fded7b9e54ab804be5fc5a158e2b22dd13caf61ece9f565975d62f4bc00a",
+          "sourceHash": "6ee653a51ef99035277ce5d0cc2a2e8f8926d72e7c4cd35691e1ef09bce164b8"
+        }
+      ]
+    }
+  ],
+  "baseId": "7edbfc89c32e"
+}

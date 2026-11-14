@@ -1,0 +1,27 @@
+nowline v1
+
+// Named non-working days, shown (m2p phase 5b, specs/working-calendar.md
+// §4, §7.2, §10 Example B). The same body as non-working-hide.nowline, with
+// `default roadmap non-working:show`: each closure is a shaded band at its
+// true width, and its label ("Thanksgiving · 2d", "Company summit · 3d") sits
+// in the marker row above the band's left edge.
+//
+// The one stressed axis is the view. Compare it with non-working-hide.nowline:
+// there the closures are labelled seams, here they are labelled bands, and
+// Launch (a Saturday milestone) lands on its own date instead of the seam.
+
+config
+
+default roadmap non-working:show
+
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
+
+non-working summit "Company summit" start:2026-12-09 end:2026-12-11
+
+roadmap non-working-show "Named days shown" start:2026-11-23 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-11-28
+swimlane a "A"
+  item checkout "Checkout" duration:1w
+  item qa "QA" duration:2d
+  item rollout "Rollout" duration:2w

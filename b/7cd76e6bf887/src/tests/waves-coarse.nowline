@@ -1,0 +1,49 @@
+nowline v1
+
+// Wave fixture at coarse scale (scale:1m): seven waves including an empty
+// one, a gap from a start floor, and a styled wave; two stacked marker rows;
+// background work crossing boundaries; and a `group wave:x` on a boundary.
+
+config
+
+style hardening-style
+  bg: orange
+  fg: red
+  text: navy
+  border: dashed
+
+roadmap waves-coarse "Coarse waves" start:2026-01-05 scale:1m calendar:full
+
+anchor kickoff "Kickoff" date:2026-01-05
+anchor budget "Budget lock" date:2026-03-09
+
+wave discover "Discover"
+wave design "Design"
+wave build "Build"
+wave beta "Beta (TBD)"
+wave harden "Harden" style:hardening-style
+wave launch "Launch" after:2026-11-02
+wave grow "Grow"
+
+swimlane product "Product"
+  item research "Research" duration:2m wave:discover
+  item spec "Spec" duration:2m wave:design
+  item prototype "Prototype" duration:3m wave:build
+  item stabilize "Stabilize" duration:1m wave:harden
+  item go-live "Go live" duration:1m wave:launch
+  item expand "Expand" duration:2m wave:grow
+
+swimlane eng "Engineering"
+  item arch "Architecture" duration:1m wave:discover
+  group wave:build
+    item api "API" duration:2m
+    item ui "UI" duration:1m
+  item perf "Performance" duration:2m wave:harden
+  item rollout "Rollout" duration:2m wave:launch
+
+swimlane ops "Operations"
+  item on-call "On-call" duration:12m
+  item compliance "Compliance review" duration:5m
+
+milestone spec-signed "Spec signed" date:2026-03-16
+milestone beta-cut "Beta cut" after:build

@@ -1,0 +1,16 @@
+nowline v1
+
+// Wave fixture: a roadmap:isolate include that takes part in the barrier.
+// Region ids stay private, but the waves are global: pf-scale waits for the
+// region's ios-offline. Child: waves-isolate-team.nowline (same waves).
+
+include "./waves-isolate-team.nowline" roadmap:isolate
+
+roadmap waves-isolate "Isolated region and waves" start:2026-01-05 scale:1w calendar:full
+
+wave w1 "Wave 1"
+wave w2 "Wave 2"
+
+swimlane platform "Platform"
+  item pf-api "Platform API" duration:2w wave:w1
+  item pf-scale "Scale out" duration:2w wave:w2

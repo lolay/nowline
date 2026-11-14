@@ -1,0 +1,12 @@
+nowline v1
+
+// Lean example: one engineering swimlane with lane capacity, item capacity,
+// and utilization along the band. "On-call support" is 1 of 4 = 25% of
+// the team. For warn/over/segment demos see tests/utilization-states.nowline.
+
+roadmap eng-q1 "Engineering Q1" start:2026-01-05 length:8w
+
+swimlane engineering "Engineering" capacity:4
+  item support       "On-call support" duration:8w capacity:1
+  item auth-refactor "Auth refactor"   duration:3w capacity:2 status:in-progress
+  item search-v2     "Search v2"       duration:2w capacity:2 after:auth-refactor

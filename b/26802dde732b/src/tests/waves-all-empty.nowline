@@ -1,0 +1,19 @@
+nowline v1
+
+// Wave fixture: waves are declared but no item, group or parallel is
+// assigned to any of them. Nothing about waves is drawn (specs/waves.md
+// §9.1): no strip, boundaries, hatch or legend, so it renders as if the
+// wave lines were absent. NL.I1006 names all three waves in one message.
+
+roadmap waves-all-empty "All waves empty" start:2026-01-05 scale:1w
+
+wave discover "Discover"
+wave build "Build and harden the platform for general availability"
+wave launch "Launch"
+
+swimlane a "Lane A"
+  item a1 "Item A1" duration:2w
+  item a2 "Item A2" duration:1w
+
+swimlane b "Lane B"
+  item b1 "Item B1" duration:3w

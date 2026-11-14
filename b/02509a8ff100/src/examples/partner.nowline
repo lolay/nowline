@@ -1,0 +1,9 @@
+nowline v1
+
+roadmap partner "Partner - Vendor plugin roadmap" start:2026-01-05 scale:1w
+
+anchor kickoff date:2026-01-05
+
+swimlane plugin "Plugin"
+  item plugin-alpha "Plugin alpha" duration:4w after:kickoff
+  item plugin-beta "Plugin beta" duration:2w after:plugin-alpha

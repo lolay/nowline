@@ -1,0 +1,35 @@
+nowline v1
+
+// Wave fixture: parallel tracks in different waves; an id-only
+// `group api-track wave:w1` and an anonymous `group wave:w2` that assign
+// their children and draw nothing themselves (no bracket, no label); and a
+// titled group that spans a boundary and keeps its bracket.
+
+roadmap waves-parallel-group "Parallel and group waves" start:2026-01-05 scale:1w
+
+wave w1 "Foundations"
+wave w2 "Features"
+
+swimlane platform "Platform"
+  item kickoff-work "Kickoff" duration:1w wave:w1
+  parallel streams
+    group api-track wave:w1
+      item api-v2 "API v2" duration:2w
+      item api-docs "API docs" duration:1w
+    item sdk-update "SDK update" duration:2w wave:w2
+  item integration "Integration" duration:1w wave:w2
+
+swimlane mobile "Mobile"
+  item mobile-spike "Mobile spike" duration:5w wave:w1
+
+swimlane checkout "Checkout"
+  group checkout-v2 "Checkout v2"
+    item flows "Flows" duration:2w wave:w1
+    item ui "UI" duration:3w wave:w2
+  item polish "Polish" duration:1w wave:w2
+
+swimlane payments "Payments"
+  item vendor-eval "Vendor eval" duration:4w wave:w1
+  group wave:w2
+    item integrate "Integrate" duration:2w
+    item certify "Certify" duration:1w

@@ -1,0 +1,30 @@
+nowline v1
+
+// Narrow-column labels under a bounded recurrence (specs/working-calendar.md
+// §7.2). Summer Fridays take every Friday out from Jul 1 to Aug 31, so each
+// week from Jun 29 to Aug 24 has four working days and its column is 32 px
+// under the default `non-working:hide`, too narrow for a 35 px "Jun 29".
+//
+// The stressed axis is the week tick labels:
+//   - Inside the recurrence the nine narrowed weeks form one run, so their
+//     labels alternate (Jul 06, Jul 20, Aug 03, Aug 17), each one borrowing
+//     half of the unlabelled column on either side. Before the fix every
+//     label in the run was dropped and the axis was blank for nine weeks.
+//   - Juneteenth (Fri Jun 19) narrows one week between two full ones. A lone
+//     narrowed week keeps the plain rule: its label is dropped.
+// The recurrence has a title but is not labelled on the chart (only dated
+// declarations are), so the axis is the only place the stretch shows.
+
+config
+
+non-working juneteenth "Juneteenth" date:2026-06-19
+
+non-working fridays "Summer Fridays" every:fri start:2026-07-01 end:2026-08-31
+
+roadmap non-working-recurrence "Summer Fridays" start:2026-06-01 scale:1w calendar:business
+
+anchor kickoff "Kickoff" date:2026-06-01
+swimlane platform "Platform"
+  item api-v2 "API v2" duration:4w
+  item data-migration "Data migration" duration:6w
+  item hardening "Hardening" duration:4w
