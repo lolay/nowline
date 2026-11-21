@@ -1,0 +1,18 @@
+nowline v1
+
+// Defaults exerciser — intentionally omits `start:` from the roadmap
+// declaration so the layout falls back to today's date (matching the
+// spec: "renderers choose their own reference date (e.g. the day of
+// rendering)"), and is rendered without `--now` so the renderer also
+// falls back to today's date for the now-line. The output therefore
+// drifts every day — that's by design. This fixture is NOT a
+// byte-stable snapshot (see `scripts/render-tests.mjs` MANIFEST), it's
+// purely a visual reference that the default-handling code paths still
+// produce a sensible diagram.
+
+roadmap defaults-no-start-no-now "Defaults — no start, no now" author:"Defaults exerciser"
+
+swimlane engineering "Engineering"
+  item plan "Plan" duration:5w status:done
+  item ship "Ship" duration:5w status:in-progress remaining:50%
+  item run  "Run"  duration:5w status:planned

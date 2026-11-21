@@ -1,0 +1,19 @@
+nowline v1
+
+// Wave fixture: an empty wave (no items) between two populated ones.
+// It spans no time, draws as a hollow marker on the shared boundary, shows
+// "(no items)" in the legend, and reports NL.I1006.
+
+roadmap waves-empty "Empty wave" start:2026-01-05 scale:1w
+
+wave w1 "Wave 1"
+wave w2 "Hardening (TBD)"
+wave w3 "Wave 3"
+
+swimlane a "Lane A"
+  item a1 "Item A1" duration:2w wave:w1
+  item a3 "Item A3" duration:1w wave:w3
+
+swimlane b "Lane B"
+  item b1 "Item B1" duration:1w wave:w1
+  item b3 "Item B3" duration:2w wave:w3
