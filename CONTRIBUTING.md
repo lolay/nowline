@@ -465,11 +465,11 @@ The release cut folds every fragment into a new `## [X.Y.Z] - YYYY-MM-DD` sectio
 4. **Update documentation** — package READMEs, the top-level `README.md`, inline comments, plus a `.changelog/` fragment for any user-observable change (see [Changelog entries](#changelog-entries) above).
 5. **Open a PR** against `main` with:
     - A clear summary of the change.
-    - The motivation (linked issue, bug repro, or design doc).
+    - The motivation: what's true today and what goes wrong, with the linked issue, bug repro, or design doc. Write it for a reader who hasn't followed the issue.
+    - A before and after, when the change needs more than a glance: a small table of inputs or fields, a diagram pair, or screenshots and terminal output if it's user-visible.
     - A short review guide: the review tier and why, and the order to read the diff in. The [PR template](./.github/PULL_REQUEST_TEMPLATE.md) explains the tiers.
     - Validation: what you ran and what you saw.
     - How to roll it back, if a revert isn't the whole story.
-    - Screenshots or terminal output if the change is user-visible.
 6. **Respond to review feedback** with follow-up commits; we squash-merge, so intermediate history doesn't need to be pristine.
 
 For changes touching the language or the published AST JSON schema, please open an issue first so we can discuss the shape before you invest implementation time — these are contracts we want to keep stable.
