@@ -8,9 +8,14 @@ Thanks for opening a PR. A few quick reminders:
 See CONTRIBUTING.md for the full workflow.
 
 The description is a review guide: a reviewer should get the change from the
-part above the first <details> in about 2 minutes, on a phone. Tag each area
-of the diff with what the reviewer should do with it; the PR's tier is the
-highest tag, and when an area could take two tags it takes the deeper one.
+part above the first <details> in about 2 minutes, on a phone, without having
+seen the issue thread, the plan or the session behind it. So say what's true
+today before what changes, give a linked issue's or plan's one-line content
+inline, and use no label the reader would have to look up.
+
+Tag each area of the diff with what the reviewer should do with it; the PR's
+tier is the highest tag, and when an area could take two tags it takes the
+deeper one.
 
 - [study] read every line: DSL syntax, AST JSON, CLI flags, exporter output,
   persisted data, auth or input validation, anything hard to undo.
@@ -20,18 +25,37 @@ highest tag, and when an area could take two tags it takes the deeper one.
 - [skip] trust the tool: generated code, lockfiles, formatter passes (name it).
 
 Drop any section or tier with nothing to say. A [skim] or [skip] PR keeps the
-Review tier and Review time lines and can drop the rest of the guide.
+Review tier and Review time lines and can drop Before and after and the rest
+of the guide. A [study] or [check] PR keeps Before and after, as
+"None: <reason>" when there's nothing to show.
 -->
 
 ## Summary
 
-<!-- What does this change do, in one or two sentences? -->
+<!-- What does this change do, in one or two sentences? If the PR carries two changes, the title names both, or the deeper one. -->
 
 ## Motivation
 
-<!-- Why is this change needed? Link the issue, bug repro, or design doc. -->
+<!-- What's true today, and what goes wrong or is missing? Link the issue, bug repro, or design doc, and say here what it says: a link alone isn't the motivation. -->
 
 Closes #
+
+## Before and after
+
+<!--
+The one view that explains the change, taken from the base commit and from this branch:
+
+- Behavior for given input (a DSL construct, a CLI flag, an MCP tool input, a diagnostic): a table, one row per input or case.
+- A contract (AST JSON, a package's exports, a config key): a table, one row per field.
+- Control flow between packages: a Mermaid pair with the same node names.
+- A user-visible change (renderer, CLI output, error messages): before/after output. A renderer change follows AGENTS.md "Visual changes": before/after renders with the `.nowline` lines that draw them. Same-repo PRs also get a review.nowline.dev build to link.
+
+Further views go in the collapsible blocks below.
+-->
+
+| <what> | Before | After |
+| --- | --- | --- |
+| <input, field or case> | | |
 
 ## Review guide
 
@@ -39,9 +63,9 @@ Review tier: [check], because <reason>.
 Blast radius: <who or what breaks if it's wrong; how reversible>.
 Review time: ~N min
 
-<!-- Reading order: contracts and the tests that define new behavior first. Link each path to its diff. -->
+<!-- Reading order: contracts and the tests that define new behavior first. One line per area, saying what to confirm there, not what the diff contains. Link each path to its diff. -->
 
-1. [check] `path`: <what to look at>
+1. [check] `path`: <what to confirm there>
 2. [skim] `path`
 
 ## Validation
@@ -59,20 +83,13 @@ Each check you ran with its result, and each one that applies but didn't run, wi
 
 <!-- How to undo it: revert the squash commit, plus anything a revert doesn't undo (a published package, a migrated file). -->
 
-## Screenshots / terminal output
-
-<!--
-If the change is user-visible (renderer, CLI output, error messages), include before/after. Delete this section if not applicable.
-A renderer change follows AGENTS.md "Visual changes": before/after renders with the `.nowline` lines that draw them. Same-repo PRs also get a review.nowline.dev build to link.
--->
-
 <!--
 One collapsible block per tier present, deepest first; [study] starts open. Keep the blank line after <summary> or the Markdown inside won't render.
 
 <details>
 <summary>[check] Control flow and error handling</summary>
 
-<before/after: contracts table, Mermaid diagram, data, error handling>
+<further before/after: contracts table, Mermaid diagram, data, error handling>
 
 </details>
 
