@@ -1,0 +1,18 @@
+nowline v1
+
+// A dated milestone overrun by an item: Polish ends four weeks past Ship's
+// date, so Ship's line, diamond and label render red, with a red dotted
+// arrow from Polish's end back to the line. UI finishes before Ship and adds
+// no arrow. Review's predecessor ends on time, so Review stays in ink.
+
+roadmap milestone-overrun "Milestone overrun" start:2026-01-05 scale:1w
+
+swimlane core "Core"
+  item build "Build" duration:6w
+  item polish "Polish" duration:3w after:build
+
+swimlane web "Web"
+  item ui "UI" duration:3w
+
+milestone review "Review" date:2026-02-23 after:build
+milestone ship "Ship" date:2026-02-02 after:[polish, ui]

@@ -1,0 +1,29 @@
+nowline v1
+
+// Named non-working days, hidden (m2p phase 5b, specs/working-calendar.md
+// §4, §7.2, §10 Example B). With the default `non-working:hide`, a titled
+// closure is cut out of the time axis and drawn as a labelled seam: a dotted
+// line down from a label in the marker row that names it and counts the
+// working days it removes ("Thanksgiving · 2d", "Company summit · 3d").
+//
+// The stressed axis is the labels and their packing:
+//   - Thanksgiving: Thu Nov 26 to Fri Nov 27, inside the Checkout bar, which
+//     is pushed out by the two days it loses.
+//   - Company summit: Wed Dec 9 to Fri Dec 11, inside the Rollout bar.
+//   - Launch: a Saturday milestone that hides onto the same x as the
+//     Thanksgiving seam, so the label packs onto its own marker row.
+// Only dated, titled, non-working declarations are labelled.
+
+config
+
+non-working thanksgiving "Thanksgiving" start:2026-11-26 end:2026-11-27
+
+non-working summit "Company summit" start:2026-12-09 end:2026-12-11
+
+roadmap non-working-hide "Named days hidden" start:2026-11-23 scale:1w calendar:business
+
+milestone launch "Launch" date:2026-11-28
+swimlane a "A"
+  item checkout "Checkout" duration:1w
+  item qa "QA" duration:2d
+  item rollout "Rollout" duration:2w

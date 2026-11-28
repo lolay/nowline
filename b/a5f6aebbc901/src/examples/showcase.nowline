@@ -1,0 +1,21 @@
+nowline v1
+
+roadmap showcase "Nowline Showcase" start:2026-01-05 scale:1m author:"Nowline"
+
+anchor kickoff date:2026-01-05
+
+swimlane engineering "Engineering"
+  item design "Design spec" duration:2w after:kickoff status:done
+  parallel after:design
+    group build "Build"
+      item api "API surface" duration:3w status:in-progress remaining:1w
+      item ui "Web client" duration:3w status:in-progress remaining:2w
+    item integrate "Integration tests" duration:2w
+  item ship "Ship" duration:1w after:integrate
+
+swimlane marketing "Marketing"
+  item brief "Launch brief" duration:1w after:kickoff status:done
+  item assets "Launch assets" duration:3w after:brief
+  item announce "Announcement" duration:1w after:ship
+
+milestone launch "Launch" after:[ship, announce]

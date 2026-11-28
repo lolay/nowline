@@ -1,0 +1,13 @@
+nowline v1
+
+// Child of examples/waves-program.nowline. Re-declares the program's waves
+// (floor included) so it renders on its own; the root checks they agree.
+
+roadmap api-plan "API" start:2026-01-05 scale:1w calendar:full
+
+wave plan "Plan"
+wave execute "Execute" after:2026-02-02
+
+swimlane api "API"
+  item api-design "API design" duration:3w wave:plan
+  item api-build "API build" duration:4w wave:execute

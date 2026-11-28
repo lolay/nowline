@@ -1,0 +1,16 @@
+nowline v1
+
+include "./partner.nowline" roadmap:isolate
+
+roadmap primary-release "Primary Release" author:"Core + Integrations + isolated partner include" start:2026-01-05 scale:1w
+
+anchor kickoff date:2026-01-05
+
+swimlane core "Core"
+  item core-api "Core API" duration:3w after:kickoff
+  item migrations "Migrations" duration:2w after:core-api
+
+swimlane integrations "Integrations"
+  item bridge "Partner bridge" duration:2w after:migrations
+
+milestone ga "GA" after:bridge
